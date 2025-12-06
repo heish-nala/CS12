@@ -113,5 +113,3 @@ export async function POST(request: NextRequest) {
     }
 }
 
-// Export mockTeamMembers for use in other routes
-export { mockTeamMembers };
