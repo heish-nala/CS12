@@ -1,26 +1,366 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-notion);
+  --font-mono: var(--font-notion-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  /* Notion Typography */
+  --font-notion: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
+  --font-notion-mono: "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace;
+
+  /* Notion Radius - very subtle */
+  --radius: 3px;
+
+  /* ===== NOTION LIGHT MODE ===== */
+  /* Primary text and backgrounds */
+  --background: #ffffff;
+  --foreground: rgb(55, 53, 47);
+
+  /* Card/Surface colors */
+  --card: #ffffff;
+  --card-foreground: rgb(55, 53, 47);
+
+  /* Popover/Dropdown */
+  --popover: #ffffff;
+  --popover-foreground: rgb(55, 53, 47);
+
+  /* Primary action color - Notion blue */
+  --primary: rgb(35, 131, 226);
+  --primary-foreground: #ffffff;
+
+  /* Secondary - subtle gray */
+  --secondary: rgba(55, 53, 47, 0.06);
+  --secondary-foreground: rgb(55, 53, 47);
+
+  /* Muted text and backgrounds */
+  --muted: rgba(55, 53, 47, 0.03);
+  --muted-foreground: rgba(55, 53, 47, 0.65);
+
+  /* Accent for hover states */
+  --accent: rgba(55, 53, 47, 0.08);
+  --accent-foreground: rgb(55, 53, 47);
+
+  /* Destructive/Error - Notion red */
+  --destructive: rgb(235, 87, 87);
+  --destructive-foreground: #ffffff;
+
+  /* Borders and inputs */
+  --border: rgba(55, 53, 47, 0.09);
+  --input: rgba(55, 53, 47, 0.09);
+  --ring: rgb(35, 131, 226);
+
+  /* Notion Chart Colors */
+  --chart-1: rgb(35, 131, 226);   /* Blue */
+  --chart-2: rgb(235, 87, 87);    /* Red */
+  --chart-3: rgb(223, 171, 1);    /* Yellow */
+  --chart-4: rgb(120, 119, 116);  /* Gray */
+  --chart-5: rgb(15, 123, 108);   /* Green */
+
+  /* Sidebar - Notion's subtle off-white */
+  --sidebar: rgb(251, 251, 250);
+  --sidebar-foreground: rgb(55, 53, 47);
+  --sidebar-primary: rgb(35, 131, 226);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(55, 53, 47, 0.08);
+  --sidebar-accent-foreground: rgb(55, 53, 47);
+  --sidebar-border: rgba(55, 53, 47, 0.09);
+  --sidebar-ring: rgb(35, 131, 226);
+
+  /* Notion Tag/Status Colors */
+  --notion-default: rgba(206, 205, 202, 0.5);
+  --notion-gray: rgba(155, 154, 151, 0.4);
+  --notion-brown: rgba(140, 46, 0, 0.2);
+  --notion-orange: rgba(245, 93, 0, 0.2);
+  --notion-yellow: rgba(233, 168, 0, 0.2);
+  --notion-green: rgba(0, 135, 107, 0.2);
+  --notion-blue: rgba(0, 120, 223, 0.2);
+  --notion-purple: rgba(103, 36, 222, 0.2);
+  --notion-pink: rgba(221, 0, 129, 0.2);
+  --notion-red: rgba(255, 0, 26, 0.2);
+
+  /* Notion Tag Text Colors */
+  --notion-default-text: rgb(55, 53, 47);
+  --notion-gray-text: rgb(120, 119, 116);
+  --notion-brown-text: rgb(159, 107, 83);
+  --notion-orange-text: rgb(217, 115, 13);
+  --notion-yellow-text: rgb(203, 145, 47);
+  --notion-green-text: rgb(68, 131, 97);
+  --notion-blue-text: rgb(51, 126, 169);
+  --notion-purple-text: rgb(144, 101, 176);
+  --notion-pink-text: rgb(193, 76, 138);
+  --notion-red-text: rgb(212, 76, 71);
+
+  /* Notion Solid/Dot Colors (for color pickers) */
+  --notion-default-solid: rgb(145, 145, 142);
+  --notion-gray-solid: rgb(120, 119, 116);
+  --notion-brown-solid: rgb(159, 107, 83);
+  --notion-orange-solid: rgb(217, 115, 13);
+  --notion-yellow-solid: rgb(203, 145, 47);
+  --notion-green-solid: rgb(68, 131, 97);
+  --notion-blue-solid: rgb(51, 126, 169);
+  --notion-purple-solid: rgb(144, 101, 176);
+  --notion-pink-solid: rgb(193, 76, 138);
+  --notion-red-solid: rgb(212, 76, 71);
+}
+
+.dark {
+  /* ===== NOTION DARK MODE ===== */
+  --background: rgb(25, 25, 25);
+  --foreground: rgba(255, 255, 255, 0.9);
+
+  --card: rgb(32, 32, 32);
+  --card-foreground: rgba(255, 255, 255, 0.9);
+
+  --popover: rgb(37, 37, 37);
+  --popover-foreground: rgba(255, 255, 255, 0.9);
+
+  --primary: rgb(35, 131, 226);
+  --primary-foreground: #ffffff;
+
+  --secondary: rgba(255, 255, 255, 0.055);
+  --secondary-foreground: rgba(255, 255, 255, 0.9);
+
+  --muted: rgba(255, 255, 255, 0.03);
+  --muted-foreground: rgba(255, 255, 255, 0.5);
+
+  --accent: rgba(255, 255, 255, 0.08);
+  --accent-foreground: rgba(255, 255, 255, 0.9);
+
+  --destructive: rgb(235, 87, 87);
+  --destructive-foreground: #ffffff;
+
+  --border: rgba(255, 255, 255, 0.09);
+  --input: rgba(255, 255, 255, 0.09);
+  --ring: rgb(35, 131, 226);
+
+  --chart-1: rgb(35, 131, 226);
+  --chart-2: rgb(235, 87, 87);
+  --chart-3: rgb(223, 171, 1);
+  --chart-4: rgb(155, 154, 151);
+  --chart-5: rgb(15, 123, 108);
+
+  --sidebar: rgb(32, 32, 32);
+  --sidebar-foreground: rgba(255, 255, 255, 0.9);
+  --sidebar-primary: rgb(35, 131, 226);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(255, 255, 255, 0.08);
+  --sidebar-accent-foreground: rgba(255, 255, 255, 0.9);
+  --sidebar-border: rgba(255, 255, 255, 0.09);
+  --sidebar-ring: rgb(35, 131, 226);
+
+  /* Notion Dark Mode Tag Colors */
+  --notion-default: rgba(206, 205, 202, 0.3);
+  --notion-gray: rgba(155, 154, 151, 0.3);
+  --notion-brown: rgba(140, 46, 0, 0.3);
+  --notion-orange: rgba(245, 93, 0, 0.3);
+  --notion-yellow: rgba(233, 168, 0, 0.3);
+  --notion-green: rgba(0, 135, 107, 0.3);
+  --notion-blue: rgba(0, 120, 223, 0.3);
+  --notion-purple: rgba(103, 36, 222, 0.3);
+  --notion-pink: rgba(221, 0, 129, 0.3);
+  --notion-red: rgba(255, 0, 26, 0.3);
+
+  /* Notion Dark Mode Solid/Dot Colors */
+  --notion-default-solid: rgb(155, 154, 151);
+  --notion-gray-solid: rgb(145, 145, 142);
+  --notion-brown-solid: rgb(186, 133, 111);
+  --notion-orange-solid: rgb(245, 93, 0);
+  --notion-yellow-solid: rgb(233, 168, 0);
+  --notion-green-solid: rgb(0, 166, 125);
+  --notion-blue-solid: rgb(0, 120, 223);
+  --notion-purple-solid: rgb(144, 101, 176);
+  --notion-pink-solid: rgb(221, 0, 129);
+  --notion-red-solid: rgb(255, 0, 26);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-notion);
+    font-feature-settings: "kern" 1;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Notion-style focus outline */
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--ring), 0 0 0 4px rgba(35, 131, 226, 0.15);
+  }
+
+  /* Notion-style selection */
+  ::selection {
+    background: rgba(35, 131, 226, 0.3);
+  }
+
+  /* Notion-style scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(55, 53, 47, 0.16);
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(55, 53, 47, 0.32);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.32);
+    border: 2px solid transparent;
+    background-clip: padding-box;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Notion Typography Utilities */
+@layer utilities {
+  /* Notion heading styles */
+  .notion-h1 {
+    @apply text-[40px] font-bold leading-[1.2] tracking-[-0.01em];
+  }
+
+  .notion-h2 {
+    @apply text-[30px] font-semibold leading-[1.3] tracking-[-0.01em];
+  }
+
+  .notion-h3 {
+    @apply text-[24px] font-semibold leading-[1.3];
+  }
+
+  .notion-h4 {
+    @apply text-[20px] font-medium leading-[1.4];
+  }
+
+  /* Notion text styles */
+  .notion-text {
+    @apply text-[15px] leading-[1.5] tracking-[0.01em];
+  }
+
+  .notion-text-sm {
+    @apply text-[14px] leading-[1.5];
+  }
+
+  .notion-text-xs {
+    @apply text-[12px] leading-[1.4];
+  }
+
+  /* Notion label/caption */
+  .notion-label {
+    @apply text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground;
+  }
+
+  /* Notion hover state - used throughout the app */
+  .notion-hover {
+    @apply transition-colors duration-100;
+  }
+
+  .notion-hover:hover {
+    @apply bg-accent;
+  }
+
+  /* Notion clickable item */
+  .notion-clickable {
+    @apply cursor-pointer transition-all duration-75 rounded-[3px];
+  }
+
+  .notion-clickable:hover {
+    @apply bg-accent;
+  }
+
+  .notion-clickable:active {
+    @apply bg-accent/80 scale-[0.99];
+  }
+
+  /* Notion page container */
+  .notion-page {
+    @apply max-w-[900px] mx-auto px-24;
+  }
+
+  /* Notion inline code */
+  .notion-code {
+    @apply font-mono text-[85%] px-[0.4em] py-[0.2em] rounded-[3px] bg-secondary;
+  }
+
+  /* Notion divider */
+  .notion-divider {
+    @apply w-full h-px bg-border my-4;
+  }
+
+  /* Notion tag/badge styles */
+  .notion-tag {
+    @apply inline-flex items-center px-[6px] py-[2px] rounded-[3px] text-[12px] font-normal;
+  }
+
+  .notion-tag-default { background: var(--notion-default); color: var(--notion-default-text); }
+  .notion-tag-gray { background: var(--notion-gray); color: var(--notion-gray-text); }
+  .notion-tag-brown { background: var(--notion-brown); color: var(--notion-brown-text); }
+  .notion-tag-orange { background: var(--notion-orange); color: var(--notion-orange-text); }
+  .notion-tag-yellow { background: var(--notion-yellow); color: var(--notion-yellow-text); }
+  .notion-tag-green { background: var(--notion-green); color: var(--notion-green-text); }
+  .notion-tag-blue { background: var(--notion-blue); color: var(--notion-blue-text); }
+  .notion-tag-purple { background: var(--notion-purple); color: var(--notion-purple-text); }
+  .notion-tag-pink { background: var(--notion-pink); color: var(--notion-pink-text); }
+  .notion-tag-red { background: var(--notion-red); color: var(--notion-red-text); }
 }

@@ -1,0 +1,136 @@
+import { NextRequest, NextResponse } from 'next/server';
+import {
+    getOverviewWidgetsByClient,
+    createOverviewWidget,
+    getDataTablesByClient,
+    getColumnsByTable,
+    calculateAggregation,
+    calculateChartData,
+    getAggregatableColumns,
+    getChartableColumns,
+    initializeAttendeeTracker,
+} from '@/lib/mock-data';
+import { OverviewMetricCard, OverviewChartWidget } from '@/lib/db/types';
+
+export async function GET(request: NextRequest) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const clientId = searchParams.get('client_id');
+
+        if (!clientId) {
+            return NextResponse.json(
+                { error: 'client_id is required' },
+                { status: 400 }
+            );
+        }
+
+        // Initialize data tables if needed
+        initializeAttendeeTracker(clientId);
+
+        const widgets = getOverviewWidgetsByClient(clientId);
+
+        // Calculate values for each widget
+        const widgetsWithValues = widgets.map(widget => {
+            if (widget.type === 'metric_card') {
+                const config = widget.config as OverviewMetricCard['config'];
+                const computed_value = calculateAggregation(
+                    config.table_id,
+                    config.column_id,
+                    config.aggregation
+                );
+                return { ...widget, computed_value };
+            } else if (widget.type === 'chart') {
+                const config = widget.config as OverviewChartWidget['config'];
+                const computed_data = calculateChartData(
+                    config.table_id,
+                    config.column_id
+                );
+                return { ...widget, computed_data };
+            }
+            return widget;
+        });
+
+        return NextResponse.json({ widgets: widgetsWithValues });
+    } catch (error) {
+        console.error('Error fetching overview widgets:', error);
+        return NextResponse.json(
+            { error: 'Internal server error' },
+            { status: 500 }
+        );
+    }
+}
+
+export async function POST(request: NextRequest) {
+    try {
+        const body = await request.json();
+        const { client_id, type, label, config } = body;
+
+        if (!client_id) {
+            return NextResponse.json(
+                { error: 'client_id is required' },
+                { status: 400 }
+            );
+        }
+
+        if (!type || !['metric_card', 'chart'].includes(type)) {
+            return NextResponse.json(
+                { error: 'type must be "metric_card" or "chart"' },
+                { status: 400 }
+            );
+        }
+
+        if (!label) {
+            return NextResponse.json(
+                { error: 'label is required' },
+                { status: 400 }
+            );
+        }
+
+        if (!config || !config.table_id || !config.column_id) {
+            return NextResponse.json(
+                { error: 'config with table_id and column_id is required' },
+                { status: 400 }
+            );
+        }
+
+        if (type === 'metric_card' && !config.aggregation) {
+            return NextResponse.json(
+                { error: 'aggregation is required for metric_card' },
+                { status: 400 }
+            );
+        }
+
+        if (type === 'chart' && !config.chart_type) {
+            return NextResponse.json(
+                { error: 'chart_type is required for chart widget' },
+                { status: 400 }
+            );
+        }
+
+        const widget = createOverviewWidget(client_id, type, label, config);
+
+        // Calculate value for the new widget
+        if (widget.type === 'metric_card') {
+            const widgetConfig = widget.config as OverviewMetricCard['config'];
+            const computed_value = calculateAggregation(
+                widgetConfig.table_id,
+                widgetConfig.column_id,
+                widgetConfig.aggregation
+            );
+            return NextResponse.json({ widget: { ...widget, computed_value } }, { status: 201 });
+        } else {
+            const widgetConfig = widget.config as OverviewChartWidget['config'];
+            const computed_data = calculateChartData(
+                widgetConfig.table_id,
+                widgetConfig.column_id
+            );
+            return NextResponse.json({ widget: { ...widget, computed_data } }, { status: 201 });
+        }
+    } catch (error) {
+        console.error('Error creating overview widget:', error);
+        return NextResponse.json(
+            { error: 'Internal server error' },
+            { status: 500 }
+        );
+    }
+}
