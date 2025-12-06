@@ -40,13 +40,12 @@ export function CreateClientDialog({
         setLoading(true);
 
         try {
-            // TODO: Replace with actual API call
-            const response = await fetch('/api/clients', {
+            const response = await fetch('/api/dsos', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(formData),
+                body: JSON.stringify({ name: formData.name }),
             });
 
             if (!response.ok) {
@@ -68,8 +67,8 @@ export function CreateClientDialog({
             onOpenChange(false);
 
             // Navigate to the new client page
-            if (data.client?.id) {
-                router.push(`/clients/${data.client.id}`);
+            if (data.dso?.id) {
+                router.push(`/clients/${data.dso.id}`);
             }
         } catch (error) {
             console.error('Error creating client:', error);

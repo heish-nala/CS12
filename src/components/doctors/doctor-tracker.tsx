@@ -117,17 +117,27 @@ export function DoctorTracker({ dsoId }: DoctorTrackerProps) {
     };
 
     const updateDoctorField = async (doctorId: string, field: string, value: string) => {
-        try {
-            // TODO: Replace with actual API call
-            await new Promise(resolve => setTimeout(resolve, 500));
+        // Optimistically update the UI first
+        const previousDoctors = [...doctors];
+        setDoctors(doctors.map(d =>
+            d.id === doctorId ? { ...d, [field]: value } : d
+        ));
 
-            // Optimistically update the UI
-            setDoctors(doctors.map(d =>
-                d.id === doctorId ? { ...d, [field]: value } : d
-            ));
+        try {
+            const response = await fetch(`/api/doctors/${doctorId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [field]: value }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update doctor');
+            }
 
             toast.success('Doctor updated successfully');
         } catch (error) {
+            // Revert on error
+            setDoctors(previousDoctors);
             console.error('Error updating doctor:', error);
             toast.error('Failed to update doctor');
             throw error;
@@ -135,30 +145,20 @@ export function DoctorTracker({ dsoId }: DoctorTrackerProps) {
     };
 
     const updateCustomField = async (doctorId: string, columnId: string, value: any) => {
-        try {
-            // TODO: Replace with actual API call
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Optimistically update the UI
-            setDoctors(doctors.map(d => {
-                if (d.id === doctorId) {
-                    return {
-                        ...d,
-                        custom_fields: {
-                            ...(d.custom_fields || {}),
-                            [columnId]: value,
-                        },
-                    };
-                }
-                return d;
-            }));
-
-            toast.success('Field updated successfully');
-        } catch (error) {
-            console.error('Error updating custom field:', error);
-            toast.error('Failed to update field');
-            throw error;
-        }
+        // Custom fields are stored in local state only (columns defined in localStorage)
+        setDoctors(doctors.map(d => {
+            if (d.id === doctorId) {
+                return {
+                    ...d,
+                    custom_fields: {
+                        ...(d.custom_fields || {}),
+                        [columnId]: value,
+                    },
+                };
+            }
+            return d;
+        }));
+        toast.success('Field updated');
     };
 
     const getRiskBadge = (riskLevel?: RiskLevel) => {
