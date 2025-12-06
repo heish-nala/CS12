@@ -7,12 +7,14 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { CreateClientDialog } from '@/components/clients/create-client-dialog';
 import { SearchCommand } from '@/components/layout/search-command';
+import { useAuth } from '@/contexts/auth-context';
 import {
     Home,
     Users,
     Settings,
     Plus,
     Search,
+    LogOut,
 } from 'lucide-react';
 
 interface SidebarItemProps {
@@ -44,8 +46,12 @@ function SidebarItem({ href, icon, label, isActive }: SidebarItemProps) {
 
 export function NotionSidebar() {
     const pathname = usePathname();
+    const { user, signOut } = useAuth();
     const [createClientOpen, setCreateClientOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
+
+    const userEmail = user?.email || '';
+    const userInitial = userEmail.charAt(0).toUpperCase() || 'U';
 
     return (
         <div className="fixed left-0 top-0 w-60 border-r border-border bg-sidebar flex flex-col h-screen">
@@ -126,13 +132,22 @@ export function NotionSidebar() {
 
             {/* Footer - User Profile */}
             <div className="px-2 py-2 border-t border-border">
-                <div className="flex items-center gap-2 px-2 py-1.5 rounded-[3px] hover:bg-accent transition-colors duration-75 cursor-pointer">
+                <div className="flex items-center gap-2 px-2 py-1.5 rounded-[3px] hover:bg-accent transition-colors duration-75">
                     <div className="w-5 h-5 rounded-[3px] bg-[var(--notion-orange)] flex items-center justify-center text-[var(--notion-orange-text)] text-[10px] font-semibold">
-                        A
+                        {userInitial}
                     </div>
                     <div className="flex-1 min-w-0">
-                        <div className="text-[13px] font-medium text-foreground truncate">Alan</div>
+                        <div className="text-[13px] font-medium text-foreground truncate">{userEmail}</div>
                     </div>
+                    <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="h-6 w-6 p-0 hover:bg-accent rounded-[3px]"
+                        onClick={() => signOut()}
+                        title="Sign out"
+                    >
+                        <LogOut className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Button>
                 </div>
             </div>
 

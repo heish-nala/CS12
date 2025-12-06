@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
-import { NotionSidebar } from "@/components/layout/notion-sidebar";
+import { AuthProvider } from "@/contexts/auth-context";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { AppShell } from "@/components/layout/app-shell";
 
 export const metadata: Metadata = {
     title: "Konekt - Customer Success Platform",
@@ -16,10 +18,11 @@ export default function RootLayout({
     return (
         <html lang="en">
             <body className="antialiased">
-                <div className="min-h-screen bg-background">
-                    <NotionSidebar />
-                    <main className="ml-60 overflow-y-auto">{children}</main>
-                </div>
+                <AuthProvider>
+                    <AuthGuard>
+                        <AppShell>{children}</AppShell>
+                    </AuthGuard>
+                </AuthProvider>
                 <Toaster />
             </body>
         </html>
