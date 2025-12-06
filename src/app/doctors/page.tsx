@@ -1,17 +1,7 @@
-'use client';
-
 import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { DoctorTracker } from '@/components/doctors/doctor-tracker';
+import { DoctorsContent } from './doctors-content';
 
 export const dynamic = 'force-dynamic';
-
-function DoctorsContent() {
-    const searchParams = useSearchParams();
-    const dsoId = searchParams.get('dso_id') || undefined;
-
-    return <DoctorTracker dsoId={dsoId} />;
-}
 
 export default function DoctorsPage() {
     return (
