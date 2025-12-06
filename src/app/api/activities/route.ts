@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { mockActivities, getActivitiesByDoctor } from '@/lib/mock-data';
-import { Activity } from '@/lib/db/types';
+import { supabase } from '@/lib/db/client';
 
 export async function GET(request: NextRequest) {
     try {
@@ -8,21 +7,21 @@ export async function GET(request: NextRequest) {
         const doctorId = searchParams.get('doctor_id');
         const limit = parseInt(searchParams.get('limit') || '100');
 
-        let activities = [...mockActivities];
+        let query = supabase
+            .from('activities')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(limit);
 
         if (doctorId) {
-            activities = getActivitiesByDoctor(doctorId);
+            query = query.eq('doctor_id', doctorId);
         }
 
-        // Sort by created_at descending
-        activities.sort((a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
+        const { data: activities, error } = await query;
 
-        // Apply limit
-        activities = activities.slice(0, limit);
+        if (error) throw error;
 
-        return NextResponse.json(activities);
+        return NextResponse.json(activities || []);
     } catch (error) {
         console.error('Error fetching activities:', error);
         return NextResponse.json(
@@ -54,23 +53,24 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const newActivity: Activity = {
-            id: String(mockActivities.length + 1),
-            doctor_id: doctor_id || '',
-            activity_type,
-            description,
-            outcome,
-            contact_name,
-            contact_email,
-            contact_phone,
-            created_by: created_by || 'current-user',
-            created_at: new Date().toISOString(),
-        };
+        const { data, error } = await supabase
+            .from('activities')
+            .insert({
+                doctor_id: doctor_id || null,
+                activity_type,
+                description,
+                outcome,
+                contact_name,
+                contact_email,
+                contact_phone,
+                created_by: created_by || 'current-user',
+            })
+            .select()
+            .single();
 
-        // Add to mock data (in-memory, will reset on server restart)
-        mockActivities.unshift(newActivity);
+        if (error) throw error;
 
-        return NextResponse.json(newActivity, { status: 201 });
+        return NextResponse.json(data, { status: 201 });
     } catch (error) {
         console.error('Error creating activity:', error);
         return NextResponse.json(

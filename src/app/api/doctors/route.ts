@@ -1,15 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { supabase } from '@/lib/db/client';
 import { calculateRiskLevel, getDaysSinceActivity } from '@/lib/calculations/risk-level';
-import {
-    mockDoctors,
-    mockDSOs,
-    getDoctorsByDSO,
-    getDoctorsByStatus,
-    searchDoctors,
-    getPeriodProgressByDoctor,
-    getLastActivityByDoctor,
-    getDSOById
-} from '@/lib/mock-data';
 
 export async function GET(request: NextRequest) {
     try {
@@ -18,48 +9,58 @@ export async function GET(request: NextRequest) {
         const status = searchParams.get('status');
         const search = searchParams.get('search');
 
-        // Filter doctors based on query parameters
-        let doctors = [...mockDoctors];
+        // Build query
+        let query = supabase
+            .from('doctors')
+            .select(`
+                *,
+                dso:dsos(*),
+                period_progress(*),
+                activities(*)
+            `)
+            .order('created_at', { ascending: false });
 
         if (dsoId) {
-            doctors = getDoctorsByDSO(dsoId);
+            query = query.eq('dso_id', dsoId);
         }
 
         if (status) {
-            doctors = doctors.filter(d => d.status === status);
+            query = query.eq('status', status);
         }
 
         if (search) {
-            doctors = searchDoctors(search);
+            query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
         }
 
-        // Enrich doctors with computed fields and DSO data
-        const enrichedDoctors = doctors.map((doctor) => {
-            const dso = getDSOById(doctor.dso_id);
-            const periodProgress = getPeriodProgressByDoctor(doctor.id);
-            const lastActivity = getLastActivityByDoctor(doctor.id);
+        const { data: doctors, error } = await query;
+
+        if (error) throw error;
+
+        // Enrich doctors with computed fields
+        const enrichedDoctors = (doctors || []).map((doctor) => {
+            const periodProgress = doctor.period_progress || [];
+            const activities = doctor.activities || [];
+            const lastActivity = activities.length > 0
+                ? activities.sort((a: { created_at: string }, b: { created_at: string }) =>
+                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                  )[0]
+                : null;
 
             // Calculate course progress percentage (based on 12-month program)
             const maxPeriod = periodProgress.length > 0
-                ? Math.max(...periodProgress.map(p => p.period_number))
+                ? Math.max(...periodProgress.map((p: { period_number: number }) => p.period_number))
                 : 0;
             const courseProgressPercent = Math.round((maxPeriod / 12) * 100);
 
             return {
                 ...doctor,
-                dso,
                 risk_level: calculateRiskLevel(doctor, periodProgress, lastActivity),
                 days_since_activity: getDaysSinceActivity(lastActivity),
-                total_cases: periodProgress.reduce((sum, p) => sum + p.cases_submitted, 0),
-                total_courses: periodProgress.reduce((sum, p) => sum + p.courses_completed, 0),
+                total_cases: periodProgress.reduce((sum: number, p: { cases_submitted: number }) => sum + p.cases_submitted, 0),
+                total_courses: periodProgress.reduce((sum: number, p: { courses_completed: number }) => sum + p.courses_completed, 0),
                 course_progress_percent: courseProgressPercent,
             };
         });
-
-        // Sort by created_at descending
-        enrichedDoctors.sort((a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
 
         return NextResponse.json({
             doctors: enrichedDoctors,
@@ -74,10 +75,32 @@ export async function GET(request: NextRequest) {
     }
 }
 
-// POST disabled for mock data mode
 export async function POST(request: NextRequest) {
-    return NextResponse.json(
-        { error: 'Creating doctors is disabled in mock data mode' },
-        { status: 503 }
-    );
+    try {
+        const body = await request.json();
+        const { dso_id, name, email, phone, start_date, status, notes } = body;
+
+        if (!dso_id || !name || !start_date) {
+            return NextResponse.json(
+                { error: 'dso_id, name, and start_date are required' },
+                { status: 400 }
+            );
+        }
+
+        const { data, error } = await supabase
+            .from('doctors')
+            .insert({ dso_id, name, email, phone, start_date, status: status || 'active', notes })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return NextResponse.json({ doctor: data }, { status: 201 });
+    } catch (error) {
+        console.error('Error creating doctor:', error);
+        return NextResponse.json(
+            { error: 'Internal server error' },
+            { status: 500 }
+        );
+    }
 }

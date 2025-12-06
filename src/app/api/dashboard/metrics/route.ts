@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { supabase } from '@/lib/db/client';
 import { DashboardMetrics } from '@/lib/db/types';
-import {
-    mockDoctors,
-    mockActivities,
-    mockPeriodProgress,
-    getDoctorsByDSO,
-    getPeriodProgressByDoctor,
-    getLastActivityByDoctor,
-} from '@/lib/mock-data';
 import { calculateRiskLevel, getDaysSinceActivity } from '@/lib/calculations/risk-level';
 
 export async function GET(request: NextRequest) {
@@ -15,8 +8,23 @@ export async function GET(request: NextRequest) {
         const searchParams = request.nextUrl.searchParams;
         const dsoId = searchParams.get('dso_id');
 
-        // Filter doctors by DSO if specified
-        let doctors = dsoId ? getDoctorsByDSO(dsoId) : [...mockDoctors];
+        // Fetch doctors with related data
+        let query = supabase
+            .from('doctors')
+            .select(`
+                *,
+                period_progress(*),
+                activities(*)
+            `);
+
+        if (dsoId) {
+            query = query.eq('dso_id', dsoId);
+        }
+
+        const { data: doctorsData, error } = await query;
+        if (error) throw error;
+
+        const doctors = doctorsData || [];
 
         // Calculate metrics
         const totalDoctors = doctors.length;
@@ -24,8 +32,13 @@ export async function GET(request: NextRequest) {
 
         // Calculate risk levels for all doctors
         const doctorsWithRisk = doctors.map(doctor => {
-            const periodProgress = getPeriodProgressByDoctor(doctor.id);
-            const lastActivity = getLastActivityByDoctor(doctor.id);
+            const periodProgress = doctor.period_progress || [];
+            const activities = doctor.activities || [];
+            const lastActivity = activities.length > 0
+                ? activities.sort((a: { created_at: string }, b: { created_at: string }) =>
+                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                  )[0]
+                : null;
             const riskLevel = calculateRiskLevel(doctor, periodProgress, lastActivity);
             const daysSinceActivity = getDaysSinceActivity(lastActivity);
 
@@ -53,9 +66,8 @@ export async function GET(request: NextRequest) {
         const currentMonth = currentDate.getMonth();
         const currentYear = currentDate.getFullYear();
 
-        const doctorIds = doctors.map(d => d.id);
-        const relevantPeriods = mockPeriodProgress.filter(p => {
-            if (!doctorIds.includes(p.doctor_id)) return false;
+        const allPeriodProgress = doctors.flatMap(d => d.period_progress || []);
+        const relevantPeriods = allPeriodProgress.filter(p => {
             const periodStart = new Date(p.start_date);
             const periodEnd = new Date(p.end_date);
             return (
@@ -88,11 +100,15 @@ export async function GET(request: NextRequest) {
         const engagementRate = totalDoctors > 0 ? (engagedDoctors / totalDoctors) * 100 : 0;
 
         // Average cases and courses per doctor
-        const totalCases = doctorsWithRisk.reduce((sum, d) =>
-            sum + d.period_progress.reduce((s, p) => s + p.cases_submitted, 0), 0
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const totalCases = doctorsWithRisk.reduce((sum: number, d: any) =>
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            sum + d.period_progress.reduce((s: number, p: any) => s + p.cases_submitted, 0), 0
         );
-        const totalCourses = doctorsWithRisk.reduce((sum, d) =>
-            sum + d.period_progress.reduce((s, p) => s + p.courses_completed, 0), 0
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const totalCourses = doctorsWithRisk.reduce((sum: number, d: any) =>
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            sum + d.period_progress.reduce((s: number, p: any) => s + p.courses_completed, 0), 0
         );
         const avgCasesPerDoctor = totalDoctors > 0 ? totalCases / totalDoctors : 0;
         const avgCoursesPerDoctor = totalDoctors > 0 ? totalCourses / totalDoctors : 0;
@@ -103,8 +119,8 @@ export async function GET(request: NextRequest) {
         ).length;
 
         // Recent activities count (last 7 days)
-        const relevantActivities = mockActivities.filter(a => {
-            if (!doctorIds.includes(a.doctor_id)) return false;
+        const allActivities = doctors.flatMap(d => d.activities || []);
+        const relevantActivities = allActivities.filter(a => {
             const activityDate = new Date(a.created_at);
             return activityDate >= sevenDaysAgo;
         });
@@ -114,8 +130,10 @@ export async function GET(request: NextRequest) {
         const onTrackCount = riskDistribution.low + riskDistribution.medium;
 
         // Completion rate (simplified: doctors with cases/courses in current period)
-        const doctorsWithProgress = doctorsWithRisk.filter(d => {
-            const currentPeriod = d.period_progress.find(p => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const doctorsWithProgress = doctorsWithRisk.filter((d: any) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const currentPeriod = d.period_progress.find((p: any) => {
                 const start = new Date(p.start_date);
                 const end = new Date(p.end_date);
                 return currentDate >= start && currentDate <= end;

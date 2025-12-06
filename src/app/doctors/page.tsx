@@ -1,12 +1,17 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { DoctorTracker } from '@/components/doctors/doctor-tracker';
 
-export default function DoctorsPage() {
+function DoctorsContent() {
     const searchParams = useSearchParams();
     const dsoId = searchParams.get('dso_id') || undefined;
 
+    return <DoctorTracker dsoId={dsoId} />;
+}
+
+export default function DoctorsPage() {
     return (
         <div className="container mx-auto py-8 space-y-8">
             <div>
@@ -16,7 +21,9 @@ export default function DoctorsPage() {
                 </p>
             </div>
 
-            <DoctorTracker dsoId={dsoId} />
+            <Suspense fallback={<div>Loading...</div>}>
+                <DoctorsContent />
+            </Suspense>
         </div>
     );
 }
