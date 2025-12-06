@@ -4,6 +4,8 @@ import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { DoctorTracker } from '@/components/doctors/doctor-tracker';
 
+export const dynamic = 'force-dynamic';
+
 function DoctorsContent() {
     const searchParams = useSearchParams();
     const dsoId = searchParams.get('dso_id') || undefined;
