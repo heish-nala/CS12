@@ -10,9 +10,9 @@ export function Header() {
                     <div className="flex items-center gap-6">
                         <Link href="/" className="flex items-center gap-2">
                             <div className="w-6 h-6 rounded-[3px] bg-primary flex items-center justify-center text-primary-foreground text-[12px] font-semibold">
-                                K
+                                C
                             </div>
-                            <span className="font-semibold text-[15px] text-foreground">Konekt</span>
+                            <span className="font-semibold text-[15px] text-foreground">CS12</span>
                         </Link>
                         <div className="flex items-center gap-1">
                             <Link

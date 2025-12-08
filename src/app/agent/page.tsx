@@ -26,7 +26,7 @@ export default function AgentPage() {
                         <div className="p-2 bg-blue-100 rounded-lg">
                             <Bot className="w-6 h-6 text-blue-600" />
                         </div>
-                        Konekt Agent
+                        CS12 Agent
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="flex-1 overflow-hidden p-0 bg-white">

@@ -59,9 +59,9 @@ export function NotionSidebar() {
             <div className="px-2 py-3 border-b border-border">
                 <div className="flex items-center gap-2 px-2 py-1">
                     <div className="w-5 h-5 rounded-[3px] bg-primary flex items-center justify-center text-primary-foreground text-[11px] font-semibold">
-                        K
+                        C
                     </div>
-                    <span className="font-medium text-[14px] text-foreground">Konekt</span>
+                    <span className="font-medium text-[14px] text-foreground">CS12</span>
                 </div>
             </div>
 

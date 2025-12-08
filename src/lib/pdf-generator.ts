@@ -117,7 +117,7 @@ export async function generateAttendeeTrackerPDF({
     const addFooter = () => {
         doc.setFontSize(8);
         doc.setTextColor(156, 163, 175);
-        doc.text('Konekt - Attendee Tracker Report', margin, pageHeight - 10);
+        doc.text('CS12 - Attendee Tracker Report', margin, pageHeight - 10);
     };
 
     // Calculate table data

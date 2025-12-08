@@ -6,7 +6,7 @@ import { AuthGuard } from "@/components/auth/auth-guard";
 import { AppShell } from "@/components/layout/app-shell";
 
 export const metadata: Metadata = {
-    title: "Konekt - Customer Success Platform",
+    title: "CS12 - Customer Success Platform",
     description: "Drive doctor engagement and success through data-driven insights and proactive support",
 };
 
