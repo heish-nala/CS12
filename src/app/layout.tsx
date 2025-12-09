@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/contexts/auth-context";
+import { ClientsProvider } from "@/contexts/clients-context";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { AppShell } from "@/components/layout/app-shell";
 
@@ -19,9 +20,11 @@ export default function RootLayout({
         <html lang="en">
             <body className="antialiased">
                 <AuthProvider>
-                    <AuthGuard>
-                        <AppShell>{children}</AppShell>
-                    </AuthGuard>
+                    <ClientsProvider>
+                        <AuthGuard>
+                            <AppShell>{children}</AppShell>
+                        </AuthGuard>
+                    </ClientsProvider>
                 </AuthProvider>
                 <Toaster />
             </body>

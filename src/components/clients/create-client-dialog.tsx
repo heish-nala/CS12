@@ -16,20 +16,20 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Building2, Mail, User } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
+import { useClients } from '@/contexts/clients-context';
 
 interface CreateClientDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onClientCreated?: () => void;
 }
 
 export function CreateClientDialog({
     open,
     onOpenChange,
-    onClientCreated,
 }: CreateClientDialogProps) {
     const router = useRouter();
     const { user } = useAuth();
+    const { addClient } = useClients();
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
@@ -70,11 +70,10 @@ export function CreateClientDialog({
 
             onOpenChange(false);
 
-            // Notify parent to refresh client list
-            onClientCreated?.();
-
-            // Navigate to the new client page
+            // Add client to shared state immediately (optimistic update)
             if (data.dso?.id) {
+                addClient({ id: data.dso.id, name: formData.name });
+                // Navigate to the new client page
                 router.push(`/clients/${data.dso.id}`);
             }
         } catch (error) {

@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { CreateClientDialog } from '@/components/clients/create-client-dialog';
 import { SearchCommand } from '@/components/layout/search-command';
 import { useAuth } from '@/contexts/auth-context';
+import { useClients } from '@/contexts/clients-context';
 import {
     Home,
     Users,
@@ -21,11 +22,6 @@ import {
     ChevronRight,
 } from 'lucide-react';
 
-interface Client {
-    id: string;
-    name: string;
-    archived?: boolean;
-}
 
 interface SidebarItemProps {
     href: string;
@@ -56,39 +52,14 @@ function SidebarItem({ href, icon, label, isActive }: SidebarItemProps) {
 
 export function NotionSidebar() {
     const pathname = usePathname();
-    const router = useRouter();
     const { user, signOut } = useAuth();
+    const { clients, archivedClients } = useClients();
     const [createClientOpen, setCreateClientOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
-    const [clients, setClients] = useState<Client[]>([]);
-    const [archivedClients, setArchivedClients] = useState<Client[]>([]);
     const [showArchived, setShowArchived] = useState(false);
 
     const userEmail = user?.email || '';
     const userInitial = userEmail.charAt(0).toUpperCase() || 'U';
-
-    const fetchClients = async () => {
-        if (!user?.id) return;
-
-        try {
-            const response = await fetch(`/api/dsos?user_id=${user.id}&include_archived=true`);
-            if (response.ok) {
-                const data = await response.json();
-                setClients(data.dsos || []);
-                setArchivedClients(data.archivedDsos || []);
-            }
-        } catch (error) {
-            console.error('Error fetching clients:', error);
-        }
-    };
-
-    useEffect(() => {
-        fetchClients();
-    }, [user?.id]);
-
-    const handleClientCreated = () => {
-        fetchClients();
-    };
 
     return (
         <div className="fixed left-0 top-0 w-60 border-r border-border bg-sidebar flex flex-col h-screen">
@@ -226,7 +197,6 @@ export function NotionSidebar() {
             <CreateClientDialog
                 open={createClientOpen}
                 onOpenChange={setCreateClientOpen}
-                onClientCreated={handleClientCreated}
             />
 
             {/* Search Command */}

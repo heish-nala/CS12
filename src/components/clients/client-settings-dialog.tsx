@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Building2, Mail, User, Calendar, Trash2, Plus, BarChart3, Activity, Archive, ArchiveRestore } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
+import { useClients } from '@/contexts/clients-context';
 import { useRouter } from 'next/navigation';
 import {
     Select,
@@ -45,6 +46,7 @@ export function ClientSettingsDialog({
     onOpenMetricsDialog,
 }: ClientSettingsDialogProps) {
     const { user } = useAuth();
+    const { refreshClients } = useClients();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [archiving, setArchiving] = useState(false);
@@ -176,6 +178,9 @@ export function ClientSettingsDialog({
             toast.success(client.archived ? 'Client restored' : 'Client archived');
             onOpenChange(false);
             onUpdate?.();
+
+            // Refresh the sidebar clients list
+            refreshClients();
 
             // Redirect to home if archiving
             if (!client.archived) {
