@@ -4,7 +4,6 @@ import {
     createDataTable,
     getColumnsByTable,
     getRowsByTable,
-    initializeAttendeeTracker,
 } from '@/lib/mock-data';
 
 export async function GET(request: NextRequest) {
@@ -18,9 +17,6 @@ export async function GET(request: NextRequest) {
                 { status: 400 }
             );
         }
-
-        // Initialize default Attendee Tracker table with mock data
-        initializeAttendeeTracker(clientId);
 
         const tables = getDataTablesByClient(clientId);
 

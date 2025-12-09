@@ -18,7 +18,7 @@ export async function POST(_req: Request) {
     //
     // const result = streamText({
     //     model: openai('gpt-4-turbo'),
-    //     system: 'You are a helpful customer support agent for Konekt. Be friendly, professional, and concise.',
+    //     system: 'You are a helpful customer support agent for CS12. Be friendly, professional, and concise.',
     //     messages: convertToModelMessages(messages),
     // });
     //

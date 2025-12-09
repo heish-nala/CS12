@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { CreateClientDialog } from '@/components/clients/create-client-dialog';
@@ -15,7 +15,13 @@ import {
     Plus,
     Search,
     LogOut,
+    Building2,
 } from 'lucide-react';
+
+interface Client {
+    id: string;
+    name: string;
+}
 
 interface SidebarItemProps {
     href: string;
@@ -46,12 +52,36 @@ function SidebarItem({ href, icon, label, isActive }: SidebarItemProps) {
 
 export function NotionSidebar() {
     const pathname = usePathname();
+    const router = useRouter();
     const { user, signOut } = useAuth();
     const [createClientOpen, setCreateClientOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
+    const [clients, setClients] = useState<Client[]>([]);
 
     const userEmail = user?.email || '';
     const userInitial = userEmail.charAt(0).toUpperCase() || 'U';
+
+    const fetchClients = async () => {
+        if (!user?.id) return;
+
+        try {
+            const response = await fetch(`/api/dsos?user_id=${user.id}`);
+            if (response.ok) {
+                const data = await response.json();
+                setClients(data.dsos || []);
+            }
+        } catch (error) {
+            console.error('Error fetching clients:', error);
+        }
+    };
+
+    useEffect(() => {
+        fetchClients();
+    }, [user?.id]);
+
+    const handleClientCreated = () => {
+        fetchClients();
+    };
 
     return (
         <div className="fixed left-0 top-0 w-60 border-r border-border bg-sidebar flex flex-col h-screen">
@@ -106,12 +136,15 @@ export function NotionSidebar() {
                     </div>
                 </div>
 
-                <SidebarItem
-                    href="/clients/1"
-                    icon={<Users className="h-[18px] w-[18px]" />}
-                    label="Clients"
-                    isActive={pathname?.startsWith('/clients')}
-                />
+                {clients.map((client) => (
+                    <SidebarItem
+                        key={client.id}
+                        href={`/clients/${client.id}`}
+                        icon={<Building2 className="h-[18px] w-[18px]" />}
+                        label={client.name}
+                        isActive={pathname === `/clients/${client.id}`}
+                    />
+                ))}
 
                 {/* Settings Section */}
                 <div className="pt-4 pb-1">
@@ -155,6 +188,7 @@ export function NotionSidebar() {
             <CreateClientDialog
                 open={createClientOpen}
                 onOpenChange={setCreateClientOpen}
+                onClientCreated={handleClientCreated}
             />
 
             {/* Search Command */}

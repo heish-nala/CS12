@@ -68,7 +68,7 @@ const MOCK_TEAM_MEMBERS: TeamMember[] = [
     {
         id: '1',
         user_id: 'user-1',
-        email: 'alan@konekt.com',
+        email: 'alan@cs12.com',
         name: 'Alan',
         role: 'admin',
         created_at: '2024-01-15T00:00:00Z',

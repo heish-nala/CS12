@@ -634,7 +634,7 @@ import { Resend } from 'resend';
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 await resend.emails.send({
-    from: 'Konekt <noreply@yourdomain.com>',
+    from: 'CS12 <noreply@yourdomain.com>',
     to: email,
     subject: 'You\'ve been invited to join a workspace',
     html: `<a href="${inviteUrl}">Accept Invite</a>`,

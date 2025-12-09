@@ -4,6 +4,6 @@ import Page from './page'
 
 test('Page', () => {
     render(<Page />)
-    expect(screen.getByText('Konekt Agent')).toBeDefined()
+    expect(screen.getByText('CS12 Agent')).toBeDefined()
     expect(screen.getByText('How can I help you today?')).toBeDefined()
 })

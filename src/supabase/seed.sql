@@ -1,4 +1,4 @@
--- Sample seed data for Konekt Platform
+-- Sample seed data for CS12 Platform
 -- Run this in Supabase SQL Editor after running schema.sql
 
 -- Insert sample DSOs
@@ -92,24 +92,24 @@ INSERT INTO period_progress (doctor_id, period_number, start_date, end_date, cas
 
 -- Insert sample activities
 INSERT INTO activities (doctor_id, activity_type, description, created_by, created_at) VALUES
-  ('650e8400-e29b-41d4-a716-446655440001', 'call', 'Initial onboarding call - discussed program expectations', 'admin@konekt.com', NOW() - INTERVAL '30 days'),
-  ('650e8400-e29b-41d4-a716-446655440001', 'email', 'Sent welcome package and course materials', 'admin@konekt.com', NOW() - INTERVAL '28 days'),
-  ('650e8400-e29b-41d4-a716-446655440001', 'meeting', 'Monthly check-in - progress review', 'admin@konekt.com', NOW() - INTERVAL '15 days'),
-  ('650e8400-e29b-41d4-a716-446655440001', 'case_review', 'Reviewed first 5 cases - excellent quality', 'admin@konekt.com', NOW() - INTERVAL '10 days'),
-  ('650e8400-e29b-41d4-a716-446655440001', 'email', 'Follow-up on course completion', 'admin@konekt.com', NOW() - INTERVAL '2 days'),
+  ('650e8400-e29b-41d4-a716-446655440001', 'call', 'Initial onboarding call - discussed program expectations', 'admin@cs12.com', NOW() - INTERVAL '30 days'),
+  ('650e8400-e29b-41d4-a716-446655440001', 'email', 'Sent welcome package and course materials', 'admin@cs12.com', NOW() - INTERVAL '28 days'),
+  ('650e8400-e29b-41d4-a716-446655440001', 'meeting', 'Monthly check-in - progress review', 'admin@cs12.com', NOW() - INTERVAL '15 days'),
+  ('650e8400-e29b-41d4-a716-446655440001', 'case_review', 'Reviewed first 5 cases - excellent quality', 'admin@cs12.com', NOW() - INTERVAL '10 days'),
+  ('650e8400-e29b-41d4-a716-446655440001', 'email', 'Follow-up on course completion', 'admin@cs12.com', NOW() - INTERVAL '2 days'),
   
-  ('650e8400-e29b-41d4-a716-446655440002', 'call', 'Onboarding call completed', 'admin@konekt.com', NOW() - INTERVAL '25 days'),
-  ('650e8400-e29b-41d4-a716-446655440002', 'training', 'Digital workflow training session', 'admin@konekt.com', NOW() - INTERVAL '20 days'),
-  ('650e8400-e29b-41d4-a716-446655440002', 'meeting', 'Monthly progress review', 'admin@konekt.com', NOW() - INTERVAL '12 days'),
+  ('650e8400-e29b-41d4-a716-446655440002', 'call', 'Onboarding call completed', 'admin@cs12.com', NOW() - INTERVAL '25 days'),
+  ('650e8400-e29b-41d4-a716-446655440002', 'training', 'Digital workflow training session', 'admin@cs12.com', NOW() - INTERVAL '20 days'),
+  ('650e8400-e29b-41d4-a716-446655440002', 'meeting', 'Monthly progress review', 'admin@cs12.com', NOW() - INTERVAL '12 days'),
   
-  ('650e8400-e29b-41d4-a716-446655440003', 'call', 'Welcome call - very engaged', 'admin@konekt.com', NOW() - INTERVAL '5 days'),
-  ('650e8400-e29b-41d4-a716-446655440003', 'email', 'Sent onboarding materials', 'admin@konekt.com', NOW() - INTERVAL '4 days'),
+  ('650e8400-e29b-41d4-a716-446655440003', 'call', 'Welcome call - very engaged', 'admin@cs12.com', NOW() - INTERVAL '5 days'),
+  ('650e8400-e29b-41d4-a716-446655440003', 'email', 'Sent onboarding materials', 'admin@cs12.com', NOW() - INTERVAL '4 days'),
   
-  ('650e8400-e29b-41d4-a716-446655440004', 'call', 'Initial contact', 'admin@konekt.com', NOW() - INTERVAL '45 days'),
-  ('650e8400-e29b-41d4-a716-446655440004', 'email', 'Follow-up email - no response', 'admin@konekt.com', NOW() - INTERVAL '30 days'),
+  ('650e8400-e29b-41d4-a716-446655440004', 'call', 'Initial contact', 'admin@cs12.com', NOW() - INTERVAL '45 days'),
+  ('650e8400-e29b-41d4-a716-446655440004', 'email', 'Follow-up email - no response', 'admin@cs12.com', NOW() - INTERVAL '30 days'),
   
-  ('650e8400-e29b-41d4-a716-446655440005', 'call', 'Onboarding call scheduled', 'admin@konekt.com', NOW() - INTERVAL '1 day'),
-  ('650e8400-e29b-41d4-a716-446655440005', 'email', 'Welcome email sent', 'admin@konekt.com', NOW() - INTERVAL '1 day');
+  ('650e8400-e29b-41d4-a716-446655440005', 'call', 'Onboarding call scheduled', 'admin@cs12.com', NOW() - INTERVAL '1 day'),
+  ('650e8400-e29b-41d4-a716-446655440005', 'email', 'Welcome email sent', 'admin@cs12.com', NOW() - INTERVAL '1 day');
 
 -- Insert task groups
 INSERT INTO task_groups (id, name, description, order_index) VALUES

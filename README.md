@@ -1,4 +1,4 @@
-# Konekt Platform
+# CS12 Platform
 
 A comprehensive customer success tracking application for monitoring doctors/dentists through a 12-month onboarding program.
 
@@ -30,7 +30,7 @@ A comprehensive customer success tracking application for monitoring doctors/den
 
 1. **Clone and install dependencies**:
    ```bash
-   cd konekt-app
+   cd cs12-app
    npm install
    ```
 
@@ -62,7 +62,7 @@ A comprehensive customer success tracking application for monitoring doctors/den
 ## Project Structure
 
 ```
-konekt-app/
+cs12-app/
 ├── app/                      # Next.js app router
 │   ├── api/                  # API routes
 │   │   ├── doctors/          # Doctor CRUD endpoints

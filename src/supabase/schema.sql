@@ -1,4 +1,4 @@
--- Konekt Platform Database Schema
+-- CS12 Platform Database Schema
 -- Customer Success Tracking for Doctor/Dentist Onboarding
 
 -- Enable UUID extension
