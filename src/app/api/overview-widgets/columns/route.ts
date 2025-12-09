@@ -3,7 +3,6 @@ import {
     getDataTablesByClient,
     getAggregatableColumns,
     getChartableColumns,
-    initializeAttendeeTracker,
 } from '@/lib/mock-data';
 
 export async function GET(request: NextRequest) {
@@ -18,9 +17,6 @@ export async function GET(request: NextRequest) {
                 { status: 400 }
             );
         }
-
-        // Initialize data tables if needed
-        initializeAttendeeTracker(clientId);
 
         const tables = getDataTablesByClient(clientId);
 

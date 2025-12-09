@@ -3,7 +3,6 @@ import {
     getPeriodDataByRow,
     getDataTableById,
     initializePeriodsForRow,
-    initializeAttendeeTracker,
 } from '@/lib/mock-data';
 
 // GET /api/data-tables/[id]/rows/[rowId]/periods - Get all periods for a row
@@ -12,9 +11,6 @@ export async function GET(
     { params }: { params: Promise<{ id: string; rowId: string }> }
 ) {
     const { id: tableId, rowId } = await params;
-
-    // Initialize default data if needed
-    initializeAttendeeTracker('1');
 
     const table = getDataTableById(tableId);
     if (!table) {

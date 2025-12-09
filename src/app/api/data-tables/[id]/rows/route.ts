@@ -3,7 +3,6 @@ import {
     getRowsByTable,
     createDataRow,
     getDataTableById,
-    initializeAttendeeTracker
 } from '@/lib/mock-data';
 
 export async function GET(
@@ -12,9 +11,6 @@ export async function GET(
 ) {
     try {
         const { id } = await params;
-
-        // Initialize default data if needed
-        initializeAttendeeTracker('1');
 
         const table = getDataTableById(id);
 

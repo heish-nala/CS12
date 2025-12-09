@@ -16,11 +16,15 @@ import {
     Search,
     LogOut,
     Building2,
+    Archive,
+    ChevronDown,
+    ChevronRight,
 } from 'lucide-react';
 
 interface Client {
     id: string;
     name: string;
+    archived?: boolean;
 }
 
 interface SidebarItemProps {
@@ -57,6 +61,8 @@ export function NotionSidebar() {
     const [createClientOpen, setCreateClientOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
     const [clients, setClients] = useState<Client[]>([]);
+    const [archivedClients, setArchivedClients] = useState<Client[]>([]);
+    const [showArchived, setShowArchived] = useState(false);
 
     const userEmail = user?.email || '';
     const userInitial = userEmail.charAt(0).toUpperCase() || 'U';
@@ -65,10 +71,11 @@ export function NotionSidebar() {
         if (!user?.id) return;
 
         try {
-            const response = await fetch(`/api/dsos?user_id=${user.id}`);
+            const response = await fetch(`/api/dsos?user_id=${user.id}&include_archived=true`);
             if (response.ok) {
                 const data = await response.json();
                 setClients(data.dsos || []);
+                setArchivedClients(data.archivedDsos || []);
             }
         } catch (error) {
             console.error('Error fetching clients:', error);
@@ -145,6 +152,37 @@ export function NotionSidebar() {
                         isActive={pathname === `/clients/${client.id}`}
                     />
                 ))}
+
+                {/* Archived Section */}
+                {archivedClients.length > 0 && (
+                    <>
+                        <div className="pt-4 pb-1">
+                            <button
+                                onClick={() => setShowArchived(!showArchived)}
+                                className="flex items-center justify-between w-full px-2 py-1 group hover:bg-accent rounded-[3px] transition-colors duration-75"
+                            >
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                                    {showArchived ? (
+                                        <ChevronDown className="h-3 w-3" />
+                                    ) : (
+                                        <ChevronRight className="h-3 w-3" />
+                                    )}
+                                    Archived ({archivedClients.length})
+                                </span>
+                            </button>
+                        </div>
+
+                        {showArchived && archivedClients.map((client) => (
+                            <SidebarItem
+                                key={client.id}
+                                href={`/clients/${client.id}`}
+                                icon={<Archive className="h-[18px] w-[18px]" />}
+                                label={client.name}
+                                isActive={pathname === `/clients/${client.id}`}
+                            />
+                        ))}
+                    </>
+                )}
 
                 {/* Settings Section */}
                 <div className="pt-4 pb-1">

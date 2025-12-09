@@ -11,6 +11,7 @@ import { ActivityTimeline } from '@/components/activities/activity-timeline';
 import { Button } from '@/components/ui/button';
 import { Settings } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/contexts/auth-context';
 
 interface ClientDetailPageProps {
     params: Promise<{ id: string }>;
@@ -18,19 +19,17 @@ interface ClientDetailPageProps {
 
 export default function ClientDetailPage({ params }: ClientDetailPageProps) {
     const { id } = use(params);
+    const { user } = useAuth();
     const [client, setClient] = useState<Client | null>(null);
     const [loading, setLoading] = useState(true);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [metricsDialogOpen, setMetricsDialogOpen] = useState(false);
 
-    useEffect(() => {
-        fetchClient();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id]);
-
     const fetchClient = async () => {
+        if (!user?.id) return;
+
         try {
-            const response = await fetch(`/api/dsos`);
+            const response = await fetch(`/api/dsos?user_id=${user.id}`);
             const data = await response.json();
             const dsos = data.dsos || [];
             const foundClient = dsos.find((c: Client) => c.id === id);
@@ -42,6 +41,11 @@ export default function ClientDetailPage({ params }: ClientDetailPageProps) {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        fetchClient();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id, user?.id]);
 
     if (loading) {
         return (

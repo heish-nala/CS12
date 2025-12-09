@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Doctor, DSO } from '@/lib/db/types';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/auth-context';
 
 interface EditDoctorDialogProps {
     open: boolean;
@@ -36,6 +37,7 @@ export function EditDoctorDialog({
     doctor,
     onSuccess,
 }: EditDoctorDialogProps) {
+    const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [dsos, setDsos] = useState<DSO[]>([]);
     const [formData, setFormData] = useState({
@@ -66,8 +68,10 @@ export function EditDoctorDialog({
     }, [open, doctor]);
 
     const fetchDSOs = async () => {
+        if (!user?.id) return;
+
         try {
-            const response = await fetch('/api/dsos');
+            const response = await fetch(`/api/dsos?user_id=${user.id}`);
             const data = await response.json();
             setDsos(data.dsos || []);
         } catch (error) {

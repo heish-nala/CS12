@@ -5,7 +5,6 @@ import {
     getRowsByTable,
     deleteDataTable,
     mockDataTables,
-    initializeAttendeeTracker,
     clearPeriodsForTable,
 } from '@/lib/mock-data';
 
@@ -15,9 +14,6 @@ export async function GET(
 ) {
     try {
         const { id } = await params;
-
-        // Ensure data is initialized
-        initializeAttendeeTracker('1');
 
         const table = getDataTableById(id);
 

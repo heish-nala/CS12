@@ -11,21 +11,27 @@ import {
 } from '@/components/ui/select';
 import { Building2 } from 'lucide-react';
 import { DSO } from '@/lib/db/types';
+import { useAuth } from '@/contexts/auth-context';
 
 export function DSOSwitcher() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { user } = useAuth();
     const [dsos, setDsos] = useState<DSO[]>([]);
     const [loading, setLoading] = useState(true);
     const currentDsoId = searchParams.get('dso_id') || 'all';
 
     useEffect(() => {
-        fetchDSOs();
-    }, []);
+        if (user?.id) {
+            fetchDSOs();
+        }
+    }, [user?.id]);
 
     const fetchDSOs = async () => {
+        if (!user?.id) return;
+
         try {
-            const response = await fetch('/api/dsos');
+            const response = await fetch(`/api/dsos?user_id=${user.id}`);
             const data = await response.json();
             setDsos(data.dsos || []);
         } catch (error) {

@@ -8,7 +8,6 @@ import {
     calculateChartData,
     getAggregatableColumns,
     getChartableColumns,
-    initializeAttendeeTracker,
 } from '@/lib/mock-data';
 import { OverviewMetricCard, OverviewChartWidget } from '@/lib/db/types';
 
@@ -23,9 +22,6 @@ export async function GET(request: NextRequest) {
                 { status: 400 }
             );
         }
-
-        // Initialize data tables if needed
-        initializeAttendeeTracker(clientId);
 
         const widgets = getOverviewWidgetsByClient(clientId);
 

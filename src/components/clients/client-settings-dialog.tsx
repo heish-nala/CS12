@@ -17,7 +17,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Building2, Mail, User, Calendar, Trash2, Plus, BarChart3, Activity } from 'lucide-react';
+import { Building2, Mail, User, Calendar, Trash2, Plus, BarChart3, Activity, Archive, ArchiveRestore } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
+import { useRouter } from 'next/navigation';
 import {
     Select,
     SelectContent,
@@ -42,7 +44,10 @@ export function ClientSettingsDialog({
     onUpdate,
     onOpenMetricsDialog,
 }: ClientSettingsDialogProps) {
+    const { user } = useAuth();
+    const router = useRouter();
     const [loading, setLoading] = useState(false);
+    const [archiving, setArchiving] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         industry: '',
@@ -149,6 +154,41 @@ export function ClientSettingsDialog({
         toast.success('Activity contact source saved');
     };
 
+    const handleArchiveToggle = async () => {
+        if (!client || !user?.id) return;
+
+        setArchiving(true);
+        try {
+            const response = await fetch('/api/dsos', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: client.id,
+                    user_id: user.id,
+                    archived: !client.archived,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update client');
+            }
+
+            toast.success(client.archived ? 'Client restored' : 'Client archived');
+            onOpenChange(false);
+            onUpdate?.();
+
+            // Redirect to home if archiving
+            if (!client.archived) {
+                router.push('/');
+            }
+        } catch (error) {
+            console.error('Error archiving client:', error);
+            toast.error('Failed to update client');
+        } finally {
+            setArchiving(false);
+        }
+    };
+
     const addCustomField = () => {
         setCustomFields([...customFields, { key: '', value: '' }]);
     };
@@ -227,6 +267,41 @@ export function ClientSettingsDialog({
                                 <div className="flex items-center gap-2">
                                     <code className="text-xs bg-muted px-2 py-1 rounded">{client.id}</code>
                                     <Badge variant="outline" className="text-xs">Read-only</Badge>
+                                </div>
+                            </div>
+
+                            {/* Archive Section */}
+                            <div className="pt-4 mt-4 border-t">
+                                <div className="space-y-2">
+                                    <Label className="text-muted-foreground">
+                                        {client.archived ? 'Restore Client' : 'Archive Client'}
+                                    </Label>
+                                    <p className="text-sm text-muted-foreground">
+                                        {client.archived
+                                            ? 'Restore this client to make it active again in your workspace.'
+                                            : 'Archive this client to hide it from your workspace. You can restore it later.'}
+                                    </p>
+                                    <Button
+                                        type="button"
+                                        variant={client.archived ? 'default' : 'outline'}
+                                        onClick={handleArchiveToggle}
+                                        disabled={archiving}
+                                        className="w-full mt-2"
+                                    >
+                                        {archiving ? (
+                                            'Processing...'
+                                        ) : client.archived ? (
+                                            <>
+                                                <ArchiveRestore className="h-4 w-4 mr-2" />
+                                                Restore Client
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Archive className="h-4 w-4 mr-2" />
+                                                Archive Client
+                                            </>
+                                        )}
+                                    </Button>
                                 </div>
                             </div>
                         </TabsContent>
