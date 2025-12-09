@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Users, TrendingUp, AlertTriangle, ArrowRight, Plus, Settings2, BarChart3, FolderOpen } from 'lucide-react';
 import { CardConfigDialog, MetricConfig, DEFAULT_METRICS } from './card-config-dialog';
+import { CreateClientDialog } from './create-client-dialog';
 
 interface ClientMetrics {
     client_id: string;
@@ -28,6 +29,7 @@ export function ClientsOverview() {
     const [clients, setClients] = useState<ClientWithMetrics[]>([]);
     const [loading, setLoading] = useState(true);
     const [configDialogOpen, setConfigDialogOpen] = useState(false);
+    const [createClientOpen, setCreateClientOpen] = useState(false);
     const [metrics, setMetrics] = useState<MetricConfig[]>(DEFAULT_METRICS);
 
     useEffect(() => {
@@ -193,7 +195,7 @@ export function ClientsOverview() {
                         <Settings2 className="h-4 w-4" />
                         <span>Customize</span>
                     </Button>
-                    <Button size="sm">
+                    <Button size="sm" onClick={() => setCreateClientOpen(true)}>
                         <Plus className="h-4 w-4" />
                         <span>New Client</span>
                     </Button>
@@ -213,7 +215,7 @@ export function ClientsOverview() {
                             Track their doctors, monitor engagement, and ensure successful onboarding.
                         </p>
 
-                        <Button size="sm">
+                        <Button size="sm" onClick={() => setCreateClientOpen(true)}>
                             <Plus className="h-4 w-4" />
                             <span>Add Your First Client</span>
                         </Button>
@@ -294,6 +296,12 @@ export function ClientsOverview() {
                 onOpenChange={setConfigDialogOpen}
                 metrics={metrics}
                 onSave={saveMetricsConfig}
+            />
+
+            {/* Create Client Dialog */}
+            <CreateClientDialog
+                open={createClientOpen}
+                onOpenChange={setCreateClientOpen}
             />
         </div>
     );

@@ -9,7 +9,16 @@ import { DownloadReportDialog } from './download-report-dialog';
 import { TimeTrackingConfigDialog } from './time-tracking-config-dialog';
 import { ImportCSVDialog } from './import-csv-dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -105,6 +114,9 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
     const [importDialogOpen, setImportDialogOpen] = useState(false);
     const [timeTrackingDialogOpen, setTimeTrackingDialogOpen] = useState(false);
     const [selectedTableForConfig, setSelectedTableForConfig] = useState<DataTableWithMeta | null>(null);
+    const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+    const [tableToRename, setTableToRename] = useState<DataTableWithMeta | null>(null);
+    const [newTableName, setNewTableName] = useState('');
 
     // Period data state
     const [periodData, setPeriodData] = useState<Record<string, PeriodData[]>>({});
@@ -313,6 +325,39 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
         }
     };
 
+    const handleOpenRenameDialog = (table: DataTableWithMeta) => {
+        setTableToRename(table);
+        setNewTableName(table.name);
+        setRenameDialogOpen(true);
+    };
+
+    const handleRenameTable = async () => {
+        if (!tableToRename || !newTableName.trim()) return;
+
+        try {
+            const response = await fetch(`/api/data-tables/${tableToRename.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newTableName.trim() }),
+            });
+
+            if (response.ok) {
+                setTables((prev) =>
+                    prev.map((t) =>
+                        t.id === tableToRename.id
+                            ? { ...t, name: newTableName.trim() }
+                            : t
+                    )
+                );
+                setRenameDialogOpen(false);
+                setTableToRename(null);
+                setNewTableName('');
+            }
+        } catch (error) {
+            console.error('Error renaming table:', error);
+        }
+    };
+
     const handleOpenTimeTrackingConfig = (table: DataTableWithMeta) => {
         setSelectedTableForConfig(table);
         setTimeTrackingDialogOpen(true);
@@ -493,7 +538,12 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
                                     </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                    <DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenRenameDialog(table);
+                                        }}
+                                    >
                                         <Edit className="h-3.5 w-3.5 mr-2" />
                                         Rename
                                     </DropdownMenuItem>
@@ -626,6 +676,44 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
                     }}
                 />
             )}
+
+            {/* Rename Table Dialog */}
+            <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+                <DialogContent className="sm:max-w-[400px]">
+                    <DialogHeader>
+                        <DialogTitle>Rename Table</DialogTitle>
+                        <DialogDescription>
+                            Enter a new name for this table.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Input
+                            value={newTableName}
+                            onChange={(e) => setNewTableName(e.target.value)}
+                            placeholder="Table name"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleRenameTable();
+                                }
+                            }}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setRenameDialogOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleRenameTable}
+                            disabled={!newTableName.trim()}
+                        >
+                            Rename
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
