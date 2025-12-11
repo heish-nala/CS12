@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/db/client';
+import { supabaseAdmin } from '@/lib/db/client';
 import { calculateRiskLevel, getDaysSinceActivity } from '@/lib/calculations/risk-level';
 
 export async function GET() {
@@ -7,8 +7,8 @@ export async function GET() {
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-        // Fetch all DSOs with their doctors and related data
-        const { data: clients, error } = await supabase
+        // Fetch all non-archived DSOs with their doctors and related data
+        const { data: clients, error } = await supabaseAdmin
             .from('dsos')
             .select(`
                 *,
@@ -17,7 +17,8 @@ export async function GET() {
                     period_progress(*),
                     activities(*)
                 )
-            `);
+            `)
+            .or('archived.is.null,archived.eq.false');
 
         if (error) throw error;
 

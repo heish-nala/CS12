@@ -116,6 +116,7 @@ export async function POST(request: NextRequest) {
         if (error) throw error;
 
         // Create user access record (admin role for creator)
+        // This MUST succeed for the user to see the client
         const { error: accessError } = await supabaseAdmin
             .from('user_dso_access')
             .insert({
@@ -126,7 +127,16 @@ export async function POST(request: NextRequest) {
 
         if (accessError) {
             console.error('Error creating user access:', accessError);
-            // Don't fail the whole request, DSO was created
+            // Rollback: delete the DSO since user won't be able to access it
+            await supabaseAdmin
+                .from('dsos')
+                .delete()
+                .eq('id', data.id);
+
+            return NextResponse.json(
+                { error: 'Failed to create client access. Please try again.' },
+                { status: 500 }
+            );
         }
 
         return NextResponse.json({ dso: data }, { status: 201 });
