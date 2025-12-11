@@ -143,10 +143,22 @@ export function OnboardingOverlay() {
       if (config.checklistItem) {
         markChecklistItem(config.checklistItem as any)
       }
-      // Delay to let the page render
-      setTimeout(() => {
+
+      // Wait for dialog to close and page to fully render
+      const waitForPageReady = () => {
+        // Check if any dialog is still open
+        const dialogOpen = document.querySelector('[role="dialog"]')
+        if (dialogOpen) {
+          // Dialog still open, wait more
+          setTimeout(waitForPageReady, 200)
+          return
+        }
+        // Dialog closed, advance to next step
         nextStep()
-      }, 500)
+      }
+
+      // Initial delay to let navigation complete
+      setTimeout(waitForPageReady, 800)
     }
   }, [isOnboardingActive, config.triggerType, config.triggerPath, config.checklistItem, pathname, nextStep, markChecklistItem])
 

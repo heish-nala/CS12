@@ -71,9 +71,12 @@ export function OnboardingTooltip({ targetRect }: OnboardingTooltipProps) {
           transform: 'translateY(-50%)',
         }
       case 'bottom':
+        // Ensure tooltip doesn't go below viewport - leave room for full tooltip height (~350px)
+        const bottomTop = targetRect.bottom + padding + tooltipGap
+        const maxTop = window.innerHeight - 380
         return {
           position: 'fixed',
-          top: Math.min(targetRect.bottom + padding + tooltipGap, window.innerHeight - 200),
+          top: Math.min(bottomTop, maxTop),
           left: Math.max(20, Math.min(targetRect.left + targetRect.width / 2 - 170, window.innerWidth - 360)),
         }
       case 'top':
