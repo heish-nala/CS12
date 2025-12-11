@@ -49,11 +49,14 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
     }, [user?.id, authLoading]);
 
     useEffect(() => {
-        // Only fetch when auth is done loading
-        if (!authLoading) {
+        // Only fetch when auth is done loading AND we have a user
+        if (!authLoading && user?.id) {
             fetchClients();
+        } else if (!authLoading && !user?.id) {
+            // Auth done but no user - stop loading
+            setLoading(false);
         }
-    }, [fetchClients, authLoading]);
+    }, [user?.id, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const addClient = useCallback((client: Client) => {
         setClients(prev => [...prev, client]);
