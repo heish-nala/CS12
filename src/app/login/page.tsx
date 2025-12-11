@@ -9,31 +9,63 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function LoginPage() {
+    const [isSignUp, setIsSignUp] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
-    const { signIn, signInWithGoogle } = useAuth();
+    const { signIn, signUp, signInWithGoogle } = useAuth();
     const router = useRouter();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
+        setSuccess(null);
         setLoading(true);
 
-        const { error } = await signIn(email, password);
+        if (isSignUp) {
+            // Validate passwords match
+            if (password !== confirmPassword) {
+                setError('Passwords do not match');
+                setLoading(false);
+                return;
+            }
+            // Validate password length
+            if (password.length < 6) {
+                setError('Password must be at least 6 characters');
+                setLoading(false);
+                return;
+            }
 
-        if (error) {
-            setError(error.message);
-            setLoading(false);
+            const { error, needsConfirmation } = await signUp(email, password);
+
+            if (error) {
+                setError(error.message);
+                setLoading(false);
+            } else if (needsConfirmation) {
+                setSuccess('Account created! Please check your email to confirm your account.');
+                setLoading(false);
+            } else {
+                router.push('/');
+            }
         } else {
-            router.push('/');
+            const { error } = await signIn(email, password);
+
+            if (error) {
+                setError(error.message);
+                setLoading(false);
+            } else {
+                router.push('/');
+            }
         }
     };
 
     const handleGoogleSignIn = async () => {
         setError(null);
+        setSuccess(null);
         setGoogleLoading(true);
 
         const { error } = await signInWithGoogle();
@@ -44,6 +76,13 @@ export default function LoginPage() {
         }
     };
 
+    const toggleMode = () => {
+        setIsSignUp(!isSignUp);
+        setError(null);
+        setSuccess(null);
+        setConfirmPassword('');
+    };
+
     return (
         <div className="min-h-screen flex items-center justify-center bg-background">
             <Card className="w-full max-w-md">
@@ -52,7 +91,7 @@ export default function LoginPage() {
                         CS12
                     </CardTitle>
                     <CardDescription className="text-center">
-                        Sign in to your account to continue
+                        {isSignUp ? 'Create a new account' : 'Sign in to your account to continue'}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -112,21 +151,54 @@ export default function LoginPage() {
                             <Input
                                 id="password"
                                 type="password"
-                                placeholder="Enter your password"
+                                placeholder={isSignUp ? 'Create a password (min. 6 characters)' : 'Enter your password'}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
                             />
                         </div>
+                        {isSignUp && (
+                            <div className="space-y-2">
+                                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                                <Input
+                                    id="confirmPassword"
+                                    type="password"
+                                    placeholder="Confirm your password"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    required
+                                />
+                            </div>
+                        )}
                         {error && (
                             <div className="text-sm text-red-500 bg-red-50 dark:bg-red-950/50 p-3 rounded-md">
                                 {error}
                             </div>
                         )}
+                        {success && (
+                            <div className="text-sm text-green-600 bg-green-50 dark:bg-green-950/50 p-3 rounded-md">
+                                {success}
+                            </div>
+                        )}
                         <Button type="submit" className="w-full" disabled={loading || googleLoading}>
-                            {loading ? 'Signing in...' : 'Sign in'}
+                            {loading
+                                ? (isSignUp ? 'Creating account...' : 'Signing in...')
+                                : (isSignUp ? 'Sign up' : 'Sign in')}
                         </Button>
                     </form>
+
+                    <div className="text-center text-sm">
+                        <span className="text-muted-foreground">
+                            {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={toggleMode}
+                            className="text-primary hover:underline font-medium"
+                        >
+                            {isSignUp ? 'Sign in' : 'Sign up'}
+                        </button>
+                    </div>
                 </CardContent>
             </Card>
         </div>

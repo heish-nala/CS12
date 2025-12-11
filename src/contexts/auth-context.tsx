@@ -9,6 +9,7 @@ interface AuthContextType {
     session: Session | null;
     loading: boolean;
     signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+    signUp: (email: string, password: string) => Promise<{ error: Error | null; needsConfirmation?: boolean }>;
     signInWithGoogle: () => Promise<{ error: Error | null }>;
     signOut: () => Promise<void>;
 }
@@ -48,6 +49,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error };
     };
 
+    const signUp = async (email: string, password: string) => {
+        const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+        });
+        // If user exists but email not confirmed, or if confirmation is required
+        const needsConfirmation = !error && data?.user && !data.session ? true : undefined;
+        return { error, needsConfirmation };
+    };
+
     const signInWithGoogle = async () => {
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
@@ -63,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, session, loading, signIn, signInWithGoogle, signOut }}>
+        <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signInWithGoogle, signOut }}>
             {children}
         </AuthContext.Provider>
     );
