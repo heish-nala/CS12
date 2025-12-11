@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { usePathname } from 'next/navigation'
 import { useOnboarding } from '@/contexts/onboarding-context'
+import { useAuth } from '@/contexts/auth-context'
 import { defaultChecklistItems } from './onboarding-steps'
 import { Button } from '@/components/ui/button'
 import {
@@ -17,6 +19,8 @@ import {
 import { cn } from '@/lib/utils'
 
 export function OnboardingChecklist() {
+  const { user } = useAuth()
+  const pathname = usePathname()
   const {
     checklistItems,
     checklistProgress,
@@ -30,11 +34,13 @@ export function OnboardingChecklist() {
   const [mounted, setMounted] = useState(false)
 
   // Handle mount for portal
-  useState(() => {
+  useEffect(() => {
     setMounted(true)
-  })
+  }, [])
 
-  if (!mounted || !isChecklistVisible || !hasCompletedOnboarding) return null
+  // Don't show on login page or if user is not authenticated
+  const isLoginPage = pathname === '/login'
+  if (!mounted || !isChecklistVisible || !hasCompletedOnboarding || !user || isLoginPage) return null
 
   const completedCount = Object.values(checklistItems).filter(Boolean).length
   const totalCount = Object.keys(checklistItems).length

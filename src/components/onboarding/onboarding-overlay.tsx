@@ -194,7 +194,9 @@ export function OnboardingOverlay() {
     return () => clearInterval(interval)
   }, [isOnboardingActive, config.triggerType, config.triggerTarget, config.checklistItem, nextStep, markChecklistItem])
 
-  if (!mounted || !isOnboardingActive) return null
+  // Don't show on login page
+  const isLoginPage = pathname === '/login'
+  if (!mounted || !isOnboardingActive || isLoginPage) return null
 
   const padding = config.spotlightPadding || 8
 
