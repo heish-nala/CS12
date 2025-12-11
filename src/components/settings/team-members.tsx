@@ -20,6 +20,7 @@ import {
 import { AddMemberDialog } from './add-member-dialog';
 import { toast } from 'sonner';
 import { UserRole } from '@/lib/db/types';
+import { useAuth } from '@/contexts/auth-context';
 import {
     Plus,
     MoreHorizontal,
@@ -63,36 +64,8 @@ const ROLE_CONFIG: Record<UserRole, { label: string; icon: React.ReactNode; colo
     },
 };
 
-// Mock data for development
-const MOCK_TEAM_MEMBERS: TeamMember[] = [
-    {
-        id: '1',
-        user_id: 'user-1',
-        email: 'alan@cs12.com',
-        name: 'Alan',
-        role: 'admin',
-        created_at: '2024-01-15T00:00:00Z',
-        is_current_user: true,
-    },
-    {
-        id: '2',
-        user_id: 'user-2',
-        email: 'sarah@acmedental.com',
-        name: 'Sarah Johnson',
-        role: 'manager',
-        created_at: '2024-02-20T00:00:00Z',
-    },
-    {
-        id: '3',
-        user_id: 'user-3',
-        email: 'mike@acmedental.com',
-        name: 'Mike Chen',
-        role: 'viewer',
-        created_at: '2024-03-10T00:00:00Z',
-    },
-];
-
 export function TeamMembers() {
+    const { user } = useAuth();
     const [members, setMembers] = useState<TeamMember[]>([]);
     const [loading, setLoading] = useState(true);
     const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -102,9 +75,15 @@ export function TeamMembers() {
     const currentUserRole: UserRole = 'admin';
     const canManageTeam = currentUserRole === 'admin';
 
+    // Get display name from email
+    const getDisplayName = (email: string) => {
+        const name = email.split('@')[0];
+        return name.charAt(0).toUpperCase() + name.slice(1);
+    };
+
     useEffect(() => {
         fetchMembers();
-    }, []);
+    }, [user]);
 
     const fetchMembers = async () => {
         setLoading(true);
@@ -114,12 +93,36 @@ export function TeamMembers() {
                 const data = await response.json();
                 setMembers(data.members);
             } else {
-                // Use mock data if API not available
-                setMembers(MOCK_TEAM_MEMBERS);
+                // Show only current user if API not available
+                if (user?.email) {
+                    setMembers([{
+                        id: user.id,
+                        user_id: user.id,
+                        email: user.email,
+                        name: getDisplayName(user.email),
+                        role: 'admin',
+                        created_at: new Date().toISOString(),
+                        is_current_user: true,
+                    }]);
+                } else {
+                    setMembers([]);
+                }
             }
         } catch (error) {
-            // Use mock data on error
-            setMembers(MOCK_TEAM_MEMBERS);
+            // Show only current user on error
+            if (user?.email) {
+                setMembers([{
+                    id: user.id,
+                    user_id: user.id,
+                    email: user.email,
+                    name: getDisplayName(user.email),
+                    role: 'admin',
+                    created_at: new Date().toISOString(),
+                    is_current_user: true,
+                }]);
+            } else {
+                setMembers([]);
+            }
         } finally {
             setLoading(false);
         }
@@ -150,18 +153,10 @@ export function TeamMembers() {
                 ));
                 toast.success(`Role updated to ${ROLE_CONFIG[newRole].label}`);
             } else {
-                // Mock update for demo
-                setMembers(members.map(m =>
-                    m.id === memberId ? { ...m, role: newRole } : m
-                ));
-                toast.success(`Role updated to ${ROLE_CONFIG[newRole].label}`);
+                toast.error('Failed to update role');
             }
         } catch (error) {
-            // Mock update for demo
-            setMembers(members.map(m =>
-                m.id === memberId ? { ...m, role: newRole } : m
-            ));
-            toast.success(`Role updated to ${ROLE_CONFIG[newRole].label}`);
+            toast.error('Failed to update role');
         } finally {
             setUpdatingRole(null);
         }
@@ -189,18 +184,14 @@ export function TeamMembers() {
                 method: 'DELETE',
             });
 
-            if (response.ok || response.status === 404) {
+            if (response.ok) {
                 setMembers(members.filter(m => m.id !== memberId));
                 toast.success(`${member.name} has been removed from the team`);
             } else {
-                // Mock removal for demo
-                setMembers(members.filter(m => m.id !== memberId));
-                toast.success(`${member.name} has been removed from the team`);
+                toast.error('Failed to remove team member');
             }
         } catch (error) {
-            // Mock removal for demo
-            setMembers(members.filter(m => m.id !== memberId));
-            toast.success(`${member.name} has been removed from the team`);
+            toast.error('Failed to remove team member');
         }
     };
 
