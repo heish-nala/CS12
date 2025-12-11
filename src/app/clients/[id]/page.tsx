@@ -114,7 +114,7 @@ function ClientDetailContent({
     };
 
     return (
-        <div className="flex-1 bg-background min-h-screen">
+        <div className="flex-1 bg-background min-h-screen" data-onboarding="client-dashboard">
             {/* Notion-style Page Header */}
             <div className="px-24 pt-20 pb-4">
                 <div className="max-w-5xl mx-auto">
@@ -163,7 +163,7 @@ function ClientDetailContent({
                     {/* Tabs */}
                     <Tabs defaultValue="data" className="space-y-6">
                         <TabsList>
-                            <TabsTrigger value="data">Data</TabsTrigger>
+                            <TabsTrigger value="data" data-onboarding="data-tables-tab">Data</TabsTrigger>
                             <TabsTrigger value="overview">Overview</TabsTrigger>
                             <TabsTrigger value="activity">Activity</TabsTrigger>
                         </TabsList>

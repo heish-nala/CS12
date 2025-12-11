@@ -492,7 +492,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
                         Choose from templates or create a blank table.
                     </p>
 
-                    <Button onClick={() => setCreateDialogOpen(true)}>
+                    <Button onClick={() => setCreateDialogOpen(true)} data-onboarding="add-table-btn">
                         <Plus className="h-4 w-4 mr-2" />
                         Create Data Table
                     </Button>
@@ -573,6 +573,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
                         className="flex items-center justify-center h-8 w-8 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                         onClick={() => setCreateDialogOpen(true)}
                         title="Add Table"
+                        data-onboarding="add-table-btn"
                     >
                         <Plus className="h-4 w-4" />
                     </button>

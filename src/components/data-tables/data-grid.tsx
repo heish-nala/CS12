@@ -968,13 +968,13 @@ export function DataGrid({
                                 ))}
                                 {/* Progress column for time tracking */}
                                 {hasTimeTracking && (
-                                    <th className="text-left font-medium border-l group/progress" style={{ minWidth: 130 }}>
+                                    <th className="text-left font-medium border-l group/progress" style={{ minWidth: 130 }} data-onboarding="period-tracker">
                                         <div className="px-3 py-2 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
                                             <BarChart3 className="h-4 w-4 text-blue-500" />
                                             <span className="flex-1">Progress</span>
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <button className="h-5 w-5 rounded flex items-center justify-center opacity-0 group-hover/progress:opacity-100 hover:bg-muted transition-all">
+                                                    <button className="h-5 w-5 rounded flex items-center justify-center opacity-0 group-hover/progress:opacity-100 hover:bg-muted transition-all" data-onboarding="time-tracking-config">
                                                         <Settings className="h-3.5 w-3.5" />
                                                     </button>
                                                 </DropdownMenuTrigger>

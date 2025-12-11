@@ -211,7 +211,7 @@ export function CreateTableDialog({
                         </p>
 
                         {/* Templates Grid */}
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 gap-3" data-onboarding="template-grid">
                             {loading ? (
                                 [...Array(4)].map((_, i) => (
                                     <div

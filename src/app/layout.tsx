@@ -3,8 +3,10 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/contexts/auth-context";
 import { ClientsProvider } from "@/contexts/clients-context";
+import { OnboardingProvider } from "@/contexts/onboarding-context";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { AppShell } from "@/components/layout/app-shell";
+import { OnboardingOverlay, OnboardingTrigger } from "@/components/onboarding";
 
 export const metadata: Metadata = {
     title: "CS12 - Customer Success Platform",
@@ -21,9 +23,13 @@ export default function RootLayout({
             <body className="antialiased">
                 <AuthProvider>
                     <ClientsProvider>
-                        <AuthGuard>
-                            <AppShell>{children}</AppShell>
-                        </AuthGuard>
+                        <OnboardingProvider>
+                            <AuthGuard>
+                                <AppShell>{children}</AppShell>
+                                <OnboardingTrigger />
+                                <OnboardingOverlay />
+                            </AuthGuard>
+                        </OnboardingProvider>
                     </ClientsProvider>
                 </AuthProvider>
                 <Toaster />

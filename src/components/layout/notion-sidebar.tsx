@@ -62,7 +62,7 @@ export function NotionSidebar() {
     const userInitial = userEmail.charAt(0).toUpperCase() || 'U';
 
     return (
-        <div className="fixed left-0 top-0 w-60 border-r border-border bg-sidebar flex flex-col h-screen">
+        <div className="fixed left-0 top-0 w-60 border-r border-border bg-sidebar flex flex-col h-screen" data-onboarding="sidebar">
             {/* Header - Logo */}
             <div className="px-2 py-3 border-b border-border">
                 <div className="flex items-center gap-2 px-2 py-1">
@@ -108,6 +108,7 @@ export function NotionSidebar() {
                             size="icon-sm"
                             className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 hover:bg-accent rounded-[3px] transition-opacity duration-100"
                             onClick={() => setCreateClientOpen(true)}
+                            data-onboarding="add-client-btn"
                         >
                             <Plus className="h-3.5 w-3.5 text-muted-foreground" />
                         </Button>
