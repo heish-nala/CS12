@@ -1,9 +1,9 @@
 'use client'
 
 import { useOnboarding } from '@/contexts/onboarding-context'
-import { getStepConfig, StepConfig } from './onboarding-steps'
+import { getStepConfig } from './onboarding-steps'
 import { Button } from '@/components/ui/button'
-import { X, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, Sparkles, MousePointerClick, PartyPopper } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface OnboardingTooltipProps {
@@ -18,13 +18,28 @@ export function OnboardingTooltip({ targetRect }: OnboardingTooltipProps) {
     nextStep,
     prevStep,
     completeOnboarding,
-    stopOnboarding,
   } = useOnboarding()
 
   const config = getStepConfig(currentStep)
   const isFirstStep = currentStepIndex === 0
   const isLastStep = currentStepIndex === totalSteps - 1
   const isCenteredStep = config.placement === 'center'
+
+  // Determine what action text to show
+  const getActionHint = () => {
+    switch (config.triggerType) {
+      case 'click':
+        return 'Click the highlighted area to continue'
+      case 'navigation':
+        return 'Complete the action to continue'
+      case 'element-visible':
+        return 'Select an option to continue'
+      default:
+        return null
+    }
+  }
+
+  const actionHint = getActionHint()
 
   // Calculate tooltip position
   const getTooltipStyle = (): React.CSSProperties => {
@@ -44,30 +59,28 @@ export function OnboardingTooltip({ targetRect }: OnboardingTooltipProps) {
       case 'right':
         return {
           position: 'fixed',
-          top: targetRect.top + targetRect.height / 2,
-          left: targetRect.right + padding + tooltipGap,
+          top: Math.min(targetRect.top + targetRect.height / 2, window.innerHeight - 200),
+          left: Math.min(targetRect.right + padding + tooltipGap, window.innerWidth - 360),
           transform: 'translateY(-50%)',
         }
       case 'left':
         return {
           position: 'fixed',
-          top: targetRect.top + targetRect.height / 2,
-          right: window.innerWidth - targetRect.left + padding + tooltipGap,
+          top: Math.min(targetRect.top + targetRect.height / 2, window.innerHeight - 200),
+          right: Math.min(window.innerWidth - targetRect.left + padding + tooltipGap, window.innerWidth - 20),
           transform: 'translateY(-50%)',
         }
       case 'bottom':
         return {
           position: 'fixed',
-          top: targetRect.bottom + padding + tooltipGap,
-          left: targetRect.left + targetRect.width / 2,
-          transform: 'translateX(-50%)',
+          top: Math.min(targetRect.bottom + padding + tooltipGap, window.innerHeight - 200),
+          left: Math.max(20, Math.min(targetRect.left + targetRect.width / 2 - 170, window.innerWidth - 360)),
         }
       case 'top':
         return {
           position: 'fixed',
-          bottom: window.innerHeight - targetRect.top + padding + tooltipGap,
-          left: targetRect.left + targetRect.width / 2,
-          transform: 'translateX(-50%)',
+          bottom: Math.min(window.innerHeight - targetRect.top + padding + tooltipGap, window.innerHeight - 20),
+          left: Math.max(20, Math.min(targetRect.left + targetRect.width / 2 - 170, window.innerWidth - 360)),
         }
       default:
         return {
@@ -164,6 +177,7 @@ export function OnboardingTooltip({ targetRect }: OnboardingTooltipProps) {
       <button
         onClick={handleSkip}
         className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+        title="Skip tour"
       >
         <X className="h-4 w-4" />
       </button>
@@ -173,8 +187,15 @@ export function OnboardingTooltip({ targetRect }: OnboardingTooltipProps) {
         {/* Icon for centered modals */}
         {isCenteredStep && (
           <div className="flex justify-center mb-2">
-            <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center">
-              <Sparkles className="h-6 w-6 text-blue-600" />
+            <div className={cn(
+              'w-12 h-12 rounded-full flex items-center justify-center',
+              isLastStep ? 'bg-green-50' : 'bg-blue-50'
+            )}>
+              {isLastStep ? (
+                <PartyPopper className="h-6 w-6 text-green-600" />
+              ) : (
+                <Sparkles className="h-6 w-6 text-blue-600" />
+              )}
             </div>
           </div>
         )}
@@ -194,6 +215,14 @@ export function OnboardingTooltip({ targetRect }: OnboardingTooltipProps) {
         )}>
           {config.description}
         </p>
+
+        {/* Action hint for interactive steps */}
+        {actionHint && (
+          <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 rounded-lg px-3 py-2">
+            <MousePointerClick className="h-4 w-4 shrink-0" />
+            <span>{actionHint}</span>
+          </div>
+        )}
 
         {/* Step indicator */}
         <div className="flex items-center justify-center gap-1.5 py-2">
@@ -227,19 +256,22 @@ export function OnboardingTooltip({ targetRect }: OnboardingTooltipProps) {
                 Skip tour
               </Button>
               <Button onClick={handleNext} className="bg-blue-600 hover:bg-blue-700">
-                Start Tour
+                Let's Go!
+                <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </>
           ) : isLastStep ? (
-            <Button onClick={handleNext} className="bg-blue-600 hover:bg-blue-700 w-full">
-              Get Started
+            <Button onClick={handleNext} className="bg-green-600 hover:bg-green-700 w-full">
+              <PartyPopper className="h-4 w-4 mr-2" />
+              Start Using Konekt
             </Button>
-          ) : (
+          ) : config.showNextButton ? (
             <>
               <Button
                 variant="ghost"
                 onClick={prevStep}
                 className="text-gray-500"
+                disabled={currentStepIndex <= 1}
               >
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Back
@@ -254,6 +286,22 @@ export function OnboardingTooltip({ targetRect }: OnboardingTooltipProps) {
                 </Button>
               </div>
             </>
+          ) : (
+            // Interactive step - no next button, just progress indicator
+            <div className="w-full flex items-center justify-between">
+              <Button
+                variant="ghost"
+                onClick={prevStep}
+                className="text-gray-500"
+                size="sm"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
+              <span className="text-sm text-gray-400">
+                {currentStepIndex + 1} / {totalSteps}
+              </span>
+            </div>
           )}
         </div>
       </div>

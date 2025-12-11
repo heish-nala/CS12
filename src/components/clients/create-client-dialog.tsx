@@ -86,7 +86,7 @@ export function CreateClientDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[500px]" data-onboarding="create-client-dialog">
                 <DialogHeader>
                     <DialogTitle>Create New Client</DialogTitle>
                     <DialogDescription>

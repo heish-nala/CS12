@@ -1,5 +1,6 @@
 export { OnboardingOverlay } from './onboarding-overlay'
 export { OnboardingTooltip } from './onboarding-tooltip'
 export { OnboardingTrigger } from './onboarding-trigger'
-export { stepConfigs, getStepConfig } from './onboarding-steps'
-export type { StepConfig } from './onboarding-steps'
+export { OnboardingChecklist } from './onboarding-checklist'
+export { stepConfigs, getStepConfig, defaultChecklistItems } from './onboarding-steps'
+export type { StepConfig, ChecklistItem, TriggerType } from './onboarding-steps'

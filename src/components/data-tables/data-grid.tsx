@@ -926,7 +926,7 @@ export function DataGrid({
                 </div>
             )}
 
-            <div className="border rounded-lg overflow-hidden bg-card">
+            <div className="border rounded-lg overflow-hidden bg-card" data-onboarding="data-grid">
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         {/* Header */}
