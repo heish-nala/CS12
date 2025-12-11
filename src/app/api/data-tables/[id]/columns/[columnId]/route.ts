@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-    updateDataColumn,
-    deleteDataColumn,
-    mockDataColumns
-} from '@/lib/mock-data';
+import { supabaseAdmin } from '@/lib/db/client';
 
 export async function PUT(
     request: NextRequest,
@@ -13,13 +9,25 @@ export async function PUT(
         const { columnId } = await params;
         const body = await request.json();
 
-        const column = updateDataColumn(columnId, body);
+        // Update column
+        const { data: column, error: updateError } = await supabaseAdmin
+            .from('data_columns')
+            .update({
+                ...body,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', columnId)
+            .select()
+            .single();
 
-        if (!column) {
-            return NextResponse.json(
-                { error: 'Column not found' },
-                { status: 404 }
-            );
+        if (updateError) {
+            if (updateError.code === 'PGRST116') {
+                return NextResponse.json(
+                    { error: 'Column not found' },
+                    { status: 404 }
+                );
+            }
+            throw updateError;
         }
 
         return NextResponse.json({ column });
@@ -37,15 +45,32 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string; columnId: string }> }
 ) {
     try {
-        const { columnId } = await params;
-        const deleted = deleteDataColumn(columnId);
+        const { id, columnId } = await params;
 
-        if (!deleted) {
+        // Get column info first to remove data from rows
+        const { data: column } = await supabaseAdmin
+            .from('data_columns')
+            .select('table_id')
+            .eq('id', columnId)
+            .single();
+
+        if (!column) {
             return NextResponse.json(
                 { error: 'Column not found' },
                 { status: 404 }
             );
         }
+
+        // Delete column
+        const { error: deleteError } = await supabaseAdmin
+            .from('data_columns')
+            .delete()
+            .eq('id', columnId);
+
+        if (deleteError) throw deleteError;
+
+        // Note: Row data cleanup would require updating each row's JSONB data
+        // This is optional since the column no longer exists
 
         return NextResponse.json({ success: true });
     } catch (error) {

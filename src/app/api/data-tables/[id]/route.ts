@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-    getDataTableById,
-    getColumnsByTable,
-    getRowsByTable,
-    deleteDataTable,
-    mockDataTables,
-    clearPeriodsForTable,
-} from '@/lib/mock-data';
+import { supabaseAdmin } from '@/lib/db/client';
 
 export async function GET(
     request: NextRequest,
@@ -15,23 +8,39 @@ export async function GET(
     try {
         const { id } = await params;
 
-        const table = getDataTableById(id);
+        // Fetch table from Supabase
+        const { data: table, error: tableError } = await supabaseAdmin
+            .from('data_tables')
+            .select('*')
+            .eq('id', id)
+            .single();
 
-        if (!table) {
+        if (tableError || !table) {
             return NextResponse.json(
                 { error: 'Table not found' },
                 { status: 404 }
             );
         }
 
-        const columns = getColumnsByTable(id);
-        const rows = getRowsByTable(id);
+        // Fetch columns
+        const { data: columns } = await supabaseAdmin
+            .from('data_columns')
+            .select('*')
+            .eq('table_id', id)
+            .order('order_index');
+
+        // Fetch rows
+        const { data: rows } = await supabaseAdmin
+            .from('data_rows')
+            .select('*')
+            .eq('table_id', id)
+            .order('created_at');
 
         return NextResponse.json({
             table: {
                 ...table,
-                columns,
-                rows,
+                columns: columns || [],
+                rows: rows || [],
             }
         });
     } catch (error) {
@@ -50,34 +59,46 @@ export async function PUT(
     try {
         const { id } = await params;
         const body = await request.json();
-        const tableIndex = mockDataTables.findIndex(t => t.id === id);
 
-        if (tableIndex === -1) {
+        // Get current table to check frequency change
+        const { data: currentTable } = await supabaseAdmin
+            .from('data_tables')
+            .select('time_tracking')
+            .eq('id', id)
+            .single();
+
+        if (!currentTable) {
             return NextResponse.json(
                 { error: 'Table not found' },
                 { status: 404 }
             );
         }
 
-        const currentTable = mockDataTables[tableIndex];
         const currentFrequency = currentTable.time_tracking?.frequency;
         const newFrequency = body.time_tracking?.frequency;
 
-        console.log(`[TABLE PUT] id=${id}, currentFrequency=${currentFrequency}, newFrequency=${newFrequency}`);
-
-        // If frequency is changing, clear all existing periods so they get regenerated
+        // If frequency is changing, clear all existing periods
         if (currentFrequency && newFrequency && currentFrequency !== newFrequency) {
-            console.log(`[TABLE PUT] Clearing periods for table ${id}`);
-            clearPeriodsForTable(id);
+            await supabaseAdmin
+                .from('period_data')
+                .delete()
+                .eq('table_id', id);
         }
 
-        mockDataTables[tableIndex] = {
-            ...mockDataTables[tableIndex],
-            ...body,
-            updated_at: new Date().toISOString(),
-        };
+        // Update table
+        const { data: table, error: updateError } = await supabaseAdmin
+            .from('data_tables')
+            .update({
+                ...body,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', id)
+            .select()
+            .single();
 
-        return NextResponse.json({ table: mockDataTables[tableIndex] });
+        if (updateError) throw updateError;
+
+        return NextResponse.json({ table });
     } catch (error) {
         console.error('Error updating data table:', error);
         return NextResponse.json(
@@ -93,14 +114,32 @@ export async function DELETE(
 ) {
     try {
         const { id } = await params;
-        const deleted = deleteDataTable(id);
 
-        if (!deleted) {
-            return NextResponse.json(
-                { error: 'Table not found' },
-                { status: 404 }
-            );
-        }
+        // Delete rows first (foreign key constraint)
+        await supabaseAdmin
+            .from('data_rows')
+            .delete()
+            .eq('table_id', id);
+
+        // Delete columns
+        await supabaseAdmin
+            .from('data_columns')
+            .delete()
+            .eq('table_id', id);
+
+        // Delete period data if exists
+        await supabaseAdmin
+            .from('period_data')
+            .delete()
+            .eq('table_id', id);
+
+        // Delete table
+        const { error: deleteError } = await supabaseAdmin
+            .from('data_tables')
+            .delete()
+            .eq('id', id);
+
+        if (deleteError) throw deleteError;
 
         return NextResponse.json({ success: true });
     } catch (error) {

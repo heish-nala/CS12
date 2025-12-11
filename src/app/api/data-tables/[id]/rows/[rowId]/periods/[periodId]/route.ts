@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-    getPeriodDataById,
-    updatePeriodData,
-    deletePeriodData,
-} from '@/lib/mock-data';
+import { supabaseAdmin } from '@/lib/db/client';
 
 // GET /api/data-tables/[id]/rows/[rowId]/periods/[periodId] - Get a specific period
 export async function GET(
@@ -12,8 +8,13 @@ export async function GET(
 ) {
     const { periodId } = await params;
 
-    const period = getPeriodDataById(periodId);
-    if (!period) {
+    const { data: period, error } = await supabaseAdmin
+        .from('period_data')
+        .select('*')
+        .eq('id', periodId)
+        .single();
+
+    if (error || !period) {
         return NextResponse.json({ error: 'Period not found' }, { status: 404 });
     }
 
@@ -33,9 +34,33 @@ export async function PUT(
         return NextResponse.json({ error: 'Metrics object required' }, { status: 400 });
     }
 
-    const updated = updatePeriodData(periodId, metrics);
-    if (!updated) {
+    // Get existing metrics to merge
+    const { data: existing } = await supabaseAdmin
+        .from('period_data')
+        .select('metrics')
+        .eq('id', periodId)
+        .single();
+
+    if (!existing) {
         return NextResponse.json({ error: 'Period not found' }, { status: 404 });
+    }
+
+    // Merge existing metrics with new values
+    const mergedMetrics = { ...existing.metrics, ...metrics };
+
+    const { data: updated, error: updateError } = await supabaseAdmin
+        .from('period_data')
+        .update({
+            metrics: mergedMetrics,
+            updated_at: new Date().toISOString(),
+        })
+        .eq('id', periodId)
+        .select()
+        .single();
+
+    if (updateError) {
+        console.error('Error updating period:', updateError);
+        return NextResponse.json({ error: 'Failed to update period' }, { status: 500 });
     }
 
     return NextResponse.json(updated);
@@ -48,9 +73,14 @@ export async function DELETE(
 ) {
     const { periodId } = await params;
 
-    const success = deletePeriodData(periodId);
-    if (!success) {
-        return NextResponse.json({ error: 'Period not found' }, { status: 404 });
+    const { error } = await supabaseAdmin
+        .from('period_data')
+        .delete()
+        .eq('id', periodId);
+
+    if (error) {
+        console.error('Error deleting period:', error);
+        return NextResponse.json({ error: 'Failed to delete period' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

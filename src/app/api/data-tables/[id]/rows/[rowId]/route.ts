@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-    updateDataRow,
-    deleteDataRow,
-    mockDataRows
-} from '@/lib/mock-data';
+import { supabaseAdmin } from '@/lib/db/client';
 
 export async function PUT(
     request: NextRequest,
@@ -14,14 +10,35 @@ export async function PUT(
         const body = await request.json();
         const { data } = body;
 
-        const row = updateDataRow(rowId, data || {});
+        // Get existing row data first
+        const { data: existingRow, error: fetchError } = await supabaseAdmin
+            .from('data_rows')
+            .select('data')
+            .eq('id', rowId)
+            .single();
 
-        if (!row) {
+        if (fetchError || !existingRow) {
             return NextResponse.json(
                 { error: 'Row not found' },
                 { status: 404 }
             );
         }
+
+        // Merge existing data with new data
+        const mergedData = { ...existingRow.data, ...data };
+
+        // Update row
+        const { data: row, error: updateError } = await supabaseAdmin
+            .from('data_rows')
+            .update({
+                data: mergedData,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', rowId)
+            .select()
+            .single();
+
+        if (updateError) throw updateError;
 
         return NextResponse.json({ row });
     } catch (error) {
@@ -39,14 +56,20 @@ export async function DELETE(
 ) {
     try {
         const { rowId } = await params;
-        const deleted = deleteDataRow(rowId);
 
-        if (!deleted) {
-            return NextResponse.json(
-                { error: 'Row not found' },
-                { status: 404 }
-            );
-        }
+        // Delete associated period data first
+        await supabaseAdmin
+            .from('period_data')
+            .delete()
+            .eq('row_id', rowId);
+
+        // Delete row
+        const { error: deleteError } = await supabaseAdmin
+            .from('data_rows')
+            .delete()
+            .eq('id', rowId);
+
+        if (deleteError) throw deleteError;
 
         return NextResponse.json({ success: true });
     } catch (error) {
