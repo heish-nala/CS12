@@ -174,12 +174,19 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     localStorage.setItem(STORAGE_KEY, 'true')
     localStorage.removeItem(STEP_KEY)
 
-    // Show checklist if not all items are complete
-    const allDone = Object.values(checklistItems).every(Boolean)
-    if (!allDone) {
-      setIsChecklistVisible(true)
+    // Mark all checklist items as complete when tour finishes
+    const allComplete: ChecklistState = {
+      'create-client': true,
+      'add-table': true,
+      'use-template': true,
+      'progress-tracker': true,
     }
-  }, [checklistItems])
+    setChecklistItems(allComplete)
+    localStorage.setItem(CHECKLIST_KEY, JSON.stringify(allComplete))
+
+    // Hide checklist since tour is complete
+    setIsChecklistVisible(false)
+  }, [])
 
   const resetOnboarding = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY)

@@ -33,7 +33,7 @@ export interface StepConfig {
 export const stepConfigs: StepConfig[] = [
   {
     id: 'welcome',
-    title: 'Welcome to Konekt!',
+    title: 'Welcome to CS12!',
     description: "Let's get you set up with a quick hands-on tutorial. You'll create your first client and learn the key features.",
     placement: 'center',
     triggerType: 'manual',

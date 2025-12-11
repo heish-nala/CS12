@@ -266,7 +266,7 @@ export function OnboardingTooltip({ targetRect }: OnboardingTooltipProps) {
           ) : isLastStep ? (
             <Button onClick={handleNext} className="bg-green-600 hover:bg-green-700 w-full">
               <PartyPopper className="h-4 w-4 mr-2" />
-              Start Using Konekt
+              Start Using CS12
             </Button>
           ) : config.showNextButton ? (
             <>

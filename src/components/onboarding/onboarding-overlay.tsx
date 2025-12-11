@@ -110,14 +110,19 @@ export function OnboardingOverlay() {
   }, [isOnboardingActive, currentStep, updateTargetPosition])
 
   // Handle click triggers
+  const clickHandledRef = useRef<string | null>(null)
   useEffect(() => {
     if (!isOnboardingActive || config.triggerType !== 'click' || !config.triggerTarget) return
 
     const handleClick = (e: MouseEvent) => {
+      // Don't trigger if we already handled this step
+      if (clickHandledRef.current === currentStep) return
+
       const target = e.target as HTMLElement
       const triggerElement = target.closest(`[data-onboarding="${config.triggerTarget}"]`)
 
       if (triggerElement) {
+        clickHandledRef.current = currentStep
         // Mark checklist item if applicable
         if (config.checklistItem) {
           markChecklistItem(config.checklistItem as any)
@@ -125,20 +130,27 @@ export function OnboardingOverlay() {
         // Delay to allow the action to complete
         setTimeout(() => {
           nextStep()
-        }, 100)
+        }, 300)
       }
     }
 
     document.addEventListener('click', handleClick, true)
     return () => document.removeEventListener('click', handleClick, true)
-  }, [isOnboardingActive, config.triggerType, config.triggerTarget, config.checklistItem, nextStep, markChecklistItem])
+  }, [isOnboardingActive, config.triggerType, config.triggerTarget, config.checklistItem, nextStep, markChecklistItem, currentStep])
 
   // Handle navigation triggers
+  const navigationHandledRef = useRef<string | null>(null)
   useEffect(() => {
     if (!isOnboardingActive || config.triggerType !== 'navigation' || !config.triggerPath) return
 
+    // Don't trigger if we already handled this step
+    if (navigationHandledRef.current === currentStep) return
+
     // Check if current path matches the trigger path
     if (pathname.startsWith(config.triggerPath)) {
+      // Mark this step as handled to prevent duplicate triggers
+      navigationHandledRef.current = currentStep
+
       // Mark checklist item if applicable
       if (config.checklistItem) {
         markChecklistItem(config.checklistItem as any)
@@ -160,39 +172,54 @@ export function OnboardingOverlay() {
       // Initial delay to let navigation complete
       setTimeout(waitForPageReady, 800)
     }
-  }, [isOnboardingActive, config.triggerType, config.triggerPath, config.checklistItem, pathname, nextStep, markChecklistItem])
+  }, [isOnboardingActive, config.triggerType, config.triggerPath, config.checklistItem, pathname, nextStep, markChecklistItem, currentStep])
 
   // Handle element-visible triggers
+  const elementVisibleHandledRef = useRef<string | null>(null)
   useEffect(() => {
     if (!isOnboardingActive || config.triggerType !== 'element-visible' || !config.triggerTarget) return
 
+    // Don't trigger if we already handled this step
+    if (elementVisibleHandledRef.current === currentStep) return
+
+    let handled = false
+
     const checkElement = () => {
+      if (handled) return true
       const element = document.querySelector(`[data-onboarding="${config.triggerTarget}"]`)
       if (element) {
+        handled = true
+        elementVisibleHandledRef.current = currentStep
         // Mark checklist item if applicable
         if (config.checklistItem) {
           markChecklistItem(config.checklistItem as any)
         }
         setTimeout(() => {
           nextStep()
-        }, 300)
+        }, 500)
         return true
       }
       return false
     }
 
-    // Check immediately
-    if (checkElement()) return
+    // Delay before starting to check - give time for user to see the current step
+    const startDelay = setTimeout(() => {
+      // Check if element is visible
+      if (checkElement()) return
 
-    // Otherwise poll for the element
-    const interval = setInterval(() => {
-      if (checkElement()) {
-        clearInterval(interval)
-      }
-    }, 300)
+      // Otherwise poll for the element
+      const interval = setInterval(() => {
+        if (checkElement()) {
+          clearInterval(interval)
+        }
+      }, 500)
 
-    return () => clearInterval(interval)
-  }, [isOnboardingActive, config.triggerType, config.triggerTarget, config.checklistItem, nextStep, markChecklistItem])
+      // Cleanup interval on unmount
+      return () => clearInterval(interval)
+    }, 1000)
+
+    return () => clearTimeout(startDelay)
+  }, [isOnboardingActive, config.triggerType, config.triggerTarget, config.checklistItem, nextStep, markChecklistItem, currentStep])
 
   // Don't show on login page
   const isLoginPage = pathname === '/login'
