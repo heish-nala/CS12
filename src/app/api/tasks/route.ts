@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-    getAllTasks,
-    getAllTaskGroups,
-    getTasksByDoctor,
-    getDoctorById,
-    mockDoctors,
-} from '@/lib/mock-data';
-import { TaskWithGroup } from '@/lib/db/types';
+import { supabaseAdmin } from '@/lib/db/client';
 
 export async function GET(request: NextRequest) {
     try {
@@ -14,37 +7,66 @@ export async function GET(request: NextRequest) {
         const doctorId = searchParams.get('doctor_id');
         const dsoId = searchParams.get('dso_id');
 
-        let tasks = getAllTasks();
+        let query = supabaseAdmin
+            .from('tasks')
+            .select(`
+                *,
+                task_groups(*),
+                doctors(id, name)
+            `);
 
         // Filter by doctor if specified
         if (doctorId) {
-            tasks = getTasksByDoctor(doctorId);
+            query = query.eq('doctor_id', doctorId);
         }
 
         // Filter by DSO if specified
         if (dsoId) {
-            const dsoDoctors = mockDoctors.filter(d => d.dso_id === dsoId);
-            const doctorIds = dsoDoctors.map(d => d.id);
-            tasks = tasks.filter(t => t.doctor_id && doctorIds.includes(t.doctor_id));
+            // Get doctors in this DSO first
+            const { data: dsoDoctors } = await supabaseAdmin
+                .from('doctors')
+                .select('id')
+                .eq('dso_id', dsoId);
+
+            if (dsoDoctors && dsoDoctors.length > 0) {
+                const doctorIds = dsoDoctors.map(d => d.id);
+                query = query.in('doctor_id', doctorIds);
+            } else {
+                // No doctors in this DSO, return empty
+                return NextResponse.json({
+                    tasks: [],
+                    task_groups: [],
+                    total: 0,
+                });
+            }
         }
 
-        const taskGroups = getAllTaskGroups();
+        const { data: tasks, error: tasksError } = await query;
 
-        // Enrich tasks with task group and doctor info
-        const enrichedTasks: (TaskWithGroup & { doctor?: { id: string; name: string } })[] = tasks.map((task) => {
-            const group = taskGroups.find(g => g.id === task.task_group_id);
-            const doctor = task.doctor_id ? getDoctorById(task.doctor_id) : undefined;
+        if (tasksError) {
+            console.error('Error fetching tasks:', tasksError);
+            return NextResponse.json({
+                tasks: [],
+                task_groups: [],
+                total: 0,
+            });
+        }
 
-            return {
-                ...task,
-                task_group: group!,
-                doctor: doctor ? { id: doctor.id, name: doctor.name } : undefined,
-            };
-        });
+        // Get all task groups
+        const { data: taskGroups } = await supabaseAdmin
+            .from('task_groups')
+            .select('*');
+
+        // Format tasks with enriched data
+        const enrichedTasks = (tasks || []).map((task: any) => ({
+            ...task,
+            task_group: task.task_groups,
+            doctor: task.doctors ? { id: task.doctors.id, name: task.doctors.name } : undefined,
+        }));
 
         return NextResponse.json({
             tasks: enrichedTasks,
-            task_groups: taskGroups,
+            task_groups: taskGroups || [],
             total: enrichedTasks.length,
         });
     } catch (error) {
@@ -56,10 +78,30 @@ export async function GET(request: NextRequest) {
     }
 }
 
-// POST disabled for mock data mode
 export async function POST(request: NextRequest) {
-    return NextResponse.json(
-        { error: 'Creating tasks is disabled in mock data mode' },
-        { status: 503 }
-    );
+    try {
+        const body = await request.json();
+
+        const { data: task, error } = await supabaseAdmin
+            .from('tasks')
+            .insert(body)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error creating task:', error);
+            return NextResponse.json(
+                { error: 'Failed to create task' },
+                { status: 500 }
+            );
+        }
+
+        return NextResponse.json(task);
+    } catch (error) {
+        console.error('Error creating task:', error);
+        return NextResponse.json(
+            { error: 'Internal server error' },
+            { status: 500 }
+        );
+    }
 }

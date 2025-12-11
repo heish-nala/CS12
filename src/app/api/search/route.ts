@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-    mockClients,
-    mockDoctors,
-    mockDataRows,
-    mockDataTables,
-    mockDataColumns,
-    getDSOById,
-} from '@/lib/mock-data';
+import { supabaseAdmin } from '@/lib/db/client';
 
 export interface SearchResult {
     id: string;
@@ -28,61 +21,59 @@ export async function GET(request: NextRequest) {
 
         const results: SearchResult[] = [];
 
-        // Search clients
-        mockClients.forEach((client) => {
-            if (
-                client.name.toLowerCase().includes(query) ||
-                client.industry?.toLowerCase().includes(query) ||
-                client.contact_name?.toLowerCase().includes(query) ||
-                client.contact_email?.toLowerCase().includes(query)
-            ) {
-                results.push({
-                    id: client.id,
-                    type: 'client',
-                    title: client.name,
-                    subtitle: client.industry,
-                    href: `/clients/${client.id}`,
-                });
-            }
+        // Search clients (DSOs)
+        const { data: clients } = await supabaseAdmin
+            .from('dsos')
+            .select('id, name, industry, contact_name, contact_email')
+            .or(`name.ilike.%${query}%,industry.ilike.%${query}%,contact_name.ilike.%${query}%,contact_email.ilike.%${query}%`)
+            .limit(10);
+
+        clients?.forEach((client) => {
+            results.push({
+                id: client.id,
+                type: 'client',
+                title: client.name,
+                subtitle: client.industry,
+                href: `/clients/${client.id}`,
+            });
         });
 
         // Search doctors
-        mockDoctors.forEach((doctor) => {
-            if (
-                doctor.name.toLowerCase().includes(query) ||
-                doctor.email?.toLowerCase().includes(query) ||
-                doctor.notes?.toLowerCase().includes(query)
-            ) {
-                const dso = getDSOById(doctor.dso_id);
-                results.push({
-                    id: doctor.id,
-                    type: 'doctor',
-                    title: doctor.name,
-                    subtitle: dso?.name,
-                    href: `/clients/${doctor.dso_id}`,
-                    metadata: { status: doctor.status },
-                });
-            }
+        const { data: doctors } = await supabaseAdmin
+            .from('doctors')
+            .select('id, name, email, notes, status, dso_id, dsos(name)')
+            .or(`name.ilike.%${query}%,email.ilike.%${query}%,notes.ilike.%${query}%`)
+            .limit(10);
+
+        doctors?.forEach((doctor: any) => {
+            results.push({
+                id: doctor.id,
+                type: 'doctor',
+                title: doctor.name,
+                subtitle: doctor.dsos?.name,
+                href: `/clients/${doctor.dso_id}`,
+                metadata: { status: doctor.status },
+            });
         });
 
-        // Search data table rows
-        mockDataRows.forEach((row) => {
-            const table = mockDataTables.find(t => t.id === row.table_id);
-            const columns = mockDataColumns.filter(c => c.table_id === row.table_id);
+        // Search data table rows - search through JSONB data field
+        const { data: rows } = await supabaseAdmin
+            .from('data_rows')
+            .select('id, table_id, data, data_tables(name, client_id)')
+            .limit(20);
 
-            // Search through all row data values
+        rows?.forEach((row: any) => {
             const dataValues = Object.entries(row.data || {});
-            for (const [columnId, value] of dataValues) {
+            for (const [, value] of dataValues) {
                 if (value && String(value).toLowerCase().includes(query)) {
-                    const column = columns.find(c => c.id === columnId);
                     results.push({
                         id: row.id,
                         type: 'row',
                         title: String(value),
-                        subtitle: `${table?.name || 'Table'} - ${column?.name || 'Field'}`,
-                        href: `/clients/${table?.client_id || '1'}?table=${row.table_id}&row=${row.id}`,
+                        subtitle: row.data_tables?.name || 'Table',
+                        href: `/clients/${row.data_tables?.client_id || '1'}?table=${row.table_id}&row=${row.id}`,
                     });
-                    break; // Only add the row once
+                    break;
                 }
             }
         });
