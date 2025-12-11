@@ -85,12 +85,30 @@ export function TeamMembers() {
     }, [user]);
 
     const fetchMembers = async () => {
+        if (!user?.id) {
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
         try {
-            const response = await fetch('/api/team');
+            const response = await fetch(`/api/team?user_id=${user.id}`);
             if (response.ok) {
                 const data = await response.json();
-                setMembers(data.members);
+                if (data.members && data.members.length > 0) {
+                    setMembers(data.members);
+                } else {
+                    // No team members found - show current user as the only member
+                    setMembers([{
+                        id: user.id,
+                        user_id: user.id,
+                        email: user.email || '',
+                        name: getDisplayName(user.email || 'User'),
+                        role: 'admin',
+                        created_at: new Date().toISOString(),
+                        is_current_user: true,
+                    }]);
+                }
             } else {
                 // Show only current user if API not available
                 if (user?.email) {
