@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Users, TrendingUp, AlertTriangle, ArrowRight, Plus, Settings2, BarChart3, FolderOpen } from 'lucide-react';
 import { CardConfigDialog, MetricConfig, DEFAULT_METRICS } from './card-config-dialog';
 import { CreateClientDialog } from './create-client-dialog';
+import { useAuth } from '@/contexts/auth-context';
 
 interface ClientMetrics {
     client_id: string;
@@ -26,6 +27,7 @@ interface ClientWithMetrics extends Client {
 
 export function ClientsOverview() {
     const router = useRouter();
+    const { user } = useAuth();
     const [clients, setClients] = useState<ClientWithMetrics[]>([]);
     const [loading, setLoading] = useState(true);
     const [configDialogOpen, setConfigDialogOpen] = useState(false);
@@ -33,9 +35,11 @@ export function ClientsOverview() {
     const [metrics, setMetrics] = useState<MetricConfig[]>(DEFAULT_METRICS);
 
     useEffect(() => {
-        fetchClients();
+        if (user?.id) {
+            fetchClients();
+        }
         loadMetricsConfig();
-    }, []);
+    }, [user?.id]);
 
     const loadMetricsConfig = () => {
         try {
@@ -147,8 +151,12 @@ export function ClientsOverview() {
     };
 
     const fetchClients = async () => {
+        if (!user?.id) {
+            setLoading(false);
+            return;
+        }
         try {
-            const response = await fetch('/api/clients/overview');
+            const response = await fetch(`/api/clients/overview?user_id=${user.id}`);
             const data = await response.json();
             setClients(data.clients || []);
         } catch (error) {

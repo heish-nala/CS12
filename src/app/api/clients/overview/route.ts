@@ -1,13 +1,35 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
 import { calculateRiskLevel, getDaysSinceActivity } from '@/lib/calculations/risk-level';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
+        const { searchParams } = new URL(request.url);
+        const userId = searchParams.get('user_id');
+
+        if (!userId) {
+            return NextResponse.json({ clients: [] });
+        }
+
+        // Get DSOs that the user has access to
+        const { data: accessRecords, error: accessError } = await supabaseAdmin
+            .from('user_dso_access')
+            .select('dso_id')
+            .eq('user_id', userId);
+
+        if (accessError) throw accessError;
+
+        // If user has no access to any DSOs, return empty array
+        if (!accessRecords || accessRecords.length === 0) {
+            return NextResponse.json({ clients: [] });
+        }
+
+        const dsoIds = accessRecords.map(r => r.dso_id);
+
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-        // Fetch all non-archived DSOs with their doctors and related data
+        // Fetch only DSOs the user has access to
         const { data: clients, error } = await supabaseAdmin
             .from('dsos')
             .select(`
@@ -18,6 +40,7 @@ export async function GET() {
                     activities(*)
                 )
             `)
+            .in('id', dsoIds)
             .or('archived.is.null,archived.eq.false');
 
         if (error) throw error;
