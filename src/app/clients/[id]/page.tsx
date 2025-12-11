@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useState, useMemo } from 'react';
 import { Client } from '@/lib/db/types';
 import { ExecutiveDashboard } from '@/components/dashboard/executive-dashboard';
 import { DataTablesView } from '@/components/data-tables/data-tables-view';
@@ -11,7 +11,7 @@ import { ActivityTimeline } from '@/components/activities/activity-timeline';
 import { Button } from '@/components/ui/button';
 import { Settings } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useAuth } from '@/contexts/auth-context';
+import { useClients } from '@/contexts/clients-context';
 
 interface ClientDetailPageProps {
     params: Promise<{ id: string }>;
@@ -19,35 +19,17 @@ interface ClientDetailPageProps {
 
 export default function ClientDetailPage({ params }: ClientDetailPageProps) {
     const { id } = use(params);
-    const { user } = useAuth();
-    const [client, setClient] = useState<Client | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { clients, archivedClients, loading: clientsLoading, refreshClients } = useClients();
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [metricsDialogOpen, setMetricsDialogOpen] = useState(false);
 
-    const fetchClient = async () => {
-        if (!user?.id) return;
+    // Find client in the context (includes both active and archived)
+    const client = useMemo(() => {
+        const allClients = [...clients, ...archivedClients];
+        return allClients.find((c) => c.id === id) as Client | undefined;
+    }, [clients, archivedClients, id]);
 
-        try {
-            const response = await fetch(`/api/dsos?user_id=${user.id}`);
-            const data = await response.json();
-            const dsos = data.dsos || [];
-            const foundClient = dsos.find((c: Client) => c.id === id);
-            setClient(foundClient || null);
-        } catch (error) {
-            console.error('Error fetching client:', error);
-            setClient(null);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchClient();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id, user?.id]);
-
-    if (loading) {
+    if (clientsLoading) {
         return (
             <div className="flex-1 bg-background min-h-screen">
                 <div className="px-24 pt-20 pb-4">
@@ -89,7 +71,7 @@ export default function ClientDetailPage({ params }: ClientDetailPageProps) {
                 setSettingsOpen={setSettingsOpen}
                 metricsDialogOpen={metricsDialogOpen}
                 setMetricsDialogOpen={setMetricsDialogOpen}
-                fetchClient={fetchClient}
+                refreshClients={refreshClients}
             />
         </MetricConfigProvider>
     );
@@ -102,15 +84,15 @@ function ClientDetailContent({
     setSettingsOpen,
     metricsDialogOpen,
     setMetricsDialogOpen,
-    fetchClient,
+    refreshClients,
 }: {
-    client: Client | null;
+    client: Client;
     clientId: string;
     settingsOpen: boolean;
     setSettingsOpen: (open: boolean) => void;
     metricsDialogOpen: boolean;
     setMetricsDialogOpen: (open: boolean) => void;
-    fetchClient: () => void;
+    refreshClients: () => Promise<void>;
 }) {
     const { metricConfigs, refresh } = useMetricConfig();
 
@@ -130,10 +112,6 @@ function ClientDetailContent({
 
         await refresh();
     };
-
-    if (!client) {
-        return null;
-    }
 
     return (
         <div className="flex-1 bg-background min-h-screen">
@@ -210,7 +188,7 @@ function ClientDetailContent({
                 open={settingsOpen}
                 onOpenChange={setSettingsOpen}
                 client={client}
-                onUpdate={fetchClient}
+                onUpdate={refreshClients}
                 onOpenMetricsDialog={() => {
                     setSettingsOpen(false);
                     setTimeout(() => {

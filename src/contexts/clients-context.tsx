@@ -20,14 +20,17 @@ interface ClientsContextType {
 const ClientsContext = createContext<ClientsContextType | undefined>(undefined);
 
 export function ClientsProvider({ children }: { children: ReactNode }) {
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const [clients, setClients] = useState<Client[]>([]);
     const [archivedClients, setArchivedClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
 
     const fetchClients = useCallback(async () => {
         if (!user?.id) {
-            setLoading(false);
+            // Only set loading to false if auth is done and there's no user
+            if (!authLoading) {
+                setLoading(false);
+            }
             return;
         }
 
@@ -43,11 +46,14 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
         } finally {
             setLoading(false);
         }
-    }, [user?.id]);
+    }, [user?.id, authLoading]);
 
     useEffect(() => {
-        fetchClients();
-    }, [fetchClients]);
+        // Only fetch when auth is done loading
+        if (!authLoading) {
+            fetchClients();
+        }
+    }, [fetchClients, authLoading]);
 
     const addClient = useCallback((client: Client) => {
         setClients(prev => [...prev, client]);

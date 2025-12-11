@@ -23,6 +23,7 @@ export interface Client {
     industry?: string;
     contact_name?: string;
     contact_email?: string;
+    archived?: boolean;
     created_at: string;
     updated_at: string;
 }
