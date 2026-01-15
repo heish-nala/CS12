@@ -376,6 +376,7 @@ export function TeamMembers() {
                 existingEmails={members.map(m => m.email)}
                 dsoId={currentDsoId}
                 currentUserId={user?.id}
+                currentUserName={members.find(m => m.is_current_user)?.name || getDisplayName(user?.email || 'User')}
             />
         </div>
     );

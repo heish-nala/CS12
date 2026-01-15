@@ -40,6 +40,7 @@ interface AddMemberDialogProps {
     existingEmails: string[];
     dsoId?: string | null;
     currentUserId?: string;
+    currentUserName?: string;
 }
 
 const ROLE_OPTIONS: { value: UserRole; label: string; icon: React.ReactNode; description: string }[] = [
@@ -70,6 +71,7 @@ export function AddMemberDialog({
     existingEmails,
     dsoId,
     currentUserId,
+    currentUserName,
 }: AddMemberDialogProps) {
     const [email, setEmail] = useState('');
     const [name, setName] = useState('');
@@ -134,6 +136,7 @@ export function AddMemberDialog({
                         role,
                         dso_id: dsoId,
                         invited_by: currentUserId,
+                        inviter_name: currentUserName,
                     }),
                 });
 

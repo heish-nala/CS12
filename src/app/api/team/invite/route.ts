@@ -5,7 +5,7 @@ import { UserRole } from '@/lib/db/types';
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { email, role, dso_id, invited_by } = body;
+        const { email, role, dso_id, invited_by, inviter_name } = body;
 
         // Validate input
         if (!email) {
@@ -144,6 +144,7 @@ export async function POST(request: NextRequest) {
                     role: role,
                     dso_id: dso_id,
                     invite_id: invite.id,
+                    inviter_name: inviter_name || 'Your teammate',
                 },
                 redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/login?invited=true`,
             }
