@@ -148,7 +148,10 @@ export async function GET(request: NextRequest) {
             return a.name.localeCompare(b.name);
         });
 
-        return NextResponse.json({ members });
+        // Return the first DSO ID for invites (user's primary workspace)
+        const primaryDsoId = dsoIds.length > 0 ? dsoIds[0] : null;
+
+        return NextResponse.json({ members, dso_id: primaryDsoId });
     } catch (error) {
         console.error('Error in team API:', error);
         return NextResponse.json(

@@ -69,6 +69,7 @@ export function TeamMembers() {
     const [loading, setLoading] = useState(true);
     const [addDialogOpen, setAddDialogOpen] = useState(false);
     const [updatingRole, setUpdatingRole] = useState<string | null>(null);
+    const [currentDsoId, setCurrentDsoId] = useState<string | null>(null);
 
     // Current user is admin (for demo purposes)
     const currentUserRole: UserRole = 'admin';
@@ -95,6 +96,10 @@ export function TeamMembers() {
             const response = await fetch(`/api/team?user_id=${user.id}`);
             if (response.ok) {
                 const data = await response.json();
+                // Store the DSO ID for invites
+                if (data.dso_id) {
+                    setCurrentDsoId(data.dso_id);
+                }
                 if (data.members && data.members.length > 0) {
                     setMembers(data.members);
                 } else {
@@ -369,6 +374,8 @@ export function TeamMembers() {
                 onOpenChange={setAddDialogOpen}
                 onMemberAdded={handleAddMember}
                 existingEmails={members.map(m => m.email)}
+                dsoId={currentDsoId}
+                currentUserId={user?.id}
             />
         </div>
     );

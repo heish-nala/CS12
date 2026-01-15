@@ -38,6 +38,8 @@ interface AddMemberDialogProps {
     onOpenChange: (open: boolean) => void;
     onMemberAdded: (member: TeamMember) => void;
     existingEmails: string[];
+    dsoId?: string | null;
+    currentUserId?: string;
 }
 
 const ROLE_OPTIONS: { value: UserRole; label: string; icon: React.ReactNode; description: string }[] = [
@@ -66,6 +68,8 @@ export function AddMemberDialog({
     onOpenChange,
     onMemberAdded,
     existingEmails,
+    dsoId,
+    currentUserId,
 }: AddMemberDialogProps) {
     const [email, setEmail] = useState('');
     const [name, setName] = useState('');
@@ -112,6 +116,11 @@ export function AddMemberDialog({
             return;
         }
 
+        if (mode === 'invite' && !dsoId) {
+            toast.error('Unable to send invite. Please try again later.');
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -120,62 +129,48 @@ export function AddMemberDialog({
                 const response = await fetch('/api/team/invite', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, role }),
+                    body: JSON.stringify({
+                        email,
+                        role,
+                        dso_id: dsoId,
+                        invited_by: currentUserId,
+                    }),
                 });
 
+                const data = await response.json();
+
                 if (response.ok) {
-                    toast.success(`Invitation sent to ${email}`);
+                    if (data.added_directly) {
+                        // User was already in Supabase, just added to workspace
+                        toast.success(data.message || `${email} has been added to the workspace`);
+                    } else {
+                        toast.success(data.message || `Invitation sent to ${email}`);
+                    }
                     handleClose();
                 } else {
-                    // Mock success for demo
-                    toast.success(`Invitation sent to ${email}`);
-                    handleClose();
+                    toast.error(data.error || 'Failed to send invitation');
                 }
             } else {
                 // Direct add
                 const response = await fetch('/api/team', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, name, role }),
+                    body: JSON.stringify({ email, name, role, dso_id: dsoId }),
                 });
 
-                let newMember: TeamMember;
-
                 if (response.ok) {
-                    newMember = await response.json();
+                    const newMember = await response.json();
+                    onMemberAdded(newMember);
+                    toast.success(`${name} has been added to the team`);
+                    handleClose();
                 } else {
-                    // Mock member for demo
-                    newMember = {
-                        id: `member-${Date.now()}`,
-                        user_id: `user-${Date.now()}`,
-                        email: email.toLowerCase(),
-                        name: name.trim(),
-                        role,
-                        created_at: new Date().toISOString(),
-                    };
+                    const data = await response.json();
+                    toast.error(data.error || 'Failed to add team member');
                 }
-
-                onMemberAdded(newMember);
-                toast.success(`${name} has been added to the team`);
-                handleClose();
             }
         } catch (error) {
-            // Mock success for demo
-            if (mode === 'invite') {
-                toast.success(`Invitation sent to ${email}`);
-            } else {
-                const newMember: TeamMember = {
-                    id: `member-${Date.now()}`,
-                    user_id: `user-${Date.now()}`,
-                    email: email.toLowerCase(),
-                    name: name.trim(),
-                    role,
-                    created_at: new Date().toISOString(),
-                };
-                onMemberAdded(newMember);
-                toast.success(`${name} has been added to the team`);
-            }
-            handleClose();
+            console.error('Error in handleSubmit:', error);
+            toast.error('An error occurred. Please try again.');
         } finally {
             setLoading(false);
         }
