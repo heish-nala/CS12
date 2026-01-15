@@ -8,12 +8,22 @@ import { getStepConfig } from './onboarding-steps'
 import { OnboardingTooltip } from './onboarding-tooltip'
 import confetti from 'canvas-confetti'
 
+interface AnimatedRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 export function OnboardingOverlay() {
   const pathname = usePathname()
   const { isOnboardingActive, currentStep, nextStep, markChecklistItem, completeOnboarding } = useOnboarding()
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null)
+  const [animatedRect, setAnimatedRect] = useState<AnimatedRect | null>(null)
+  const [isTransitioning, setIsTransitioning] = useState(false)
   const [mounted, setMounted] = useState(false)
   const hasTriggeredConfetti = useRef(false)
+  const prevStepRef = useRef(currentStep)
 
   const config = getStepConfig(currentStep)
   const isCenteredStep = config.placement === 'center'
@@ -83,6 +93,34 @@ export function OnboardingOverlay() {
     setMounted(true)
     return () => setMounted(false)
   }, [])
+
+  // Detect step changes and trigger transition
+  useEffect(() => {
+    if (prevStepRef.current !== currentStep) {
+      setIsTransitioning(true)
+      prevStepRef.current = currentStep
+      // End transition after animation completes
+      const timeout = setTimeout(() => {
+        setIsTransitioning(false)
+      }, 400)
+      return () => clearTimeout(timeout)
+    }
+  }, [currentStep])
+
+  // Update animated rect with smooth transition
+  useEffect(() => {
+    if (targetRect) {
+      const padding = config.spotlightPadding || 8
+      setAnimatedRect({
+        x: targetRect.left - padding,
+        y: targetRect.top - padding,
+        width: targetRect.width + padding * 2,
+        height: targetRect.height + padding * 2,
+      })
+    } else {
+      setAnimatedRect(null)
+    }
+  }, [targetRect, config.spotlightPadding])
 
   // Update position when step changes or on resize
   useEffect(() => {
@@ -225,11 +263,11 @@ export function OnboardingOverlay() {
   const isLoginPage = pathname === '/login'
   if (!mounted || !isOnboardingActive || isLoginPage) return null
 
-  const padding = config.spotlightPadding || 8
+  const borderRadius = 8
 
-  // Create spotlight mask using SVG
+  // Create spotlight using box-shadow for smooth CSS transitions
   const renderSpotlight = () => {
-    if (isCenteredStep || !targetRect) {
+    if (isCenteredStep || !animatedRect) {
       return (
         <div
           className="fixed inset-0 bg-black/50 z-[9999] transition-opacity duration-300"
@@ -237,79 +275,65 @@ export function OnboardingOverlay() {
       )
     }
 
-    const spotlightX = targetRect.left - padding
-    const spotlightY = targetRect.top - padding
-    const spotlightWidth = targetRect.width + padding * 2
-    const spotlightHeight = targetRect.height + padding * 2
-    const borderRadius = 8
-
     return (
-      <svg
-        className="fixed inset-0 w-full h-full z-[9999] transition-all duration-300 pointer-events-none"
-      >
-        <defs>
-          <mask id="spotlight-mask">
-            <rect x="0" y="0" width="100%" height="100%" fill="white" />
-            <rect
-              x={spotlightX}
-              y={spotlightY}
-              width={spotlightWidth}
-              height={spotlightHeight}
-              rx={borderRadius}
-              ry={borderRadius}
-              fill="black"
-            />
-          </mask>
-        </defs>
-
-        {/* Semi-transparent overlay with spotlight cutout */}
-        <rect
-          x="0"
-          y="0"
-          width="100%"
-          height="100%"
-          fill="rgba(0, 0, 0, 0.5)"
-          mask="url(#spotlight-mask)"
+      <>
+        {/* Spotlight cutout using box-shadow */}
+        <div
+          className="fixed z-[9999] pointer-events-none rounded-lg"
+          style={{
+            left: animatedRect.x,
+            top: animatedRect.y,
+            width: animatedRect.width,
+            height: animatedRect.height,
+            boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)',
+            transition: 'all 400ms cubic-bezier(0.4, 0, 0.2, 1)',
+            borderRadius: borderRadius,
+          }}
         />
 
         {/* Pulsing spotlight border */}
         {config.showPulse && (
-          <>
-            <rect
-              x={spotlightX}
-              y={spotlightY}
-              width={spotlightWidth}
-              height={spotlightHeight}
-              rx={borderRadius}
-              ry={borderRadius}
-              fill="none"
-              stroke="rgba(59, 130, 246, 0.8)"
-              strokeWidth="3"
-              className="animate-pulse"
+          <div
+            className="fixed z-[9999] pointer-events-none"
+            style={{
+              left: animatedRect.x,
+              top: animatedRect.y,
+              width: animatedRect.width,
+              height: animatedRect.height,
+              transition: 'all 400ms cubic-bezier(0.4, 0, 0.2, 1)',
+              borderRadius: borderRadius,
+            }}
+          >
+            {/* Inner border */}
+            <div
+              className="absolute inset-0 rounded-lg animate-pulse"
+              style={{
+                border: '3px solid rgba(59, 130, 246, 0.8)',
+                borderRadius: borderRadius,
+              }}
             />
             {/* Outer glow ring */}
-            <rect
-              x={spotlightX - 4}
-              y={spotlightY - 4}
-              width={spotlightWidth + 8}
-              height={spotlightHeight + 8}
-              rx={borderRadius + 4}
-              ry={borderRadius + 4}
-              fill="none"
-              stroke="rgba(59, 130, 246, 0.3)"
-              strokeWidth="2"
-              className="animate-ping"
-              style={{ animationDuration: '1.5s' }}
+            <div
+              className="absolute rounded-lg"
+              style={{
+                top: -4,
+                left: -4,
+                right: -4,
+                bottom: -4,
+                border: '2px solid rgba(59, 130, 246, 0.3)',
+                borderRadius: borderRadius + 4,
+                animation: 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              }}
             />
-          </>
+          </div>
         )}
-      </svg>
+      </>
     )
   }
 
   // Click blocker that allows clicks on spotlight area
   const renderClickBlocker = () => {
-    if (!targetRect) {
+    if (!animatedRect) {
       return (
         <div
           className="fixed inset-0 z-[10000]"
@@ -318,28 +342,34 @@ export function OnboardingOverlay() {
       )
     }
 
-    const p = padding
     return (
       <>
         {/* Top blocker */}
         <div
           className="fixed left-0 right-0 top-0 z-[10000]"
-          style={{ height: Math.max(0, targetRect.top - p) }}
+          style={{
+            height: Math.max(0, animatedRect.y),
+            transition: 'all 400ms cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
           onClick={(e) => e.stopPropagation()}
         />
         {/* Bottom blocker */}
         <div
           className="fixed left-0 right-0 bottom-0 z-[10000]"
-          style={{ top: targetRect.bottom + p }}
+          style={{
+            top: animatedRect.y + animatedRect.height,
+            transition: 'all 400ms cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
           onClick={(e) => e.stopPropagation()}
         />
         {/* Left blocker */}
         <div
           className="fixed top-0 bottom-0 left-0 z-[10000]"
           style={{
-            width: Math.max(0, targetRect.left - p),
-            top: targetRect.top - p,
-            height: targetRect.height + p * 2,
+            width: Math.max(0, animatedRect.x),
+            top: animatedRect.y,
+            height: animatedRect.height,
+            transition: 'all 400ms cubic-bezier(0.4, 0, 0.2, 1)',
           }}
           onClick={(e) => e.stopPropagation()}
         />
@@ -347,9 +377,10 @@ export function OnboardingOverlay() {
         <div
           className="fixed top-0 bottom-0 right-0 z-[10000]"
           style={{
-            left: targetRect.right + p,
-            top: targetRect.top - p,
-            height: targetRect.height + p * 2,
+            left: animatedRect.x + animatedRect.width,
+            top: animatedRect.y,
+            height: animatedRect.height,
+            transition: 'all 400ms cubic-bezier(0.4, 0, 0.2, 1)',
           }}
           onClick={(e) => e.stopPropagation()}
         />
@@ -361,7 +392,7 @@ export function OnboardingOverlay() {
     <>
       {renderSpotlight()}
       {config.blockInteraction !== false && renderClickBlocker()}
-      <OnboardingTooltip targetRect={targetRect} />
+      <OnboardingTooltip targetRect={targetRect} isTransitioning={isTransitioning} />
     </>,
     document.body
   )

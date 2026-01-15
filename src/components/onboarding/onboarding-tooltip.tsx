@@ -8,9 +8,10 @@ import { cn } from '@/lib/utils'
 
 interface OnboardingTooltipProps {
   targetRect?: DOMRect | null
+  isTransitioning?: boolean
 }
 
-export function OnboardingTooltip({ targetRect }: OnboardingTooltipProps) {
+export function OnboardingTooltip({ targetRect, isTransitioning }: OnboardingTooltipProps) {
   const {
     currentStep,
     currentStepIndex,
@@ -43,12 +44,15 @@ export function OnboardingTooltip({ targetRect }: OnboardingTooltipProps) {
 
   // Calculate tooltip position
   const getTooltipStyle = (): React.CSSProperties => {
+    const transitionStyle = 'all 400ms cubic-bezier(0.4, 0, 0.2, 1)'
+
     if (isCenteredStep || !targetRect) {
       return {
         position: 'fixed',
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
+        transition: transitionStyle,
       }
     }
 
@@ -62,6 +66,7 @@ export function OnboardingTooltip({ targetRect }: OnboardingTooltipProps) {
           top: Math.min(targetRect.top + targetRect.height / 2, window.innerHeight - 200),
           left: Math.min(targetRect.right + padding + tooltipGap, window.innerWidth - 360),
           transform: 'translateY(-50%)',
+          transition: transitionStyle,
         }
       case 'left':
         return {
@@ -69,6 +74,7 @@ export function OnboardingTooltip({ targetRect }: OnboardingTooltipProps) {
           top: Math.min(targetRect.top + targetRect.height / 2, window.innerHeight - 200),
           right: Math.min(window.innerWidth - targetRect.left + padding + tooltipGap, window.innerWidth - 20),
           transform: 'translateY(-50%)',
+          transition: transitionStyle,
         }
       case 'bottom':
         // Ensure tooltip doesn't go below viewport - leave room for full tooltip height (~350px)
@@ -78,12 +84,14 @@ export function OnboardingTooltip({ targetRect }: OnboardingTooltipProps) {
           position: 'fixed',
           top: Math.min(bottomTop, maxTop),
           left: Math.max(20, Math.min(targetRect.left + targetRect.width / 2 - 170, window.innerWidth - 360)),
+          transition: transitionStyle,
         }
       case 'top':
         return {
           position: 'fixed',
           bottom: Math.min(window.innerHeight - targetRect.top + padding + tooltipGap, window.innerHeight - 20),
           left: Math.max(20, Math.min(targetRect.left + targetRect.width / 2 - 170, window.innerWidth - 360)),
+          transition: transitionStyle,
         }
       default:
         return {
@@ -91,6 +99,7 @@ export function OnboardingTooltip({ targetRect }: OnboardingTooltipProps) {
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
+          transition: transitionStyle,
         }
     }
   }
@@ -167,7 +176,10 @@ export function OnboardingTooltip({ targetRect }: OnboardingTooltipProps) {
 
   return (
     <div
-      style={getTooltipStyle()}
+      style={{
+        ...getTooltipStyle(),
+        opacity: isTransitioning ? 0.7 : 1,
+      }}
       className={cn(
         'z-[10001] bg-white rounded-xl shadow-2xl border border-gray-100',
         isCenteredStep ? 'w-[420px] p-8' : 'w-[340px] p-6'

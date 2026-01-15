@@ -29,6 +29,9 @@ import {
     Trash2,
     Mail,
     Crown,
+    Clock,
+    X,
+    RefreshCw,
 } from 'lucide-react';
 
 interface TeamMember {
@@ -39,6 +42,14 @@ interface TeamMember {
     role: UserRole;
     created_at: string;
     is_current_user?: boolean;
+}
+
+interface PendingInvite {
+    id: string;
+    email: string;
+    role: UserRole;
+    expires_at: string;
+    created_at: string;
 }
 
 // Using design system CSS variables for consistent theming
@@ -66,10 +77,12 @@ const ROLE_CONFIG: Record<UserRole, { label: string; icon: React.ReactNode; colo
 export function TeamMembers() {
     const { user } = useAuth();
     const [members, setMembers] = useState<TeamMember[]>([]);
+    const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
     const [loading, setLoading] = useState(true);
     const [addDialogOpen, setAddDialogOpen] = useState(false);
     const [updatingRole, setUpdatingRole] = useState<string | null>(null);
     const [currentDsoId, setCurrentDsoId] = useState<string | null>(null);
+    const [cancellingInvite, setCancellingInvite] = useState<string | null>(null);
 
     // Current user is admin (for demo purposes)
     const currentUserRole: UserRole = 'admin';
@@ -84,6 +97,59 @@ export function TeamMembers() {
     useEffect(() => {
         fetchMembers();
     }, [user]);
+
+    // Fetch pending invites when DSO ID is available
+    useEffect(() => {
+        if (currentDsoId) {
+            fetchPendingInvites();
+        }
+    }, [currentDsoId]);
+
+    const fetchPendingInvites = async () => {
+        if (!currentDsoId) return;
+
+        try {
+            const response = await fetch(`/api/team/invite?dso_id=${currentDsoId}`);
+            if (response.ok) {
+                const data = await response.json();
+                setPendingInvites(data.invites || []);
+            }
+        } catch (error) {
+            console.error('Error fetching pending invites:', error);
+        }
+    };
+
+    const handleCancelInvite = async (inviteId: string) => {
+        setCancellingInvite(inviteId);
+        try {
+            const response = await fetch(`/api/team/invite?id=${inviteId}`, {
+                method: 'DELETE',
+            });
+
+            if (response.ok) {
+                setPendingInvites(prev => prev.filter(inv => inv.id !== inviteId));
+                toast.success('Invitation cancelled');
+            } else {
+                toast.error('Failed to cancel invitation');
+            }
+        } catch (error) {
+            toast.error('Failed to cancel invitation');
+        } finally {
+            setCancellingInvite(null);
+        }
+    };
+
+    const getTimeRemaining = (expiresAt: string) => {
+        const expires = new Date(expiresAt);
+        const now = new Date();
+        const diff = expires.getTime() - now.getTime();
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        if (days > 1) return `${days} days left`;
+        if (days === 1) return '1 day left';
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        if (hours > 0) return `${hours} hours left`;
+        return 'Expiring soon';
+    };
 
     const fetchMembers = async () => {
         if (!user?.id) {
@@ -219,6 +285,14 @@ export function TeamMembers() {
 
     const handleAddMember = (newMember: TeamMember) => {
         setMembers([...members, newMember]);
+    };
+
+    const handleDialogClose = (open: boolean) => {
+        setAddDialogOpen(open);
+        // Refresh pending invites when dialog closes
+        if (!open && currentDsoId) {
+            fetchPendingInvites();
+        }
     };
 
     const getInitials = (name: string) => {
@@ -368,10 +442,77 @@ export function TeamMembers() {
                 })}
             </div>
 
+            {/* Pending Invites */}
+            {pendingInvites.length > 0 && (
+                <div className="space-y-3">
+                    <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Pending Invitations ({pendingInvites.length})
+                    </h3>
+                    <div className="rounded-lg border border-dashed border-border divide-y divide-border">
+                        {pendingInvites.map((invite) => {
+                            const roleConfig = ROLE_CONFIG[invite.role];
+                            const isCancelling = cancellingInvite === invite.id;
+
+                            return (
+                                <div
+                                    key={invite.id}
+                                    className="flex items-center justify-between p-4 bg-muted/20"
+                                >
+                                    {/* Invite Info */}
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                                            <Mail className="h-5 w-5" />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium text-foreground">
+                                                    {invite.email}
+                                                </span>
+                                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+                                                    Pending
+                                                </Badge>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                <span>{getTimeRemaining(invite.expires_at)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Role & Actions */}
+                                    <div className="flex items-center gap-3">
+                                        <Badge variant="outline" className={`${roleConfig.color} gap-1`}>
+                                            {roleConfig.icon}
+                                            {roleConfig.label}
+                                        </Badge>
+
+                                        {canManageTeam && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                                                onClick={() => handleCancelInvite(invite.id)}
+                                                disabled={isCancelling}
+                                            >
+                                                {isCancelling ? (
+                                                    <RefreshCw className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <X className="h-4 w-4" />
+                                                )}
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
             {/* Add Member Dialog */}
             <AddMemberDialog
                 open={addDialogOpen}
-                onOpenChange={setAddDialogOpen}
+                onOpenChange={handleDialogClose}
                 onMemberAdded={handleAddMember}
                 existingEmails={members.map(m => m.email)}
                 dsoId={currentDsoId}
