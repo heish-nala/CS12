@@ -46,6 +46,7 @@ import {
     X,
     BarChart3,
     Settings,
+    Loader2,
 } from 'lucide-react';
 import { ColumnConfigDialog } from './column-config-dialog';
 import { cn } from '@/lib/utils';
@@ -106,6 +107,9 @@ interface DataGridProps {
     periodData?: Record<string, PeriodData[]>; // rowId -> periods
     onOpenPeriodDialog?: (rowId: string, rowName: string) => void;
     onConfigureTimeTracking?: () => void;
+    // Loading states for better UX
+    isAddingRow?: boolean;
+    isAddingColumn?: boolean;
 }
 
 // Column type categories for Monday-style picker
@@ -804,6 +808,8 @@ export function DataGrid({
     periodData,
     onOpenPeriodDialog,
     onConfigureTimeTracking,
+    isAddingRow = false,
+    isAddingColumn = false,
 }: DataGridProps) {
     const [sortColumn, setSortColumn] = useState<string | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -1081,10 +1087,15 @@ export function DataGrid({
                 <div className="border-t">
                     <button
                         onClick={onAddRow}
-                        className="w-full px-3 py-2.5 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+                        disabled={isAddingRow}
+                        className="w-full px-3 py-2.5 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        <Plus className="h-4 w-4" />
-                        <span>Add new row</span>
+                        {isAddingRow ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Plus className="h-4 w-4" />
+                        )}
+                        <span>{isAddingRow ? 'Adding...' : 'Add new row'}</span>
                     </button>
                 </div>
             </div>

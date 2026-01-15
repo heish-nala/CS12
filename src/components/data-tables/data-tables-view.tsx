@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useDebouncedCallback } from 'use-debounce';
 import { DataTable, DataColumn, DataRow, ColumnType, PeriodData, TimeTrackingConfig } from '@/lib/db/types';
 import { DataGrid } from './data-grid';
 import { CreateTableDialog } from './create-table-dialog';
@@ -41,6 +42,7 @@ import {
     Download,
     Upload,
     BarChart3,
+    Loader2,
 } from 'lucide-react';
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -123,6 +125,13 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
     const [periodDialogOpen, setPeriodDialogOpen] = useState(false);
     const [selectedRowForPeriod, setSelectedRowForPeriod] = useState<{ id: string; name: string } | null>(null);
 
+    // Loading states for better UX
+    const [isAddingRow, setIsAddingRow] = useState(false);
+    const [isAddingColumn, setIsAddingColumn] = useState(false);
+
+    // Track which tables have been fully loaded (for tab caching)
+    const loadedTablesRef = useRef<Set<string>>(new Set());
+
     useEffect(() => {
         fetchTables();
     }, [clientId]);
@@ -174,7 +183,12 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
         }
     };
 
-    const fetchTableData = async (tableId: string) => {
+    const fetchTableData = async (tableId: string, force = false) => {
+        // Skip if already loaded and not forcing refresh
+        if (!force && loadedTablesRef.current.has(tableId)) {
+            return;
+        }
+
         try {
             const response = await fetch(`/api/data-tables/${tableId}`);
             const data = await response.json();
@@ -186,6 +200,9 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
                         : t
                 )
             );
+
+            // Mark as loaded
+            loadedTablesRef.current.add(tableId);
         } catch (error) {
             console.error('Error fetching table data:', error);
         }
@@ -197,7 +214,9 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
     };
 
     const handleAddRow = async () => {
-        if (!activeTableId) return;
+        if (!activeTableId || isAddingRow) return;
+
+        setIsAddingRow(true);
 
         try {
             const response = await fetch(`/api/data-tables/${activeTableId}/rows`, {
@@ -207,79 +226,128 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
             });
 
             if (response.ok) {
-                fetchTableData(activeTableId);
+                const { row } = await response.json();
+                // Optimistic append - no refetch needed
+                setTables((prev) =>
+                    prev.map((t) =>
+                        t.id === activeTableId
+                            ? { ...t, rows: [...t.rows, row], row_count: (t.row_count || 0) + 1 }
+                            : t
+                    )
+                );
             }
         } catch (error) {
             console.error('Error adding row:', error);
+        } finally {
+            setIsAddingRow(false);
         }
     };
 
-    const handleUpdateRow = async (rowId: string, data: Record<string, any>) => {
+    // Debounced row update to prevent rapid API calls during inline editing
+    const debouncedUpdateRow = useDebouncedCallback(
+        async (rowId: string, data: Record<string, any>, tableId: string) => {
+            try {
+                await fetch(`/api/data-tables/${tableId}/rows/${rowId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data }),
+                });
+            } catch (error) {
+                console.error('Error updating row:', error);
+            }
+        },
+        300
+    );
+
+    const handleUpdateRow = useCallback((rowId: string, data: Record<string, any>) => {
         if (!activeTableId) return;
 
-        try {
-            await fetch(`/api/data-tables/${activeTableId}/rows/${rowId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ data }),
-            });
+        // Optimistic update first - instant UI feedback
+        setTables((prev) =>
+            prev.map((t) =>
+                t.id === activeTableId
+                    ? {
+                        ...t,
+                        rows: t.rows.map((r) =>
+                            r.id === rowId ? { ...r, data: { ...r.data, ...data } } : r
+                        ),
+                    }
+                    : t
+            )
+        );
 
-            // Optimistic update
-            setTables((prev) =>
-                prev.map((t) =>
-                    t.id === activeTableId
-                        ? {
-                            ...t,
-                            rows: t.rows.map((r) =>
-                                r.id === rowId ? { ...r, data: { ...r.data, ...data } } : r
-                            ),
-                        }
-                        : t
-                )
-            );
-        } catch (error) {
-            console.error('Error updating row:', error);
-        }
-    };
+        // Debounced API call
+        debouncedUpdateRow(rowId, data, activeTableId);
+    }, [activeTableId, debouncedUpdateRow]);
 
     const handleDeleteRow = async (rowId: string) => {
         if (!activeTableId) return;
+
+        // Optimistic delete first
+        setTables((prev) =>
+            prev.map((t) =>
+                t.id === activeTableId
+                    ? { ...t, rows: t.rows.filter((r) => r.id !== rowId), row_count: Math.max(0, (t.row_count || 0) - 1) }
+                    : t
+            )
+        );
 
         try {
             await fetch(`/api/data-tables/${activeTableId}/rows/${rowId}`, {
                 method: 'DELETE',
             });
-
-            setTables((prev) =>
-                prev.map((t) =>
-                    t.id === activeTableId
-                        ? { ...t, rows: t.rows.filter((r) => r.id !== rowId) }
-                        : t
-                )
-            );
         } catch (error) {
             console.error('Error deleting row:', error);
+            // Could revert here if needed
         }
     };
 
     const handleAddColumn = async (name: string, type: ColumnType) => {
-        if (!activeTableId) return;
+        if (!activeTableId || isAddingColumn) return;
+
+        setIsAddingColumn(true);
 
         try {
-            await fetch(`/api/data-tables/${activeTableId}/columns`, {
+            const response = await fetch(`/api/data-tables/${activeTableId}/columns`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, type }),
             });
 
-            fetchTableData(activeTableId);
+            if (response.ok) {
+                const { column } = await response.json();
+                // Optimistic append - no refetch needed
+                setTables((prev) =>
+                    prev.map((t) =>
+                        t.id === activeTableId
+                            ? { ...t, columns: [...t.columns, column] }
+                            : t
+                    )
+                );
+            }
         } catch (error) {
             console.error('Error adding column:', error);
+        } finally {
+            setIsAddingColumn(false);
         }
     };
 
     const handleUpdateColumn = async (columnId: string, updates: Partial<DataColumn>) => {
         if (!activeTableId) return;
+
+        // Optimistic update first
+        setTables((prev) =>
+            prev.map((t) =>
+                t.id === activeTableId
+                    ? {
+                        ...t,
+                        columns: t.columns.map((c) =>
+                            c.id === columnId ? { ...c, ...updates } : c
+                        ),
+                    }
+                    : t
+            )
+        );
 
         try {
             await fetch(`/api/data-tables/${activeTableId}/columns/${columnId}`, {
@@ -287,24 +355,31 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updates),
             });
-
-            fetchTableData(activeTableId);
         } catch (error) {
             console.error('Error updating column:', error);
+            // Could revert here if needed
         }
     };
 
     const handleDeleteColumn = async (columnId: string) => {
         if (!activeTableId) return;
 
+        // Optimistic delete first
+        setTables((prev) =>
+            prev.map((t) =>
+                t.id === activeTableId
+                    ? { ...t, columns: t.columns.filter((c) => c.id !== columnId) }
+                    : t
+            )
+        );
+
         try {
             await fetch(`/api/data-tables/${activeTableId}/columns/${columnId}`, {
                 method: 'DELETE',
             });
-
-            fetchTableData(activeTableId);
         } catch (error) {
             console.error('Error deleting column:', error);
+            // Could revert here if needed
         }
     };
 
@@ -618,6 +693,8 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
                     periodData={periodData}
                     onOpenPeriodDialog={handleOpenPeriodDialog}
                     onConfigureTimeTracking={() => handleOpenTimeTrackingConfig(activeTable)}
+                    isAddingRow={isAddingRow}
+                    isAddingColumn={isAddingColumn}
                 />
             )}
 
