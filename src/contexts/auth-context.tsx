@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/db/client';
 
@@ -16,10 +16,31 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper function to check and accept pending invites
+async function checkAndAcceptInvites(userId: string, email: string) {
+    try {
+        const response = await fetch('/api/team/accept-invite', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId, email }),
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.accepted_count > 0) {
+                console.log(`Accepted ${data.accepted_count} invite(s):`, data.workspaces);
+            }
+        }
+    } catch (error) {
+        console.error('Error checking for pending invites:', error);
+    }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
+    const inviteCheckDone = useRef<Set<string>>(new Set());
 
     useEffect(() => {
         // Get initial session
@@ -27,14 +48,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setSession(session);
             setUser(session?.user ?? null);
             setLoading(false);
+
+            // Check for pending invites on initial load
+            if (session?.user?.id && session?.user?.email) {
+                if (!inviteCheckDone.current.has(session.user.id)) {
+                    inviteCheckDone.current.add(session.user.id);
+                    checkAndAcceptInvites(session.user.id, session.user.email);
+                }
+            }
         });
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            (_event, session) => {
+            (event, session) => {
                 setSession(session);
                 setUser(session?.user ?? null);
                 setLoading(false);
+
+                // Check for pending invites on sign in
+                if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user?.id && session?.user?.email) {
+                    if (!inviteCheckDone.current.has(session.user.id)) {
+                        inviteCheckDone.current.add(session.user.id);
+                        checkAndAcceptInvites(session.user.id, session.user.email);
+                    }
+                }
+
+                // Clear the check on sign out so it runs again on next sign in
+                if (event === 'SIGNED_OUT') {
+                    inviteCheckDone.current.clear();
+                }
             }
         );
 
