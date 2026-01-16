@@ -66,6 +66,14 @@ export async function POST(request: NextRequest) {
                 .single();
 
             if (existingAccess) {
+                // Also clean up any stale pending invites for this user/dso
+                await supabaseAdmin
+                    .from('team_invites')
+                    .update({ status: 'accepted', accepted_at: new Date().toISOString() })
+                    .eq('email', normalizedEmail)
+                    .eq('dso_id', dso_id)
+                    .eq('status', 'pending');
+
                 return NextResponse.json(
                     { error: 'This user is already a member of this workspace' },
                     { status: 400 }
@@ -88,6 +96,14 @@ export async function POST(request: NextRequest) {
                     { status: 500 }
                 );
             }
+
+            // Mark any pending invites as accepted since user was added directly
+            await supabaseAdmin
+                .from('team_invites')
+                .update({ status: 'accepted', accepted_at: new Date().toISOString() })
+                .eq('email', normalizedEmail)
+                .eq('dso_id', dso_id)
+                .eq('status', 'pending');
 
             return NextResponse.json({
                 success: true,
@@ -219,6 +235,49 @@ export async function GET(request: NextRequest) {
                 { error: 'Failed to fetch invites' },
                 { status: 500 }
             );
+        }
+
+        if (!invites || invites.length === 0) {
+            return NextResponse.json({ invites: [] });
+        }
+
+        // Filter out invites for users who are already members
+        // Get all current members of this DSO
+        const { data: members } = await supabaseAdmin
+            .from('user_dso_access')
+            .select('user_id')
+            .eq('dso_id', dsoId);
+
+        if (members && members.length > 0) {
+            // Get emails of current members
+            const memberEmails = new Set<string>();
+            for (const member of members) {
+                try {
+                    const { data: userData } = await supabaseAdmin.auth.admin.getUserById(member.user_id);
+                    if (userData?.user?.email) {
+                        memberEmails.add(userData.user.email.toLowerCase());
+                    }
+                } catch {
+                    // Skip if can't get user
+                }
+            }
+
+            // Filter out invites for users who are already members
+            const filteredInvites = invites.filter(invite => !memberEmails.has(invite.email.toLowerCase()));
+
+            // Clean up any stale invites (mark as accepted)
+            const staleInviteIds = invites
+                .filter(invite => memberEmails.has(invite.email.toLowerCase()))
+                .map(invite => invite.id);
+
+            if (staleInviteIds.length > 0) {
+                await supabaseAdmin
+                    .from('team_invites')
+                    .update({ status: 'accepted', accepted_at: new Date().toISOString() })
+                    .in('id', staleInviteIds);
+            }
+
+            return NextResponse.json({ invites: filteredInvites });
         }
 
         return NextResponse.json({ invites: invites || [] });
