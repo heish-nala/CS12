@@ -1,44 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/db/client';
 import { UserRole } from '@/lib/db/types';
-
-interface TeamMember {
-    id: string;
-    user_id: string;
-    email: string;
-    name: string;
-    role: UserRole;
-    created_at: string;
-    is_current_user?: boolean;
-}
-
-// In-memory store (shared with main route in real app via database)
-let mockTeamMembers: TeamMember[] = [
-    {
-        id: '1',
-        user_id: 'user-1',
-        email: 'alan@cs12.com',
-        name: 'Alan',
-        role: 'admin',
-        created_at: '2024-01-15T00:00:00Z',
-        is_current_user: true,
-    },
-    {
-        id: '2',
-        user_id: 'user-2',
-        email: 'sarah@acmedental.com',
-        name: 'Sarah Johnson',
-        role: 'manager',
-        created_at: '2024-02-20T00:00:00Z',
-    },
-    {
-        id: '3',
-        user_id: 'user-3',
-        email: 'mike@acmedental.com',
-        name: 'Mike Chen',
-        role: 'viewer',
-        created_at: '2024-03-10T00:00:00Z',
-    },
-];
 
 export async function PATCH(
     request: NextRequest,
@@ -50,28 +12,37 @@ export async function PATCH(
         const { role } = body;
 
         // Validate role
-        if (!role || !['admin', 'manager', 'viewer'].includes(role)) {
+        const validRoles: UserRole[] = ['admin', 'manager', 'viewer'];
+        if (!role || !validRoles.includes(role)) {
             return NextResponse.json(
                 { error: 'Invalid role. Must be admin, manager, or viewer' },
                 { status: 400 }
             );
         }
 
-        // Find member
-        const memberIndex = mockTeamMembers.findIndex(m => m.id === id);
-        if (memberIndex === -1) {
+        // Get the current member to check their role
+        const { data: member, error: fetchError } = await supabaseAdmin
+            .from('user_dso_access')
+            .select('id, user_id, role, dso_id')
+            .eq('id', id)
+            .single();
+
+        if (fetchError || !member) {
             return NextResponse.json(
                 { error: 'Team member not found' },
                 { status: 404 }
             );
         }
 
-        const member = mockTeamMembers[memberIndex];
-
-        // Prevent demoting the last admin
+        // If demoting an admin, check if they're the last one
         if (member.role === 'admin' && role !== 'admin') {
-            const adminCount = mockTeamMembers.filter(m => m.role === 'admin').length;
-            if (adminCount <= 1) {
+            const { data: admins, error: countError } = await supabaseAdmin
+                .from('user_dso_access')
+                .select('id')
+                .eq('dso_id', member.dso_id)
+                .eq('role', 'admin');
+
+            if (!countError && admins && admins.length <= 1) {
                 return NextResponse.json(
                     { error: 'Cannot change role. At least one admin is required.' },
                     { status: 400 }
@@ -79,15 +50,21 @@ export async function PATCH(
             }
         }
 
-        // TODO: Replace with actual Supabase update
-        // const { error } = await supabase
-        //     .from('user_dso_access')
-        //     .update({ role })
-        //     .eq('id', id);
+        // Update the role
+        const { error: updateError } = await supabaseAdmin
+            .from('user_dso_access')
+            .update({ role })
+            .eq('id', id);
 
-        mockTeamMembers[memberIndex] = { ...member, role };
+        if (updateError) {
+            console.error('Error updating role:', updateError);
+            return NextResponse.json(
+                { error: 'Failed to update role' },
+                { status: 500 }
+            );
+        }
 
-        return NextResponse.json(mockTeamMembers[memberIndex]);
+        return NextResponse.json({ success: true, role });
     } catch (error) {
         console.error('Error updating team member:', error);
         return NextResponse.json(
@@ -104,21 +81,29 @@ export async function DELETE(
     try {
         const { id } = await params;
 
-        // Find member
-        const memberIndex = mockTeamMembers.findIndex(m => m.id === id);
-        if (memberIndex === -1) {
+        // Get the member to check their role
+        const { data: member, error: fetchError } = await supabaseAdmin
+            .from('user_dso_access')
+            .select('id, user_id, role, dso_id')
+            .eq('id', id)
+            .single();
+
+        if (fetchError || !member) {
             return NextResponse.json(
                 { error: 'Team member not found' },
                 { status: 404 }
             );
         }
 
-        const member = mockTeamMembers[memberIndex];
-
         // Prevent removing the last admin
         if (member.role === 'admin') {
-            const adminCount = mockTeamMembers.filter(m => m.role === 'admin').length;
-            if (adminCount <= 1) {
+            const { data: admins, error: countError } = await supabaseAdmin
+                .from('user_dso_access')
+                .select('id')
+                .eq('dso_id', member.dso_id)
+                .eq('role', 'admin');
+
+            if (!countError && admins && admins.length <= 1) {
                 return NextResponse.json(
                     { error: 'Cannot remove the last admin.' },
                     { status: 400 }
@@ -126,21 +111,19 @@ export async function DELETE(
             }
         }
 
-        // Prevent removing yourself (in real app, check current user)
-        if (member.is_current_user) {
+        // Delete the access record
+        const { error: deleteError } = await supabaseAdmin
+            .from('user_dso_access')
+            .delete()
+            .eq('id', id);
+
+        if (deleteError) {
+            console.error('Error removing member:', deleteError);
             return NextResponse.json(
-                { error: 'You cannot remove yourself from the team.' },
-                { status: 400 }
+                { error: 'Failed to remove team member' },
+                { status: 500 }
             );
         }
-
-        // TODO: Replace with actual Supabase delete
-        // const { error } = await supabase
-        //     .from('user_dso_access')
-        //     .delete()
-        //     .eq('id', id);
-
-        mockTeamMembers = mockTeamMembers.filter(m => m.id !== id);
 
         return NextResponse.json({ success: true });
     } catch (error) {
