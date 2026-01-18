@@ -302,7 +302,7 @@ export function OnboardingTooltip({ targetRect, isTransitioning }: OnboardingToo
               </div>
             </>
           ) : (
-            // Interactive step - no next button, just progress indicator
+            // Interactive step - show back button and skip option
             <div className="w-full flex items-center justify-between">
               <Button
                 variant="ghost"
@@ -313,9 +313,20 @@ export function OnboardingTooltip({ targetRect, isTransitioning }: OnboardingToo
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Back
               </Button>
-              <span className="text-sm text-gray-400">
-                {currentStepIndex + 1} / {totalSteps}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-400">
+                  {currentStepIndex + 1} / {totalSteps}
+                </span>
+                <Button
+                  variant="ghost"
+                  onClick={handleNext}
+                  className="text-gray-500 hover:text-gray-700"
+                  size="sm"
+                >
+                  Skip
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
             </div>
           )}
         </div>

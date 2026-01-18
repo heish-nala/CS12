@@ -9,6 +9,7 @@ import { CreateClientDialog } from '@/components/clients/create-client-dialog';
 import { SearchCommand } from '@/components/layout/search-command';
 import { useAuth } from '@/contexts/auth-context';
 import { useClients } from '@/contexts/clients-context';
+import { useOnboarding } from '@/contexts/onboarding-context';
 import {
     Home,
     Users,
@@ -54,9 +55,13 @@ export function NotionSidebar() {
     const pathname = usePathname();
     const { user, signOut } = useAuth();
     const { clients, archivedClients } = useClients();
+    const { isOnboardingActive, currentStep } = useOnboarding();
     const [createClientOpen, setCreateClientOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
     const [showArchived, setShowArchived] = useState(false);
+
+    // Show add-client button during onboarding create-client step
+    const showAddClientButton = isOnboardingActive && currentStep === 'create-client';
 
     const userEmail = user?.email || '';
     const userInitial = userEmail.charAt(0).toUpperCase() || 'U';
@@ -106,7 +111,10 @@ export function NotionSidebar() {
                         <Button
                             variant="ghost"
                             size="icon-sm"
-                            className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 hover:bg-accent rounded-[3px] transition-opacity duration-100"
+                            className={cn(
+                                "h-5 w-5 p-0 hover:bg-accent rounded-[3px] transition-opacity duration-100",
+                                showAddClientButton ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                            )}
                             onClick={() => setCreateClientOpen(true)}
                             data-onboarding="add-client-btn"
                         >

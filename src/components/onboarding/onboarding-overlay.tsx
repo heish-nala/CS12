@@ -333,6 +333,12 @@ export function OnboardingOverlay() {
 
   // Click blocker that allows clicks on spotlight area
   const renderClickBlocker = () => {
+    // For steps that don't block interaction, don't render any click blockers
+    // This allows the user to click through to the target element
+    if (config.blockInteraction === false) {
+      return null
+    }
+
     if (!animatedRect) {
       return (
         <div
