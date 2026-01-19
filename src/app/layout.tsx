@@ -6,7 +6,7 @@ import { ClientsProvider } from "@/contexts/clients-context";
 import { OnboardingProvider } from "@/contexts/onboarding-context";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { AppShell } from "@/components/layout/app-shell";
-import { OnboardingOverlay, OnboardingTrigger, OnboardingChecklist } from "@/components/onboarding";
+import { OnboardingTour, OnboardingTrigger, OnboardingChecklist } from "@/components/onboarding";
 
 export const metadata: Metadata = {
     title: "CS12 - Customer Success Platform",
@@ -27,7 +27,7 @@ export default function RootLayout({
                             <AuthGuard>
                                 <AppShell>{children}</AppShell>
                                 <OnboardingTrigger />
-                                <OnboardingOverlay />
+                                <OnboardingTour />
                                 <OnboardingChecklist />
                             </AuthGuard>
                         </OnboardingProvider>

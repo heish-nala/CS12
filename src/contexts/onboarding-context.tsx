@@ -2,23 +2,12 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 
-const STORAGE_KEY = 'konekt_onboarding_complete'
-const STEP_KEY = 'konekt_onboarding_step'
-const CHECKLIST_KEY = 'konekt_onboarding_checklist'
+const STORAGE_KEY = 'cs12_onboarding_complete'
+const STEP_KEY = 'cs12_onboarding_step'
+const CHECKLIST_KEY = 'cs12_onboarding_checklist'
 
-export type OnboardingStep =
-  | 'welcome'
-  | 'sidebar'
-  | 'create-client'
-  | 'client-dialog'
-  | 'client-dashboard'
-  | 'data-tables-tab'
-  | 'add-table'
-  | 'templates'
-  | 'progress-tracker'
-  | 'complete'
-
-export const ONBOARDING_STEPS: OnboardingStep[] = [
+// Step IDs for mapping index to step name
+export const ONBOARDING_STEP_IDS = [
   'welcome',
   'sidebar',
   'create-client',
@@ -28,8 +17,12 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   'add-table',
   'templates',
   'progress-tracker',
-  'complete'
-]
+  'complete',
+] as const
+
+export type OnboardingStep = (typeof ONBOARDING_STEP_IDS)[number]
+
+const TOTAL_STEPS = ONBOARDING_STEP_IDS.length
 
 interface ChecklistState {
   'create-client': boolean
@@ -55,15 +48,13 @@ interface OnboardingContextType {
 
   // Checklist state
   checklistItems: ChecklistState
-  checklistProgress: number // 0-100
+  checklistProgress: number
   isChecklistVisible: boolean
 
   // Tour controls
   startOnboarding: () => void
   stopOnboarding: () => void
-  nextStep: () => void
-  prevStep: () => void
-  goToStep: (step: OnboardingStep) => void
+  setStepIndex: (index: number) => void
   completeOnboarding: () => void
   resetOnboarding: () => void
 
@@ -94,8 +85,8 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     setHasCompletedOnboarding(completed === 'true')
 
     if (savedStep) {
-      const stepIndex = ONBOARDING_STEPS.indexOf(savedStep as OnboardingStep)
-      if (stepIndex !== -1) {
+      const stepIndex = parseInt(savedStep, 10)
+      if (!isNaN(stepIndex) && stepIndex >= 0 && stepIndex < TOTAL_STEPS) {
         setCurrentStepIndex(stepIndex)
       }
     }
@@ -126,7 +117,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   // Save step to localStorage when it changes
   useEffect(() => {
     if (isOnboardingActive) {
-      localStorage.setItem(STEP_KEY, ONBOARDING_STEPS[currentStepIndex])
+      localStorage.setItem(STEP_KEY, currentStepIndex.toString())
     }
   }, [currentStepIndex, isOnboardingActive])
 
@@ -147,23 +138,8 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     setIsOnboardingActive(false)
   }, [])
 
-  const nextStep = useCallback(() => {
-    setCurrentStepIndex((prev) => {
-      const next = prev + 1
-      if (next >= ONBOARDING_STEPS.length) {
-        return prev
-      }
-      return next
-    })
-  }, [])
-
-  const prevStep = useCallback(() => {
-    setCurrentStepIndex((prev) => Math.max(0, prev - 1))
-  }, [])
-
-  const goToStep = useCallback((step: OnboardingStep) => {
-    const index = ONBOARDING_STEPS.indexOf(step)
-    if (index !== -1) {
+  const setStepIndex = useCallback((index: number) => {
+    if (index >= 0 && index < TOTAL_STEPS) {
       setCurrentStepIndex(index)
     }
   }, [])
@@ -217,17 +193,15 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const value: OnboardingContextType = {
     isOnboardingActive,
     hasCompletedOnboarding,
-    currentStep: ONBOARDING_STEPS[currentStepIndex],
+    currentStep: ONBOARDING_STEP_IDS[currentStepIndex],
     currentStepIndex,
-    totalSteps: ONBOARDING_STEPS.length,
+    totalSteps: TOTAL_STEPS,
     checklistItems,
     checklistProgress,
     isChecklistVisible,
     startOnboarding,
     stopOnboarding,
-    nextStep,
-    prevStep,
-    goToStep,
+    setStepIndex,
     completeOnboarding,
     resetOnboarding,
     markChecklistItem,
