@@ -395,19 +395,37 @@
 
   /* Table skeleton that matches actual table structure */
   .table-skeleton {
-    @apply rounded border border-border overflow-hidden;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    overflow: hidden;
   }
 
   .table-skeleton-header {
-    @apply h-10 bg-muted/30 border-b flex items-center gap-2 px-3;
+    height: 2.5rem;
+    background: color-mix(in srgb, var(--muted) 30%, transparent);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
   }
 
   .table-skeleton-row {
-    @apply h-10 border-b flex items-center gap-2 px-3;
+    height: 2.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
   }
 
   .table-skeleton-cell {
-    @apply h-4 bg-muted/50 rounded animate-pulse;
+    height: 1rem;
+    background: color-mix(in srgb, var(--muted) 50%, transparent);
+    border-radius: var(--radius);
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 }
 
@@ -451,5 +469,14 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
   }
 }
