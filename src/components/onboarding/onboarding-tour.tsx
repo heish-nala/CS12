@@ -1,10 +1,19 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Joyride, { CallBackProps, STATUS, EVENTS, ACTIONS, Step } from 'react-joyride'
 import { usePathname } from 'next/navigation'
 import { useOnboarding } from '@/contexts/onboarding-context'
 import confetti from 'canvas-confetti'
+
+// Step data type for custom behavior
+interface StepData {
+  checklistItem?: string
+  waitForClick?: string // Selector to watch for clicks
+  waitForNavigation?: string // Path prefix to watch for
+  waitForElement?: string // Selector to wait for visibility
+  isComplete?: boolean
+}
 
 // Convert your existing steps to Joyride format
 const steps: Step[] = [
@@ -29,10 +38,11 @@ const steps: Step[] = [
     placement: 'right',
     disableBeacon: true,
     spotlightClicks: true,
+    hideFooter: true, // Hide Next button - user must click target
     data: {
       checklistItem: 'create-client',
-      waitForClick: true,
-    },
+      waitForClick: '[data-onboarding="add-client-btn"]',
+    } as StepData,
   },
   {
     target: '[data-onboarding="create-client-dialog"]',
@@ -41,9 +51,10 @@ const steps: Step[] = [
     placement: 'right',
     disableBeacon: true,
     spotlightClicks: true,
+    hideFooter: true, // Hide Next button - user must complete action
     data: {
       waitForNavigation: '/clients/',
-    },
+    } as StepData,
   },
   {
     target: '[data-onboarding="client-dashboard"]',
@@ -66,10 +77,11 @@ const steps: Step[] = [
     placement: 'bottom',
     disableBeacon: true,
     spotlightClicks: true,
+    hideFooter: true,
     data: {
       checklistItem: 'add-table',
-      waitForClick: true,
-    },
+      waitForClick: '[data-onboarding="add-table-btn"]',
+    } as StepData,
   },
   {
     target: '[data-onboarding="template-grid"]',
@@ -78,10 +90,11 @@ const steps: Step[] = [
     placement: 'top',
     disableBeacon: true,
     spotlightClicks: true,
+    hideFooter: true,
     data: {
       checklistItem: 'use-template',
       waitForElement: '[data-onboarding="data-grid"]',
-    },
+    } as StepData,
   },
   {
     target: '[data-onboarding="period-tracker"]',
@@ -91,7 +104,7 @@ const steps: Step[] = [
     disableBeacon: true,
     data: {
       checklistItem: 'progress-tracker',
-    },
+    } as StepData,
   },
   {
     target: 'body',
@@ -101,7 +114,7 @@ const steps: Step[] = [
     disableBeacon: true,
     data: {
       isComplete: true,
-    },
+    } as StepData,
   },
 ]
 
@@ -164,8 +177,10 @@ export function OnboardingTour() {
   const [run, setRun] = useState(false)
   const [stepIndex, setLocalStepIndex] = useState(0)
   const [mounted, setMounted] = useState(false)
+  const clickHandledRef = useRef<number | null>(null)
+  const navigationHandledRef = useRef<number | null>(null)
 
-  // Sync with context
+  // Sync with context on mount
   useEffect(() => {
     setMounted(true)
   }, [])
@@ -207,31 +222,39 @@ export function OnboardingTour() {
     frame()
   }, [])
 
+  // Advance to next step helper
+  const advanceStep = useCallback(() => {
+    const currentStep = steps[stepIndex]
+    const stepData = currentStep?.data as StepData | undefined
+
+    // Mark checklist item if applicable
+    if (stepData?.checklistItem) {
+      markChecklistItem(stepData.checklistItem as any)
+    }
+
+    const nextIndex = stepIndex + 1
+    if (nextIndex < steps.length) {
+      setLocalStepIndex(nextIndex)
+      setStepIndex(nextIndex)
+    }
+  }, [stepIndex, markChecklistItem, setStepIndex])
+
   // Handle Joyride callback
   const handleJoyrideCallback = useCallback(
     (data: CallBackProps) => {
       const { action, index, status, type, step } = data
-      const stepData = step?.data as {
-        checklistItem?: string
-        waitForClick?: boolean
-        waitForNavigation?: string
-        waitForElement?: string
-        isComplete?: boolean
-      } | undefined
+      const stepData = step?.data as StepData | undefined
 
-      // Handle step completion
-      if (type === EVENTS.STEP_AFTER) {
+      // Handle step completion via Next button
+      if (type === EVENTS.STEP_AFTER && action === ACTIONS.NEXT) {
         // Mark checklist item if applicable
         if (stepData?.checklistItem) {
           markChecklistItem(stepData.checklistItem as any)
         }
 
-        // Move to next step
-        if (action === ACTIONS.NEXT) {
-          const nextIndex = index + 1
-          setLocalStepIndex(nextIndex)
-          setStepIndex(nextIndex)
-        }
+        const nextIndex = index + 1
+        setLocalStepIndex(nextIndex)
+        setStepIndex(nextIndex)
       }
 
       // Handle going back
@@ -251,58 +274,83 @@ export function OnboardingTour() {
       if (status === STATUS.SKIPPED || action === ACTIONS.CLOSE) {
         stopOnboarding()
       }
-
-      // Handle spotlight clicks for interactive steps
-      if (type === EVENTS.TARGET_NOT_FOUND) {
-        // Element not found, wait and retry
-        console.log('Waiting for element:', step?.target)
-      }
     },
     [markChecklistItem, setStepIndex, completeOnboarding, stopOnboarding, fireConfetti]
   )
 
-  // Watch for navigation changes to auto-advance certain steps
+  // Watch for clicks on target elements (for steps with waitForClick)
   useEffect(() => {
     if (!run) return
 
     const currentStep = steps[stepIndex]
-    const stepData = currentStep?.data as { waitForNavigation?: string } | undefined
+    const stepData = currentStep?.data as StepData | undefined
 
-    if (stepData?.waitForNavigation && pathname.startsWith(stepData.waitForNavigation)) {
-      // Wait for dialog to close
+    if (!stepData?.waitForClick) return
+    if (clickHandledRef.current === stepIndex) return
+
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      const clickTarget = target.closest(stepData.waitForClick!)
+
+      if (clickTarget) {
+        clickHandledRef.current = stepIndex
+        // Delay to allow the click action to complete (e.g., dialog opening)
+        setTimeout(() => {
+          advanceStep()
+        }, 300)
+      }
+    }
+
+    document.addEventListener('click', handleClick, true)
+    return () => document.removeEventListener('click', handleClick, true)
+  }, [run, stepIndex, advanceStep])
+
+  // Watch for navigation changes (for steps with waitForNavigation)
+  useEffect(() => {
+    if (!run) return
+
+    const currentStep = steps[stepIndex]
+    const stepData = currentStep?.data as StepData | undefined
+
+    if (!stepData?.waitForNavigation) return
+    if (navigationHandledRef.current === stepIndex) return
+
+    if (pathname.startsWith(stepData.waitForNavigation)) {
+      navigationHandledRef.current = stepIndex
+
+      // Wait for dialog to close before advancing
       const checkDialogClosed = () => {
         const dialogOpen = document.querySelector('[role="dialog"]')
         if (!dialogOpen) {
-          const nextIndex = stepIndex + 1
-          setLocalStepIndex(nextIndex)
-          setStepIndex(nextIndex)
+          advanceStep()
         } else {
           setTimeout(checkDialogClosed, 200)
         }
       }
       setTimeout(checkDialogClosed, 500)
     }
-  }, [pathname, stepIndex, run, setStepIndex])
+  }, [pathname, stepIndex, run, advanceStep])
 
-  // Watch for elements becoming visible to auto-advance
+  // Watch for elements becoming visible (for steps with waitForElement)
   useEffect(() => {
     if (!run) return
 
     const currentStep = steps[stepIndex]
-    const stepData = currentStep?.data as { waitForElement?: string } | undefined
+    const stepData = currentStep?.data as StepData | undefined
 
-    if (stepData?.waitForElement) {
-      const checkElement = () => {
-        const element = document.querySelector(stepData.waitForElement!)
-        if (element) {
-          const nextIndex = stepIndex + 1
-          setLocalStepIndex(nextIndex)
-          setStepIndex(nextIndex)
-          return true
-        }
-        return false
+    if (!stepData?.waitForElement) return
+
+    const checkElement = () => {
+      const element = document.querySelector(stepData.waitForElement!)
+      if (element) {
+        advanceStep()
+        return true
       }
+      return false
+    }
 
+    // Initial delay before checking
+    const startTimeout = setTimeout(() => {
       if (!checkElement()) {
         const interval = setInterval(() => {
           if (checkElement()) {
@@ -310,10 +358,21 @@ export function OnboardingTour() {
           }
         }, 500)
 
-        return () => clearInterval(interval)
+        // Cleanup interval after 30 seconds max
+        setTimeout(() => clearInterval(interval), 30000)
       }
+    }, 1000)
+
+    return () => clearTimeout(startTimeout)
+  }, [stepIndex, run, advanceStep])
+
+  // Reset handled refs when step changes
+  useEffect(() => {
+    if (stepIndex === 0) {
+      clickHandledRef.current = null
+      navigationHandledRef.current = null
     }
-  }, [stepIndex, run, setStepIndex])
+  }, [stepIndex])
 
   // Don't render on login page or before mount
   if (!mounted || pathname === '/login') return null
