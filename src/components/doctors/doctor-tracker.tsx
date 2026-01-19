@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo, memo } from 'react';
+import { useDebouncedCallback } from 'use-debounce';
 import { Doctor, DoctorWithDSO, RiskLevel, CustomColumn } from '@/lib/db/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,134 @@ interface DoctorTrackerProps {
     dsoId?: string;
 }
 
+// Memoized table row component to prevent unnecessary re-renders
+interface DoctorRowProps {
+    doctor: DoctorWithDSO;
+    metricConfig: ReturnType<typeof useMetricConfigOrDefault>;
+    customColumns: CustomColumn[];
+    onUpdateField: (doctorId: string, field: string, value: string) => void | Promise<void>;
+    onUpdateCustomField: (doctorId: string, columnId: string, value: any) => void | Promise<void>;
+    onViewProgress: (doctor: Doctor) => void;
+    onLogActivity: (doctor: Doctor) => void;
+    onEditDoctor: (doctor: Doctor) => void;
+    getRiskBadge: (riskLevel?: RiskLevel) => React.ReactNode;
+}
+
+const DoctorRow = memo(function DoctorRow({
+    doctor,
+    metricConfig,
+    customColumns,
+    onUpdateField,
+    onUpdateCustomField,
+    onViewProgress,
+    onLogActivity,
+    onEditDoctor,
+    getRiskBadge,
+}: DoctorRowProps) {
+    return (
+        <TableRow
+            className="hover:bg-accent/30 transition-colors border-b last:border-0 group"
+        >
+            <TableCell className="font-medium">
+                <EditableCell
+                    value={doctor.name}
+                    onSave={async (value) => { onUpdateField(doctor.id, 'name', value); }}
+                    placeholder="Doctor name"
+                />
+            </TableCell>
+            <TableCell>
+                <EditableCell
+                    value={doctor.email || ''}
+                    onSave={async (value) => { onUpdateField(doctor.id, 'email', value); }}
+                    type="email"
+                    placeholder="Email"
+                />
+            </TableCell>
+            <TableCell>
+                <EditableCell
+                    value={doctor.phone || ''}
+                    onSave={async (value) => { onUpdateField(doctor.id, 'phone', value); }}
+                    type="tel"
+                    placeholder="Phone"
+                />
+            </TableCell>
+            {metricConfig.isMetricEnabled('risk_level') && (
+                <TableCell>{getRiskBadge(doctor.risk_level)}</TableCell>
+            )}
+            {(metricConfig.isMetricEnabled('last_activity_date') || metricConfig.isMetricEnabled('days_since_activity')) && (
+                <TableCell className="text-sm text-muted-foreground">
+                    {doctor.days_since_activity !== undefined
+                        ? doctor.days_since_activity > 100
+                            ? 'Never'
+                            : `${doctor.days_since_activity}d ago`
+                        : 'N/A'}
+                </TableCell>
+            )}
+            {metricConfig.isMetricEnabled('total_cases') && (
+                <TableCell>{doctor.total_cases || 0}</TableCell>
+            )}
+            {metricConfig.isMetricEnabled('course_progress') && (
+                <TableCell>
+                    {doctor.course_progress_percent !== undefined
+                        ? `${doctor.course_progress_percent}%`
+                        : 'N/A'}
+                </TableCell>
+            )}
+            {metricConfig.isMetricEnabled('days_in_program') && (
+                <TableCell className="text-sm">
+                    {new Date(doctor.start_date).toLocaleDateString()}
+                </TableCell>
+            )}
+            <TableCell>
+                <Badge variant={doctor.status === 'active' ? 'default' : 'secondary'}>
+                    {doctor.status}
+                </Badge>
+            </TableCell>
+            {customColumns.map((column) => (
+                <TableCell key={column.id}>
+                    <CustomFieldCell
+                        column={column}
+                        value={doctor.custom_fields?.[column.id]}
+                        onSave={async (value) => { onUpdateCustomField(doctor.id, column.id, value); }}
+                    />
+                </TableCell>
+            ))}
+            <TableCell>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => onViewProgress(doctor)}>
+                            <BarChart3 className="h-4 w-4" />
+                            View Progress
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onLogActivity(doctor)}>
+                            <Activity className="h-4 w-4" />
+                            Log Activity
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => onEditDoctor(doctor)}>
+                            <Edit className="h-4 w-4" />
+                            Edit Doctor
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => toast.error('Delete functionality coming soon')}
+                        >
+                            <Trash2 className="h-4 w-4" />
+                            Delete
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </TableCell>
+        </TableRow>
+    );
+});
+
 export function DoctorTracker({ dsoId }: DoctorTrackerProps) {
     const metricConfig = useMetricConfigOrDefault();
     const [doctors, setDoctors] = useState<DoctorWithDSO[]>([]);
@@ -48,11 +177,37 @@ export function DoctorTracker({ dsoId }: DoctorTrackerProps) {
     const [periodDialogOpen, setPeriodDialogOpen] = useState(false);
     const [selectedDoctor, setSelectedDoctor] = useState<Doctor | undefined>();
 
+    // Debounced search to prevent excessive re-renders and API calls
+    const debouncedFetchDoctors = useDebouncedCallback(
+        (searchQuery: string) => {
+            fetchDoctorsWithSearch(searchQuery);
+        },
+        300 // 300ms debounce
+    );
+
     useEffect(() => {
         fetchDoctors();
         loadCustomColumns();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [dsoId]);
+
+    // Trigger debounced search when search changes
+    useEffect(() => {
+        if (search) {
+            debouncedFetchDoctors(search);
+        }
+    }, [search, debouncedFetchDoctors]);
+
+    // Client-side filtering for instant feedback while waiting for API
+    const filteredDoctors = useMemo(() => {
+        if (!search) return doctors;
+        const lowerSearch = search.toLowerCase();
+        return doctors.filter(d =>
+            d.name.toLowerCase().includes(lowerSearch) ||
+            d.email?.toLowerCase().includes(lowerSearch) ||
+            d.phone?.toLowerCase().includes(lowerSearch)
+        );
+    }, [doctors, search]);
 
     const loadCustomColumns = () => {
         try {
@@ -104,7 +259,6 @@ export function DoctorTracker({ dsoId }: DoctorTrackerProps) {
         try {
             const params = new URLSearchParams();
             if (dsoId) params.append('dso_id', dsoId);
-            if (search) params.append('search', search);
 
             const response = await fetch(`/api/doctors?${params}`);
             const data = await response.json();
@@ -116,37 +270,52 @@ export function DoctorTracker({ dsoId }: DoctorTrackerProps) {
         }
     };
 
-    const updateDoctorField = async (doctorId: string, field: string, value: string) => {
-        // Optimistically update the UI first
-        const previousDoctors = [...doctors];
-        setDoctors(doctors.map(d =>
-            d.id === doctorId ? { ...d, [field]: value } : d
-        ));
-
+    const fetchDoctorsWithSearch = async (searchQuery: string) => {
         try {
-            const response = await fetch(`/api/doctors/${doctorId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ [field]: value }),
-            });
+            const params = new URLSearchParams();
+            if (dsoId) params.append('dso_id', dsoId);
+            if (searchQuery) params.append('search', searchQuery);
 
-            if (!response.ok) {
-                throw new Error('Failed to update doctor');
-            }
-
-            toast.success('Doctor updated successfully');
+            const response = await fetch(`/api/doctors?${params}`);
+            const data = await response.json();
+            setDoctors(data.doctors || []);
         } catch (error) {
-            // Revert on error
-            setDoctors(previousDoctors);
-            console.error('Error updating doctor:', error);
-            toast.error('Failed to update doctor');
-            throw error;
+            console.error('Error fetching doctors:', error);
         }
     };
 
-    const updateCustomField = async (doctorId: string, columnId: string, value: any) => {
+    const updateDoctorField = useCallback((doctorId: string, field: string, value: string) => {
+        // Optimistically update the UI first
+        setDoctors(prev => {
+            const previousDoctors = [...prev];
+            const updated = prev.map(d =>
+                d.id === doctorId ? { ...d, [field]: value } : d
+            );
+
+            // Make API call (fire and forget with error handling)
+            fetch(`/api/doctors/${doctorId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [field]: value }),
+            })
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to update doctor');
+                    toast.success('Doctor updated successfully');
+                })
+                .catch(error => {
+                    // Revert on error
+                    setDoctors(previousDoctors);
+                    console.error('Error updating doctor:', error);
+                    toast.error('Failed to update doctor');
+                });
+
+            return updated;
+        });
+    }, []);
+
+    const updateCustomField = useCallback((doctorId: string, columnId: string, value: any) => {
         // Custom fields are stored in local state only (columns defined in localStorage)
-        setDoctors(doctors.map(d => {
+        setDoctors(prev => prev.map(d => {
             if (d.id === doctorId) {
                 return {
                     ...d,
@@ -159,9 +328,9 @@ export function DoctorTracker({ dsoId }: DoctorTrackerProps) {
             return d;
         }));
         toast.success('Field updated');
-    };
+    }, []);
 
-    const getRiskBadge = (riskLevel?: RiskLevel) => {
+    const getRiskBadge = useCallback((riskLevel?: RiskLevel) => {
         // Using design system CSS variables for consistent theming
         const variants = {
             low: 'bg-[var(--notion-green)] text-[var(--notion-green-text)] border-[var(--notion-green)]',
@@ -175,7 +344,23 @@ export function DoctorTracker({ dsoId }: DoctorTrackerProps) {
                 {riskLevel?.toUpperCase()}
             </Badge>
         );
-    };
+    }, []);
+
+    // Memoized callbacks for row actions to prevent re-renders
+    const handleViewProgress = useCallback((doctor: Doctor) => {
+        setSelectedDoctor(doctor);
+        setPeriodDialogOpen(true);
+    }, []);
+
+    const handleLogActivity = useCallback((doctor: Doctor) => {
+        setSelectedDoctor(doctor);
+        setActivityDialogOpen(true);
+    }, []);
+
+    const handleEditDoctor = useCallback((doctor: Doctor) => {
+        setSelectedDoctor(doctor);
+        setEditDialogOpen(true);
+    }, []);
 
     if (loading) {
         return (
@@ -195,7 +380,6 @@ export function DoctorTracker({ dsoId }: DoctorTrackerProps) {
                         placeholder="Search doctors..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && fetchDoctors()}
                         className="pl-9"
                     />
                 </div>
@@ -281,132 +465,26 @@ export function DoctorTracker({ dsoId }: DoctorTrackerProps) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {doctors.length === 0 ? (
+                        {filteredDoctors.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={10 + customColumns.length + 1} className="text-center py-8 text-muted-foreground">
-                                    No doctors found. Add your first doctor to get started.
+                                    {search ? 'No doctors match your search.' : 'No doctors found. Add your first doctor to get started.'}
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            doctors.map((doctor) => (
-                                <TableRow
+                            filteredDoctors.map((doctor) => (
+                                <DoctorRow
                                     key={doctor.id}
-                                    className="hover:bg-accent/30 transition-colors border-b last:border-0 group"
-                                >
-                                    <TableCell className="font-medium">
-                                        <EditableCell
-                                            value={doctor.name}
-                                            onSave={(value) => updateDoctorField(doctor.id, 'name', value)}
-                                            placeholder="Doctor name"
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <EditableCell
-                                            value={doctor.email || ''}
-                                            onSave={(value) => updateDoctorField(doctor.id, 'email', value)}
-                                            type="email"
-                                            placeholder="Email"
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <EditableCell
-                                            value={doctor.phone || ''}
-                                            onSave={(value) => updateDoctorField(doctor.id, 'phone', value)}
-                                            type="tel"
-                                            placeholder="Phone"
-                                        />
-                                    </TableCell>
-                                    {metricConfig.isMetricEnabled('risk_level') && (
-                                        <TableCell>{getRiskBadge(doctor.risk_level)}</TableCell>
-                                    )}
-                                    {(metricConfig.isMetricEnabled('last_activity_date') || metricConfig.isMetricEnabled('days_since_activity')) && (
-                                        <TableCell className="text-sm text-muted-foreground">
-                                            {doctor.days_since_activity !== undefined
-                                                ? doctor.days_since_activity > 100
-                                                    ? 'Never'
-                                                    : `${doctor.days_since_activity}d ago`
-                                                : 'N/A'}
-                                        </TableCell>
-                                    )}
-                                    {metricConfig.isMetricEnabled('total_cases') && (
-                                        <TableCell>{doctor.total_cases || 0}</TableCell>
-                                    )}
-                                    {metricConfig.isMetricEnabled('course_progress') && (
-                                        <TableCell>
-                                            {doctor.course_progress_percent !== undefined
-                                                ? `${doctor.course_progress_percent}%`
-                                                : 'N/A'}
-                                        </TableCell>
-                                    )}
-                                    {metricConfig.isMetricEnabled('days_in_program') && (
-                                        <TableCell className="text-sm">
-                                            {new Date(doctor.start_date).toLocaleDateString()}
-                                        </TableCell>
-                                    )}
-                                    <TableCell>
-                                        <Badge variant={doctor.status === 'active' ? 'default' : 'secondary'}>
-                                            {doctor.status}
-                                        </Badge>
-                                    </TableCell>
-                                    {customColumns.map((column) => (
-                                        <TableCell key={column.id}>
-                                            <CustomFieldCell
-                                                column={column}
-                                                value={doctor.custom_fields?.[column.id]}
-                                                onSave={(value) => updateCustomField(doctor.id, column.id, value)}
-                                            />
-                                        </TableCell>
-                                    ))}
-                                    <TableCell>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="sm">
-                                                    <MoreVertical className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                <DropdownMenuItem
-                                                    onClick={() => {
-                                                        setSelectedDoctor(doctor);
-                                                        setPeriodDialogOpen(true);
-                                                    }}
-                                                >
-                                                    <BarChart3 className="h-4 w-4" />
-                                                    View Progress
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    onClick={() => {
-                                                        setSelectedDoctor(doctor);
-                                                        setActivityDialogOpen(true);
-                                                    }}
-                                                >
-                                                    <Activity className="h-4 w-4" />
-                                                    Log Activity
-                                                </DropdownMenuItem>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem
-                                                    onClick={() => {
-                                                        setSelectedDoctor(doctor);
-                                                        setEditDialogOpen(true);
-                                                    }}
-                                                >
-                                                    <Edit className="h-4 w-4" />
-                                                    Edit Doctor
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    className="text-destructive"
-                                                    onClick={() => {
-                                                        toast.error('Delete functionality coming soon');
-                                                    }}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                    Delete
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </TableCell>
-                                </TableRow>
+                                    doctor={doctor}
+                                    metricConfig={metricConfig}
+                                    customColumns={customColumns}
+                                    onUpdateField={updateDoctorField}
+                                    onUpdateCustomField={updateCustomField}
+                                    onViewProgress={handleViewProgress}
+                                    onLogActivity={handleLogActivity}
+                                    onEditDoctor={handleEditDoctor}
+                                    getRiskBadge={getRiskBadge}
+                                />
                             ))
                         )}
                     </TableBody>

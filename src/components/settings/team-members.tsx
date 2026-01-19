@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -98,14 +98,7 @@ export function TeamMembers() {
         fetchMembers();
     }, [user]);
 
-    // Fetch pending invites when DSO ID is available
-    useEffect(() => {
-        if (currentDsoId) {
-            fetchPendingInvites();
-        }
-    }, [currentDsoId]);
-
-    const fetchPendingInvites = async () => {
+    const fetchPendingInvites = useCallback(async () => {
         if (!currentDsoId) return;
 
         try {
@@ -117,7 +110,7 @@ export function TeamMembers() {
         } catch (error) {
             console.error('Error fetching pending invites:', error);
         }
-    };
+    }, [currentDsoId]);
 
     const handleCancelInvite = async (inviteId: string) => {
         setCancellingInvite(inviteId);
@@ -151,7 +144,7 @@ export function TeamMembers() {
         return 'Expiring soon';
     };
 
-    const fetchMembers = async () => {
+    const fetchMembers = useCallback(async () => {
         if (!user?.id) {
             setLoading(false);
             return;
@@ -162,9 +155,14 @@ export function TeamMembers() {
             const response = await fetch(`/api/team?user_id=${user.id}`);
             if (response.ok) {
                 const data = await response.json();
-                // Store the DSO ID for invites
+                // Store the DSO ID for invites and fetch invites in parallel
                 if (data.dso_id) {
                     setCurrentDsoId(data.dso_id);
+                    // Fetch invites immediately in parallel
+                    fetch(`/api/team/invite?dso_id=${data.dso_id}`)
+                        .then(res => res.ok ? res.json() : { invites: [] })
+                        .then(inviteData => setPendingInvites(inviteData.invites || []))
+                        .catch(() => setPendingInvites([]));
                 }
                 if (data.members && data.members.length > 0) {
                     setMembers(data.members);
@@ -214,14 +212,16 @@ export function TeamMembers() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [user?.id, user?.email]);
 
-    const handleRoleChange = async (memberId: string, newRole: UserRole) => {
+    // Memoize admin count for performance
+    const adminCount = useMemo(() => members.filter(m => m.role === 'admin').length, [members]);
+
+    const handleRoleChange = useCallback(async (memberId: string, newRole: UserRole) => {
         const member = members.find(m => m.id === memberId);
         if (!member || member.role === newRole) return;
 
         // Prevent demoting the last admin
-        const adminCount = members.filter(m => m.role === 'admin').length;
         if (member.role === 'admin' && adminCount <= 1) {
             toast.error('Cannot change role. At least one admin is required.');
             return;
@@ -236,7 +236,7 @@ export function TeamMembers() {
             });
 
             if (response.ok) {
-                setMembers(members.map(m =>
+                setMembers(prev => prev.map(m =>
                     m.id === memberId ? { ...m, role: newRole } : m
                 ));
                 toast.success(`Role updated to ${ROLE_CONFIG[newRole].label}`);
@@ -248,14 +248,13 @@ export function TeamMembers() {
         } finally {
             setUpdatingRole(null);
         }
-    };
+    }, [members, adminCount]);
 
-    const handleRemoveMember = async (memberId: string) => {
+    const handleRemoveMember = useCallback(async (memberId: string) => {
         const member = members.find(m => m.id === memberId);
         if (!member) return;
 
         // Prevent removing the last admin
-        const adminCount = members.filter(m => m.role === 'admin').length;
         if (member.role === 'admin' && adminCount <= 1) {
             toast.error('Cannot remove the last admin.');
             return;
@@ -273,7 +272,7 @@ export function TeamMembers() {
             });
 
             if (response.ok) {
-                setMembers(members.filter(m => m.id !== memberId));
+                setMembers(prev => prev.filter(m => m.id !== memberId));
                 toast.success(`${member.name} has been removed from the team`);
             } else {
                 toast.error('Failed to remove team member');
@@ -281,28 +280,28 @@ export function TeamMembers() {
         } catch (error) {
             toast.error('Failed to remove team member');
         }
-    };
+    }, [members, adminCount]);
 
-    const handleAddMember = (newMember: TeamMember) => {
-        setMembers([...members, newMember]);
-    };
+    const handleAddMember = useCallback((newMember: TeamMember) => {
+        setMembers(prev => [...prev, newMember]);
+    }, []);
 
-    const handleDialogClose = (open: boolean) => {
+    const handleDialogClose = useCallback((open: boolean) => {
         setAddDialogOpen(open);
         // Refresh pending invites when dialog closes
         if (!open && currentDsoId) {
             fetchPendingInvites();
         }
-    };
+    }, [currentDsoId, fetchPendingInvites]);
 
-    const getInitials = (name: string) => {
+    const getInitials = useCallback((name: string) => {
         return name
             .split(' ')
             .map(n => n[0])
             .join('')
             .toUpperCase()
             .slice(0, 2);
-    };
+    }, []);
 
     if (loading) {
         return (

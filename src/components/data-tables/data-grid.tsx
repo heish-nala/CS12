@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { DataColumn, DataRow, ColumnType, StatusOption, TimeTrackingConfig, PeriodData, ColumnConfig, StatusColor, SelectOption } from '@/lib/db/types';
 import { Button } from '@/components/ui/button';
@@ -801,18 +801,7 @@ function ProgressIndicatorCell({
 }
 
 // Virtualized Row Component - memoized for performance
-const VirtualRow = ({
-    row,
-    columns,
-    isSelected,
-    onToggleRow,
-    onUpdateRow,
-    hasTimeTracking,
-    timeTracking,
-    periodData,
-    onOpenPeriodDialog,
-    style,
-}: {
+interface VirtualRowProps {
     row: DataRow;
     columns: DataColumn[];
     isSelected: boolean;
@@ -823,7 +812,20 @@ const VirtualRow = ({
     periodData?: Record<string, PeriodData[]>;
     onOpenPeriodDialog?: (rowId: string, rowName: string) => void;
     style: React.CSSProperties;
-}) => {
+}
+
+const VirtualRow = memo(function VirtualRow({
+    row,
+    columns,
+    isSelected,
+    onToggleRow,
+    onUpdateRow,
+    hasTimeTracking,
+    timeTracking,
+    periodData,
+    onOpenPeriodDialog,
+    style,
+}: VirtualRowProps) {
     return (
         <div
             className={cn(
@@ -883,7 +885,7 @@ const VirtualRow = ({
             <div className="w-[40px] shrink-0"></div>
         </div>
     );
-};
+});
 
 // Main DataGrid Component with Virtualization
 export function DataGrid({

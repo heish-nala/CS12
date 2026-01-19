@@ -97,48 +97,52 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
         try {
             const allContacts: Contact[] = [];
 
-            // 1. Fetch contacts from Data Tables
-            const tablesResponse = await fetch(`/api/data-tables?client_id=${clientId}`);
+            // Fetch tables and doctors in parallel
+            const [tablesResponse, doctorsResponse] = await Promise.all([
+                fetch(`/api/data-tables?client_id=${clientId}`),
+                fetch(`/api/doctors?dso_id=${clientId}`)
+            ]);
+
+            // Process tables response
             if (tablesResponse.ok) {
                 const { tables } = await tablesResponse.json();
 
-                // For each table, fetch rows and extract contacts
-                for (const table of tables) {
+                // Fetch all table rows in parallel
+                // Tables from API include columns, but TypeScript needs explicit typing
+                const rowsPromises = tables.map(async (table: DataTable & { columns?: DataColumn[] }) => {
                     const columns: DataColumn[] = table.columns || [];
-
-                    // Find primary (name) column and contact columns
                     const primaryColumn = columns.find(c => c.is_primary);
-                    const emailColumn = columns.find(c => c.type === 'email');
-                    const phoneColumn = columns.find(c => c.type === 'phone');
 
-                    // If no primary column, skip this table
-                    if (!primaryColumn) continue;
+                    if (!primaryColumn) return [];
 
-                    // Fetch rows for this table
-                    const rowsResponse = await fetch(`/api/data-tables/${table.id}/rows`);
-                    if (!rowsResponse.ok) continue;
+                    try {
+                        const rowsResponse = await fetch(`/api/data-tables/${table.id}/rows`);
+                        if (!rowsResponse.ok) return [];
 
-                    const { rows } = await rowsResponse.json();
+                        const { rows } = await rowsResponse.json();
+                        const emailColumn = columns.find(c => c.type === 'email');
+                        const phoneColumn = columns.find(c => c.type === 'phone');
 
-                    // Extract contacts from rows
-                    for (const row of rows) {
-                        const name = row.data[primaryColumn.id];
-                        if (!name) continue;
-
-                        allContacts.push({
-                            id: `table-${table.id}-row-${row.id}`,
-                            name: String(name),
-                            email: emailColumn ? row.data[emailColumn.id] : undefined,
-                            phone: phoneColumn ? row.data[phoneColumn.id] : undefined,
-                            tableId: table.id,
-                            tableName: table.name,
-                        });
+                        return rows
+                            .filter((row: DataRow) => row.data[primaryColumn.id])
+                            .map((row: DataRow) => ({
+                                id: `table-${table.id}-row-${row.id}`,
+                                name: String(row.data[primaryColumn.id]),
+                                email: emailColumn ? row.data[emailColumn.id] : undefined,
+                                phone: phoneColumn ? row.data[phoneColumn.id] : undefined,
+                                tableId: table.id,
+                                tableName: table.name,
+                            }));
+                    } catch {
+                        return [];
                     }
-                }
+                });
+
+                const tableContacts = await Promise.all(rowsPromises);
+                allContacts.push(...tableContacts.flat());
             }
 
-            // 2. Fetch legacy Doctors
-            const doctorsResponse = await fetch(`/api/doctors?dso_id=${clientId}`);
+            // Process doctors response
             if (doctorsResponse.ok) {
                 const { doctors } = await doctorsResponse.json();
 

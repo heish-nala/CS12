@@ -3,6 +3,23 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { getDefaultMetrics } from '@/lib/metrics/metric-library';
 
+// Pre-computed default values to avoid recreation on every render
+const DEFAULT_METRICS = getDefaultMetrics();
+const DEFAULT_ENABLED_SET = new Set(DEFAULT_METRICS);
+const DEFAULT_CONFIGS = DEFAULT_METRICS.map((metricId, index) => ({
+    metric_id: metricId,
+    enabled: true,
+    order_index: index,
+}));
+const DEFAULT_IS_ENABLED = (metricId: string) => DEFAULT_METRICS.includes(metricId);
+const DEFAULT_CONTEXT_VALUE = {
+    enabledMetrics: DEFAULT_ENABLED_SET,
+    metricConfigs: DEFAULT_CONFIGS,
+    loading: false,
+    refresh: async () => {},
+    isMetricEnabled: DEFAULT_IS_ENABLED,
+};
+
 export interface MetricConfig {
     metric_id: string;
     enabled: boolean;
@@ -106,21 +123,9 @@ export function useMetricConfig() {
 }
 
 // Optional: Hook that provides defaults if not in provider
+// Uses pre-computed static values to avoid creating new objects on each render
 export function useMetricConfigOrDefault() {
     const context = useContext(MetricConfigContext);
-    if (context === undefined) {
-        const defaults = getDefaultMetrics();
-        return {
-            enabledMetrics: new Set(defaults),
-            metricConfigs: defaults.map((metricId, index) => ({
-                metric_id: metricId,
-                enabled: true,
-                order_index: index,
-            })),
-            loading: false,
-            refresh: async () => {},
-            isMetricEnabled: (metricId: string) => defaults.includes(metricId),
-        };
-    }
-    return context;
+    // Return static default if no provider - avoids recreating objects
+    return context ?? DEFAULT_CONTEXT_VALUE;
 }
