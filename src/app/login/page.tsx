@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 
 export default function LoginPage() {
     const [isSignUp, setIsSignUp] = useState(false);
@@ -87,9 +87,9 @@ export default function LoginPage() {
         <div className="min-h-screen flex items-center justify-center bg-background">
             <Card className="w-full max-w-md">
                 <CardHeader className="space-y-1">
-                    <CardTitle className="text-2xl font-bold text-center">
+                    <h1 className="text-2xl font-bold text-center">
                         CS12
-                    </CardTitle>
+                    </h1>
                     <CardDescription className="text-center">
                         {isSignUp ? 'Create a new account' : 'Sign in to your account to continue'}
                     </CardDescription>

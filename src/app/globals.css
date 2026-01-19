@@ -64,8 +64,8 @@
   --popover: #ffffff;
   --popover-foreground: rgb(55, 53, 47);
 
-  /* Primary action color - Notion blue */
-  --primary: rgb(35, 131, 226);
+  /* Primary action color - Notion blue (darkened for WCAG 4.5:1 contrast) */
+  --primary: rgb(25, 115, 200);
   --primary-foreground: #ffffff;
 
   /* Secondary - subtle gray */
@@ -74,7 +74,7 @@
 
   /* Muted text and backgrounds */
   --muted: rgba(55, 53, 47, 0.03);
-  --muted-foreground: rgba(55, 53, 47, 0.65);
+  --muted-foreground: rgba(55, 53, 47, 0.75); /* Darkened for WCAG 4.5:1 contrast */
 
   /* Accent for hover states */
   --accent: rgba(55, 53, 47, 0.08);
@@ -87,7 +87,7 @@
   /* Borders and inputs */
   --border: rgba(55, 53, 47, 0.09);
   --input: rgba(55, 53, 47, 0.09);
-  --ring: rgb(35, 131, 226);
+  --ring: rgb(25, 115, 200);
 
   /* Notion Chart Colors */
   --chart-1: rgb(35, 131, 226);   /* Blue */
@@ -99,12 +99,12 @@
   /* Sidebar - Notion's subtle off-white */
   --sidebar: rgb(251, 251, 250);
   --sidebar-foreground: rgb(55, 53, 47);
-  --sidebar-primary: rgb(35, 131, 226);
+  --sidebar-primary: rgb(25, 115, 200);
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: rgba(55, 53, 47, 0.08);
   --sidebar-accent-foreground: rgb(55, 53, 47);
   --sidebar-border: rgba(55, 53, 47, 0.09);
-  --sidebar-ring: rgb(35, 131, 226);
+  --sidebar-ring: rgb(25, 115, 200);
 
   /* Notion Tag/Status Colors */
   --notion-default: rgba(206, 205, 202, 0.5);
@@ -154,14 +154,14 @@
   --popover: rgb(37, 37, 37);
   --popover-foreground: rgba(255, 255, 255, 0.9);
 
-  --primary: rgb(35, 131, 226);
+  --primary: rgb(55, 145, 230);
   --primary-foreground: #ffffff;
 
   --secondary: rgba(255, 255, 255, 0.055);
   --secondary-foreground: rgba(255, 255, 255, 0.9);
 
   --muted: rgba(255, 255, 255, 0.03);
-  --muted-foreground: rgba(255, 255, 255, 0.5);
+  --muted-foreground: rgba(255, 255, 255, 0.6);
 
   --accent: rgba(255, 255, 255, 0.08);
   --accent-foreground: rgba(255, 255, 255, 0.9);
@@ -171,7 +171,7 @@
 
   --border: rgba(255, 255, 255, 0.09);
   --input: rgba(255, 255, 255, 0.09);
-  --ring: rgb(35, 131, 226);
+  --ring: rgb(55, 145, 230);
 
   --chart-1: rgb(35, 131, 226);
   --chart-2: rgb(235, 87, 87);
@@ -181,12 +181,12 @@
 
   --sidebar: rgb(32, 32, 32);
   --sidebar-foreground: rgba(255, 255, 255, 0.9);
-  --sidebar-primary: rgb(35, 131, 226);
+  --sidebar-primary: rgb(55, 145, 230);
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: rgba(255, 255, 255, 0.08);
   --sidebar-accent-foreground: rgba(255, 255, 255, 0.9);
   --sidebar-border: rgba(255, 255, 255, 0.09);
-  --sidebar-ring: rgb(35, 131, 226);
+  --sidebar-ring: rgb(55, 145, 230);
 
   /* Notion Dark Mode Tag Colors */
   --notion-default: rgba(206, 205, 202, 0.3);
@@ -230,12 +230,12 @@
   /* Notion-style focus outline */
   :focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px var(--ring), 0 0 0 4px rgba(35, 131, 226, 0.15);
+    box-shadow: 0 0 0 2px var(--ring), 0 0 0 4px rgba(25, 115, 200, 0.15);
   }
 
   /* Notion-style selection */
   ::selection {
-    background: rgba(35, 131, 226, 0.3);
+    background: rgba(25, 115, 200, 0.3);
   }
 
   /* Notion-style scrollbar */

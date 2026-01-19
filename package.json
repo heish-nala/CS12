@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest",
+    "test:e2e": "playwright test tests/example.spec.ts",
+    "test:ux": "playwright test tests/ux.spec.ts",
+    "qa": "npx tsx scripts/qa-agent.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.73",
@@ -45,6 +49,7 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.0",
     "@playwright/test": "^1.57.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.1",
