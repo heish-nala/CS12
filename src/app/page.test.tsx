@@ -1,9 +1,54 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import Page from './page'
 
-test('Page', () => {
+// Mock next/navigation
+vi.mock('next/navigation', () => ({
+    useRouter: () => ({
+        push: vi.fn(),
+        replace: vi.fn(),
+        prefetch: vi.fn(),
+        back: vi.fn(),
+        forward: vi.fn(),
+    }),
+    usePathname: () => '/',
+    useSearchParams: () => new URLSearchParams(),
+}))
+
+// Mock the auth context
+vi.mock('@/contexts/auth-context', () => ({
+    useAuth: () => ({
+        user: { id: 'test-user-id', email: 'test@example.com' },
+        loading: false,
+        signIn: vi.fn(),
+        signUp: vi.fn(),
+        signOut: vi.fn(),
+        signInWithGoogle: vi.fn(),
+    }),
+    AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+}))
+
+// Mock the clients context
+vi.mock('@/contexts/clients-context', () => ({
+    useClients: () => ({
+        clients: [],
+        loading: false,
+        error: null,
+        refreshClients: vi.fn(),
+    }),
+    ClientsProvider: ({ children }: { children: React.ReactNode }) => children,
+}))
+
+// Mock fetch for API calls
+beforeEach(() => {
+    global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ clients: [] }),
+    })
+})
+
+test('Page renders homepage with correct heading', () => {
     render(<Page />)
-    expect(screen.getByText('CS12 Agent')).toBeDefined()
-    expect(screen.getByText('How can I help you today?')).toBeDefined()
+    expect(screen.getByText('Home')).toBeDefined()
+    expect(screen.getByText('Welcome to your customer success workspace')).toBeDefined()
 })
