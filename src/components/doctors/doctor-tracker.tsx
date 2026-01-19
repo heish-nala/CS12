@@ -365,14 +365,34 @@ export function DoctorTracker({ dsoId }: DoctorTrackerProps) {
     if (loading) {
         return (
             <div className="space-y-4">
-                <div className="h-10 w-full bg-muted animate-pulse rounded" />
-                <div className="h-64 w-full bg-muted animate-pulse rounded" />
+                {/* Search bar skeleton */}
+                <div className="flex items-center justify-between gap-4">
+                    <div className="h-10 w-64 bg-muted/40 animate-pulse rounded" />
+                    <div className="h-10 w-32 bg-muted/40 animate-pulse rounded" />
+                </div>
+                {/* Table skeleton matching actual structure */}
+                <div className="table-skeleton">
+                    <div className="table-skeleton-header">
+                        <div className="table-skeleton-cell flex-1 max-w-[150px]" />
+                        <div className="table-skeleton-cell flex-1 max-w-[180px]" />
+                        <div className="table-skeleton-cell flex-1 max-w-[120px]" />
+                        <div className="table-skeleton-cell w-16" />
+                    </div>
+                    {[...Array(5)].map((_, i) => (
+                        <div key={i} className="table-skeleton-row" style={{ opacity: 1 - i * 0.15 }}>
+                            <div className="table-skeleton-cell flex-1 max-w-[150px]" />
+                            <div className="table-skeleton-cell flex-1 max-w-[180px]" />
+                            <div className="table-skeleton-cell flex-1 max-w-[120px]" />
+                            <div className="table-skeleton-cell w-16" />
+                        </div>
+                    ))}
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 content-loaded">
             <div className="flex items-center justify-between gap-4">
                 <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

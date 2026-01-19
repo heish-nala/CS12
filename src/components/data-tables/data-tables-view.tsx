@@ -544,8 +544,28 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
     if (loading) {
         return (
             <div className="space-y-4">
-                <div className="h-10 bg-muted/30 animate-pulse rounded" />
-                <div className="h-64 bg-muted/30 animate-pulse rounded" />
+                {/* Tab skeleton */}
+                <div className="flex items-center gap-2 border-b pb-px">
+                    <div className="h-9 w-24 bg-muted/40 animate-pulse rounded" />
+                    <div className="h-9 w-20 bg-muted/30 animate-pulse rounded" />
+                </div>
+                {/* Table skeleton matching actual structure */}
+                <div className="table-skeleton">
+                    <div className="table-skeleton-header">
+                        <div className="table-skeleton-cell w-8" />
+                        <div className="table-skeleton-cell flex-1 max-w-[120px]" />
+                        <div className="table-skeleton-cell flex-1 max-w-[100px]" />
+                        <div className="table-skeleton-cell flex-1 max-w-[80px]" />
+                    </div>
+                    {[...Array(5)].map((_, i) => (
+                        <div key={i} className="table-skeleton-row" style={{ opacity: 1 - i * 0.15 }}>
+                            <div className="table-skeleton-cell w-8" />
+                            <div className="table-skeleton-cell flex-1 max-w-[120px]" />
+                            <div className="table-skeleton-cell flex-1 max-w-[100px]" />
+                            <div className="table-skeleton-cell flex-1 max-w-[80px]" />
+                        </div>
+                    ))}
+                </div>
             </div>
         );
     }
@@ -553,7 +573,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
     // Empty state
     if (tables.length === 0) {
         return (
-            <div className="border border-dashed border-border/60 rounded-lg">
+            <div className="border border-dashed border-border/60 rounded-lg content-loaded">
                 <div className="flex flex-col items-center justify-center py-16 px-6">
                     <div className="rounded-full bg-muted/60 p-5 mb-4">
                         <Database className="h-10 w-10 text-muted-foreground/60" />
@@ -584,7 +604,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
     }
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 content-loaded">
             {/* Tabs Header */}
             <div className="flex items-center gap-2 border-b">
                 <div className="flex-1 flex items-center gap-1 overflow-x-auto pb-px">

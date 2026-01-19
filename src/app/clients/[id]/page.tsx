@@ -34,13 +34,35 @@ export default function ClientDetailPage({ params }: ClientDetailPageProps) {
             <div className="flex-1 bg-background min-h-screen">
                 <div className="px-24 pt-20 pb-4">
                     <div className="max-w-5xl mx-auto">
-                        <div className="h-10 w-64 bg-muted animate-pulse rounded-[3px] mb-2" />
-                        <div className="h-4 w-32 bg-muted/60 animate-pulse rounded-[3px]" />
+                        <div className="h-10 w-64 bg-muted/50 animate-pulse rounded-[3px] mb-2" />
+                        <div className="h-4 w-32 bg-muted/30 animate-pulse rounded-[3px]" />
                     </div>
                 </div>
                 <div className="px-24 pb-24">
-                    <div className="max-w-5xl mx-auto">
-                        <div className="h-96 bg-muted/40 animate-pulse rounded-[3px]" />
+                    <div className="max-w-5xl mx-auto space-y-4">
+                        {/* Tabs skeleton */}
+                        <div className="flex gap-2">
+                            <div className="h-9 w-16 bg-muted/40 animate-pulse rounded" />
+                            <div className="h-9 w-20 bg-muted/30 animate-pulse rounded" />
+                            <div className="h-9 w-18 bg-muted/30 animate-pulse rounded" />
+                        </div>
+                        {/* Table skeleton */}
+                        <div className="table-skeleton">
+                            <div className="table-skeleton-header">
+                                <div className="table-skeleton-cell w-8" />
+                                <div className="table-skeleton-cell flex-1 max-w-[120px]" />
+                                <div className="table-skeleton-cell flex-1 max-w-[100px]" />
+                                <div className="table-skeleton-cell flex-1 max-w-[80px]" />
+                            </div>
+                            {[...Array(5)].map((_, i) => (
+                                <div key={i} className="table-skeleton-row" style={{ opacity: 1 - i * 0.15 }}>
+                                    <div className="table-skeleton-cell w-8" />
+                                    <div className="table-skeleton-cell flex-1 max-w-[120px]" />
+                                    <div className="table-skeleton-cell flex-1 max-w-[100px]" />
+                                    <div className="table-skeleton-cell flex-1 max-w-[80px]" />
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -114,7 +136,7 @@ function ClientDetailContent({
     };
 
     return (
-        <div className="flex-1 bg-background min-h-screen" data-onboarding="client-dashboard">
+        <div className="flex-1 bg-background min-h-screen content-loaded" data-onboarding="client-dashboard">
             {/* Notion-style Page Header */}
             <div className="px-24 pt-20 pb-4">
                 <div className="max-w-5xl mx-auto">

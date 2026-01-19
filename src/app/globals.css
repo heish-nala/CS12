@@ -387,6 +387,28 @@
   .skeleton {
     @apply bg-muted animate-pulse rounded;
   }
+
+  /* Smooth content fade-in after loading */
+  .content-loaded {
+    animation: contentFadeIn 0.3s ease-out;
+  }
+
+  /* Table skeleton that matches actual table structure */
+  .table-skeleton {
+    @apply rounded border border-border overflow-hidden;
+  }
+
+  .table-skeleton-header {
+    @apply h-10 bg-muted/30 border-b flex items-center gap-2 px-3;
+  }
+
+  .table-skeleton-row {
+    @apply h-10 border-b flex items-center gap-2 px-3;
+  }
+
+  .table-skeleton-cell {
+    @apply h-4 bg-muted/50 rounded animate-pulse;
+  }
 }
 
 /* Table animation keyframes */
@@ -418,5 +440,16 @@
   }
   100% {
     background-color: transparent;
+  }
+}
+
+@keyframes contentFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
