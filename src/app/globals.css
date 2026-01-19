@@ -363,4 +363,60 @@
   .notion-tag-purple { background: var(--notion-purple); color: var(--notion-purple-text); }
   .notion-tag-pink { background: var(--notion-pink); color: var(--notion-pink-text); }
   .notion-tag-red { background: var(--notion-red); color: var(--notion-red-text); }
+
+  /* Table row animations for smooth UX */
+  .row-enter {
+    animation: rowSlideIn 0.2s ease-out;
+  }
+
+  .row-exit {
+    animation: rowSlideOut 0.2s ease-out forwards;
+  }
+
+  .cell-highlight {
+    animation: cellFlash 0.3s ease-out;
+  }
+
+  /* Smooth scroll behavior for virtualized tables */
+  .virtual-scroll {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Loading skeleton animation */
+  .skeleton {
+    @apply bg-muted animate-pulse rounded;
+  }
+}
+
+/* Table animation keyframes */
+@keyframes rowSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rowSlideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+}
+
+@keyframes cellFlash {
+  0% {
+    background-color: rgba(25, 115, 200, 0.2);
+  }
+  100% {
+    background-color: transparent;
+  }
 }

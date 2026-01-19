@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { DataColumn, DataRow, ColumnType, StatusOption, TimeTrackingConfig, PeriodData, ColumnConfig, StatusColor, SelectOption } from '@/lib/db/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -91,6 +92,12 @@ const STATUS_GROUP_LABELS: Record<string, string> = {
     in_progress: 'In Progress',
     complete: 'Complete',
 };
+
+// Row height for virtualization
+const ROW_HEIGHT = 40;
+const HEADER_HEIGHT = 41;
+const MAX_VISIBLE_ROWS = 15; // Show max 15 rows before scrolling
+const OVERSCAN = 5; // Render 5 extra rows above/below viewport
 
 interface DataGridProps {
     tableId: string;
@@ -793,7 +800,92 @@ function ProgressIndicatorCell({
     );
 }
 
-// Main DataGrid Component
+// Virtualized Row Component - memoized for performance
+const VirtualRow = ({
+    row,
+    columns,
+    isSelected,
+    onToggleRow,
+    onUpdateRow,
+    hasTimeTracking,
+    timeTracking,
+    periodData,
+    onOpenPeriodDialog,
+    style,
+}: {
+    row: DataRow;
+    columns: DataColumn[];
+    isSelected: boolean;
+    onToggleRow: (rowId: string) => void;
+    onUpdateRow: (rowId: string, data: Record<string, any>) => void;
+    hasTimeTracking: boolean;
+    timeTracking?: TimeTrackingConfig | null;
+    periodData?: Record<string, PeriodData[]>;
+    onOpenPeriodDialog?: (rowId: string, rowName: string) => void;
+    style: React.CSSProperties;
+}) => {
+    return (
+        <div
+            className={cn(
+                'flex border-b last:border-b-0 transition-colors',
+                isSelected ? 'bg-primary/5' : 'hover:bg-muted/20'
+            )}
+            style={style}
+        >
+            {/* Checkbox */}
+            <div className="w-[40px] shrink-0 px-3 flex items-center">
+                <button
+                    onClick={() => onToggleRow(row.id)}
+                    className="flex items-center justify-center"
+                >
+                    <div
+                        className={cn(
+                            'h-4 w-4 rounded border flex items-center justify-center transition-colors',
+                            isSelected
+                                ? 'bg-primary border-primary'
+                                : 'border-input hover:border-primary'
+                        )}
+                    >
+                        {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                    </div>
+                </button>
+            </div>
+
+            {/* Data cells */}
+            {columns.map((col) => (
+                <div
+                    key={col.id}
+                    className="border-l shrink-0"
+                    style={{ width: col.width || 150 }}
+                >
+                    <EditableCell
+                        value={row.data[col.id]}
+                        column={col}
+                        onSave={(value) => onUpdateRow(row.id, { [col.id]: value })}
+                    />
+                </div>
+            ))}
+
+            {/* Progress cell for time tracking */}
+            {hasTimeTracking && timeTracking && (
+                <div className="border-l shrink-0" style={{ width: 130 }}>
+                    <ProgressIndicatorCell
+                        rowId={row.id}
+                        rowName={row.data[columns.find(c => c.is_primary)?.id || columns[0]?.id] || 'Item'}
+                        timeTracking={timeTracking}
+                        periods={periodData?.[row.id]}
+                        onOpenDialog={onOpenPeriodDialog}
+                    />
+                </div>
+            )}
+
+            {/* Empty cell for add column button alignment */}
+            <div className="w-[40px] shrink-0"></div>
+        </div>
+    );
+};
+
+// Main DataGrid Component with Virtualization
 export function DataGrid({
     tableId,
     columns,
@@ -816,6 +908,9 @@ export function DataGrid({
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
     const [configColumn, setConfigColumn] = useState<DataColumn | null>(null);
     const [configDialogOpen, setConfigDialogOpen] = useState(false);
+
+    // Ref for the scrollable container
+    const parentRef = useRef<HTMLDivElement>(null);
 
     // Check if time tracking is enabled
     const hasTimeTracking = timeTracking?.enabled;
@@ -840,7 +935,7 @@ export function DataGrid({
         }
     };
 
-    const toggleRow = (rowId: string) => {
+    const toggleRow = useCallback((rowId: string) => {
         setSelectedRows((prev) => {
             const next = new Set(prev);
             if (next.has(rowId)) {
@@ -850,7 +945,7 @@ export function DataGrid({
             }
             return next;
         });
-    };
+    }, []);
 
     const toggleAll = () => {
         if (selectedRows.size === rows.length) {
@@ -880,15 +975,37 @@ export function DataGrid({
     const allSelected = rows.length > 0 && selectedRows.size === rows.length;
     const someSelected = selectedRows.size > 0;
 
-    // Sort rows
-    const sortedRows = [...rows].sort((a, b) => {
-        if (!sortColumn) return 0;
-        const aVal = a.data[sortColumn];
-        const bVal = b.data[sortColumn];
-        if (aVal == null) return 1;
-        if (bVal == null) return -1;
-        const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-        return sortDirection === 'asc' ? comparison : -comparison;
+    // Sort rows - memoized for performance
+    const sortedRows = useMemo(() => {
+        return [...rows].sort((a, b) => {
+            if (!sortColumn) return 0;
+            const aVal = a.data[sortColumn];
+            const bVal = b.data[sortColumn];
+            if (aVal == null) return 1;
+            if (bVal == null) return -1;
+            const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+            return sortDirection === 'asc' ? comparison : -comparison;
+        });
+    }, [rows, sortColumn, sortDirection]);
+
+    // Calculate total width for the table
+    const totalWidth = useMemo(() => {
+        const columnWidths = columns.reduce((sum, col) => sum + (col.width || 150), 0);
+        const checkboxWidth = 40;
+        const addColumnWidth = 40;
+        const progressWidth = hasTimeTracking ? 130 : 0;
+        return columnWidths + checkboxWidth + addColumnWidth + progressWidth;
+    }, [columns, hasTimeTracking]);
+
+    // Calculate visible height - limit to MAX_VISIBLE_ROWS
+    const visibleHeight = Math.min(sortedRows.length, MAX_VISIBLE_ROWS) * ROW_HEIGHT;
+
+    // Virtualizer setup
+    const rowVirtualizer = useVirtualizer({
+        count: sortedRows.length,
+        getScrollElement: () => parentRef.current,
+        estimateSize: () => ROW_HEIGHT,
+        overscan: OVERSCAN,
     });
 
     return (
@@ -934,153 +1051,144 @@ export function DataGrid({
 
             <div className="border rounded-lg overflow-hidden bg-card" data-onboarding="data-grid">
                 <div className="overflow-x-auto">
-                    <table className="w-full">
-                        {/* Header */}
-                        <thead>
-                            <tr className="border-b bg-muted/30">
-                                {/* Checkbox column */}
-                                <th className="w-[40px] px-3 py-2">
-                                    <button
-                                        onClick={toggleAll}
-                                        className="flex items-center justify-center"
-                                    >
-                                        <div
-                                            className={cn(
-                                                'h-4 w-4 rounded border flex items-center justify-center transition-colors',
-                                                allSelected
-                                                    ? 'bg-primary border-primary'
-                                                    : 'border-input hover:border-primary'
-                                            )}
-                                        >
-                                            {allSelected && <Check className="h-3 w-3 text-primary-foreground" />}
-                                        </div>
-                                    </button>
-                                </th>
-                                {columns.map((col) => (
-                                    <th
-                                        key={col.id}
-                                        className="text-left font-medium border-l"
-                                        style={{ minWidth: col.width || 150 }}
-                                    >
-                                        <ColumnHeader
-                                            column={col}
-                                            onUpdate={(updates) => onUpdateColumn(col.id, updates)}
-                                            onDelete={() => onDeleteColumn(col.id)}
-                                            sortDirection={sortColumn === col.id ? sortDirection : null}
-                                            onSort={() => handleSort(col.id)}
-                                            onConfigure={() => handleOpenConfig(col)}
-                                        />
-                                    </th>
-                                ))}
-                                {/* Progress column for time tracking */}
-                                {hasTimeTracking && (
-                                    <th className="text-left font-medium border-l group/progress" style={{ minWidth: 130 }} data-onboarding="period-tracker">
-                                        <div className="px-3 py-2 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-                                            <BarChart3 className="h-4 w-4 text-blue-500" />
-                                            <span className="flex-1">Progress</span>
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <button className="h-5 w-5 rounded flex items-center justify-center opacity-0 group-hover/progress:opacity-100 hover:bg-muted transition-all" data-onboarding="time-tracking-config">
-                                                        <Settings className="h-3.5 w-3.5" />
-                                                    </button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem onClick={onConfigureTimeTracking}>
-                                                        <Settings className="h-3.5 w-3.5 mr-2" />
-                                                        Configure Metrics
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuItem
-                                                        onClick={onConfigureTimeTracking}
-                                                        className="text-destructive"
-                                                    >
-                                                        <Trash2 className="h-3.5 w-3.5 mr-2" />
-                                                        Remove Progress Tracking
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
-                                    </th>
-                                )}
-                                <th className="w-[40px] border-l">
-                                    <AddColumnDialog
-                                        onAdd={onAddColumn}
-                                        onConfigureTimeTracking={onConfigureTimeTracking}
-                                        hasTimeTracking={hasTimeTracking}
-                                    />
-                                </th>
-                            </tr>
-                        </thead>
+                    {/* Sticky Header */}
+                    <div
+                        className="flex border-b bg-muted/30 sticky top-0 z-10"
+                        style={{ minWidth: totalWidth }}
+                    >
+                        {/* Checkbox column */}
+                        <div className="w-[40px] shrink-0 px-3 py-2 flex items-center">
+                            <button
+                                onClick={toggleAll}
+                                className="flex items-center justify-center"
+                            >
+                                <div
+                                    className={cn(
+                                        'h-4 w-4 rounded border flex items-center justify-center transition-colors',
+                                        allSelected
+                                            ? 'bg-primary border-primary'
+                                            : 'border-input hover:border-primary'
+                                    )}
+                                >
+                                    {allSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                                </div>
+                            </button>
+                        </div>
 
-                        {/* Body */}
-                        <tbody>
-                            {sortedRows.map((row) => {
-                                const isSelected = selectedRows.has(row.id);
-                                return (
-                                    <tr
-                                        key={row.id}
-                                        className={cn(
-                                            'border-b last:border-b-0 transition-colors',
-                                            isSelected ? 'bg-primary/5' : 'hover:bg-muted/20'
-                                        )}
-                                    >
-                                        {/* Checkbox */}
-                                        <td className="w-[40px] px-3 py-2">
-                                            <button
-                                                onClick={() => toggleRow(row.id)}
-                                                className="flex items-center justify-center"
-                                            >
-                                                <div
-                                                    className={cn(
-                                                        'h-4 w-4 rounded border flex items-center justify-center transition-colors',
-                                                        isSelected
-                                                            ? 'bg-primary border-primary'
-                                                            : 'border-input hover:border-primary'
-                                                    )}
-                                                >
-                                                    {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
-                                                </div>
+                        {/* Column headers */}
+                        {columns.map((col) => (
+                            <div
+                                key={col.id}
+                                className="text-left font-medium border-l shrink-0"
+                                style={{ width: col.width || 150 }}
+                            >
+                                <ColumnHeader
+                                    column={col}
+                                    onUpdate={(updates) => onUpdateColumn(col.id, updates)}
+                                    onDelete={() => onDeleteColumn(col.id)}
+                                    sortDirection={sortColumn === col.id ? sortDirection : null}
+                                    onSort={() => handleSort(col.id)}
+                                    onConfigure={() => handleOpenConfig(col)}
+                                />
+                            </div>
+                        ))}
+
+                        {/* Progress column for time tracking */}
+                        {hasTimeTracking && (
+                            <div className="text-left font-medium border-l group/progress shrink-0" style={{ width: 130 }} data-onboarding="period-tracker">
+                                <div className="px-3 py-2 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                                    <BarChart3 className="h-4 w-4 text-blue-500" />
+                                    <span className="flex-1">Progress</span>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button className="h-5 w-5 rounded flex items-center justify-center opacity-0 group-hover/progress:opacity-100 hover:bg-muted transition-all" data-onboarding="time-tracking-config">
+                                                <Settings className="h-3.5 w-3.5" />
                                             </button>
-                                        </td>
-                                        {columns.map((col) => (
-                                            <td
-                                                key={col.id}
-                                                className="border-l"
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={onConfigureTimeTracking}>
+                                                <Settings className="h-3.5 w-3.5 mr-2" />
+                                                Configure Metrics
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                                onClick={onConfigureTimeTracking}
+                                                className="text-destructive"
                                             >
-                                                <EditableCell
-                                                    value={row.data[col.id]}
-                                                    column={col}
-                                                    onSave={(value) => onUpdateRow(row.id, { [col.id]: value })}
-                                                />
-                                            </td>
-                                        ))}
-                                        {/* Progress cell for time tracking */}
-                                        {hasTimeTracking && timeTracking && (
-                                            <td className="border-l">
-                                                <ProgressIndicatorCell
-                                                    rowId={row.id}
-                                                    rowName={row.data[columns.find(c => c.is_primary)?.id || columns[0]?.id] || 'Item'}
-                                                    timeTracking={timeTracking}
-                                                    periods={periodData?.[row.id]}
-                                                    onOpenDialog={onOpenPeriodDialog}
-                                                />
-                                            </td>
-                                        )}
-                                        <td className="w-[40px]"></td>
-                                    </tr>
-                                );
-                            })}
+                                                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                                Remove Progress Tracking
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            </div>
+                        )}
 
-                            {/* Empty state */}
-                            {rows.length === 0 && (
-                                <tr>
-                                    <td colSpan={columns.length + (hasTimeTracking ? 3 : 2)} className="text-center py-8 text-muted-foreground">
-                                        No data yet. Click below to add your first row.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                        {/* Add column button */}
+                        <div className="w-[40px] shrink-0 border-l">
+                            <AddColumnDialog
+                                onAdd={onAddColumn}
+                                onConfigureTimeTracking={onConfigureTimeTracking}
+                                hasTimeTracking={hasTimeTracking}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Virtualized Body */}
+                    {sortedRows.length > 0 ? (
+                        <div
+                            ref={parentRef}
+                            className="overflow-y-auto virtual-scroll"
+                            style={{
+                                height: visibleHeight,
+                                minWidth: totalWidth,
+                            }}
+                        >
+                            <div
+                                style={{
+                                    height: `${rowVirtualizer.getTotalSize()}px`,
+                                    width: '100%',
+                                    position: 'relative',
+                                }}
+                            >
+                                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                                    const row = sortedRows[virtualRow.index];
+                                    const isSelected = selectedRows.has(row.id);
+
+                                    return (
+                                        <VirtualRow
+                                            key={row.id}
+                                            row={row}
+                                            columns={columns}
+                                            isSelected={isSelected}
+                                            onToggleRow={toggleRow}
+                                            onUpdateRow={onUpdateRow}
+                                            hasTimeTracking={!!hasTimeTracking}
+                                            timeTracking={timeTracking}
+                                            periodData={periodData}
+                                            onOpenPeriodDialog={onOpenPeriodDialog}
+                                            style={{
+                                                position: 'absolute',
+                                                top: 0,
+                                                left: 0,
+                                                width: '100%',
+                                                height: `${virtualRow.size}px`,
+                                                transform: `translateY(${virtualRow.start}px)`,
+                                            }}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ) : (
+                        /* Empty state */
+                        <div
+                            className="text-center py-8 text-muted-foreground"
+                            style={{ minWidth: totalWidth }}
+                        >
+                            No data yet. Click below to add your first row.
+                        </div>
+                    )}
                 </div>
 
                 {/* Add Row Button */}
