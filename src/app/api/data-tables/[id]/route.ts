@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
+import { requireDsoAccess } from '@/lib/auth';
 
 export async function GET(
     request: NextRequest,
@@ -20,6 +21,12 @@ export async function GET(
                 { error: 'Table not found' },
                 { status: 404 }
             );
+        }
+
+        // Verify user has access to this table's client/DSO
+        const accessResult = await requireDsoAccess(request, table.client_id);
+        if ('response' in accessResult) {
+            return accessResult.response;
         }
 
         // Fetch columns
@@ -60,10 +67,10 @@ export async function PUT(
         const { id } = await params;
         const body = await request.json();
 
-        // Get current table to check frequency change
+        // Get current table to check frequency change and get client_id
         const { data: currentTable } = await supabaseAdmin
             .from('data_tables')
-            .select('time_tracking')
+            .select('time_tracking, client_id')
             .eq('id', id)
             .single();
 
@@ -72,6 +79,12 @@ export async function PUT(
                 { error: 'Table not found' },
                 { status: 404 }
             );
+        }
+
+        // Require write access to this table's client/DSO
+        const accessResult = await requireDsoAccess(request, currentTable.client_id, true);
+        if ('response' in accessResult) {
+            return accessResult.response;
         }
 
         const currentFrequency = currentTable.time_tracking?.frequency;
@@ -114,6 +127,26 @@ export async function DELETE(
 ) {
     try {
         const { id } = await params;
+
+        // Get table to check client_id
+        const { data: table } = await supabaseAdmin
+            .from('data_tables')
+            .select('client_id')
+            .eq('id', id)
+            .single();
+
+        if (!table) {
+            return NextResponse.json(
+                { error: 'Table not found' },
+                { status: 404 }
+            );
+        }
+
+        // Require write access to this table's client/DSO
+        const accessResult = await requireDsoAccess(request, table.client_id, true);
+        if ('response' in accessResult) {
+            return accessResult.response;
+        }
 
         // Delete rows first (foreign key constraint)
         await supabaseAdmin

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db/client';
 import { calculateRiskLevel, getDaysSinceActivity } from '@/lib/calculations/risk-level';
+import { requireAuth, requireDsoAccess } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
@@ -8,6 +9,20 @@ export async function GET(request: NextRequest) {
         const dsoId = searchParams.get('dso_id');
         const status = searchParams.get('status');
         const search = searchParams.get('search');
+
+        // Require authentication
+        const authResult = await requireAuth(request);
+        if ('response' in authResult) {
+            return authResult.response;
+        }
+
+        // If dsoId is provided, verify user has access
+        if (dsoId) {
+            const accessResult = await requireDsoAccess(request, dsoId);
+            if ('response' in accessResult) {
+                return accessResult.response;
+            }
+        }
 
         // Build query
         let query = supabase
@@ -85,6 +100,12 @@ export async function POST(request: NextRequest) {
                 { error: 'dso_id, name, and start_date are required' },
                 { status: 400 }
             );
+        }
+
+        // Require write access to this DSO
+        const accessResult = await requireDsoAccess(request, dso_id, true);
+        if ('response' in accessResult) {
+            return accessResult.response;
         }
 
         const { data, error } = await supabase

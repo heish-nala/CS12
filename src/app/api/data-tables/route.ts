@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
 import { mockDataTemplates } from '@/lib/mock-data';
+import { requireDsoAccess } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
@@ -12,6 +13,12 @@ export async function GET(request: NextRequest) {
                 { error: 'client_id is required' },
                 { status: 400 }
             );
+        }
+
+        // Verify user has access to this client/DSO
+        const accessResult = await requireDsoAccess(request, clientId);
+        if ('response' in accessResult) {
+            return accessResult.response;
         }
 
         // Fetch tables from Supabase
@@ -72,6 +79,12 @@ export async function POST(request: NextRequest) {
                 { error: 'name or template_id is required' },
                 { status: 400 }
             );
+        }
+
+        // Require write access to this client/DSO
+        const accessResult = await requireDsoAccess(request, client_id, true);
+        if ('response' in accessResult) {
+            return accessResult.response;
         }
 
         // Get template if provided
