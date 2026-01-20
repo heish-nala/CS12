@@ -388,7 +388,11 @@ export function OnboardingTour() {
       callback={handleJoyrideCallback}
       styles={joyrideStyles}
       floaterProps={{
-        disableAnimation: false,
+        styles: {
+          floater: {
+            transition: 'opacity 0.3s ease-in-out',
+          },
+        },
       }}
       locale={{
         back: 'Back',
