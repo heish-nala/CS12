@@ -99,6 +99,11 @@ const HEADER_HEIGHT = 41;
 const MAX_VISIBLE_ROWS = 15; // Show max 15 rows before scrolling
 const OVERSCAN = 5; // Render 5 extra rows above/below viewport
 
+// Column sizing
+const MIN_COLUMN_WIDTH = 80;
+const MAX_COLUMN_WIDTH = 500;
+const DEFAULT_COLUMN_WIDTH = 150;
+
 interface DataGridProps {
     tableId: string;
     columns: DataColumn[];
@@ -387,6 +392,60 @@ function AddColumnDialog({
 
 // Check if column type supports configuration
 const CONFIGURABLE_TYPES: ColumnType[] = ['status', 'select', 'multi_select'];
+
+// Column Resize Handle Component
+function ColumnResizeHandle({
+    onResize,
+    onResizeEnd,
+}: {
+    onResize: (delta: number) => void;
+    onResizeEnd: () => void;
+}) {
+    const [isResizing, setIsResizing] = useState(false);
+    const startXRef = useRef(0);
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsResizing(true);
+        startXRef.current = e.clientX;
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            const delta = moveEvent.clientX - startXRef.current;
+            startXRef.current = moveEvent.clientX;
+            onResize(delta);
+        };
+
+        const handleMouseUp = () => {
+            setIsResizing(false);
+            onResizeEnd();
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+    };
+
+    return (
+        <div
+            onMouseDown={handleMouseDown}
+            className={cn(
+                'absolute right-0 top-0 h-full w-1 cursor-col-resize z-10 group/resize',
+                'hover:bg-primary/50 active:bg-primary',
+                isResizing && 'bg-primary'
+            )}
+        >
+            <div className={cn(
+                'absolute right-0 top-0 h-full w-4 -translate-x-1/2',
+            )} />
+        </div>
+    );
+}
 
 // Column Header with sorting
 function ColumnHeader({
@@ -732,10 +791,10 @@ function EditableCell({
 
     return (
         <div
-            className="px-3 py-2 cursor-text min-h-[40px] flex items-center"
+            className="px-3 py-2 cursor-text min-h-[40px] flex items-center overflow-hidden"
             onClick={() => setIsEditing(true)}
         >
-            <span className={cn('text-sm', value ? 'text-foreground' : 'text-muted-foreground')}>
+            <span className={cn('text-sm truncate', value ? 'text-foreground' : 'text-muted-foreground')}>
                 {displayValue || ''}
             </span>
         </div>
@@ -804,6 +863,7 @@ function ProgressIndicatorCell({
 interface VirtualRowProps {
     row: DataRow;
     columns: DataColumn[];
+    columnWidths: Record<string, number>;
     isSelected: boolean;
     onToggleRow: (rowId: string) => void;
     onUpdateRow: (rowId: string, data: Record<string, any>) => void;
@@ -817,6 +877,7 @@ interface VirtualRowProps {
 const VirtualRow = memo(function VirtualRow({
     row,
     columns,
+    columnWidths,
     isSelected,
     onToggleRow,
     onUpdateRow,
@@ -857,8 +918,8 @@ const VirtualRow = memo(function VirtualRow({
             {columns.map((col) => (
                 <div
                     key={col.id}
-                    className="border-l shrink-0"
-                    style={{ width: col.width || 150 }}
+                    className="border-l shrink-0 overflow-hidden"
+                    style={{ width: columnWidths[col.id] || DEFAULT_COLUMN_WIDTH }}
                 >
                     <EditableCell
                         value={row.data[col.id]}
@@ -911,8 +972,47 @@ export function DataGrid({
     const [configColumn, setConfigColumn] = useState<DataColumn | null>(null);
     const [configDialogOpen, setConfigDialogOpen] = useState(false);
 
+    // Column widths state - initialize from column data or default
+    const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+        const widths: Record<string, number> = {};
+        columns.forEach(col => {
+            widths[col.id] = col.width || DEFAULT_COLUMN_WIDTH;
+        });
+        return widths;
+    });
+
+    // Update column widths when columns change (new columns added)
+    useEffect(() => {
+        setColumnWidths(prev => {
+            const newWidths = { ...prev };
+            columns.forEach(col => {
+                if (!(col.id in newWidths)) {
+                    newWidths[col.id] = col.width || DEFAULT_COLUMN_WIDTH;
+                }
+            });
+            return newWidths;
+        });
+    }, [columns]);
+
     // Ref for the scrollable container
     const parentRef = useRef<HTMLDivElement>(null);
+
+    // Handle column resize
+    const handleColumnResize = useCallback((columnId: string, delta: number) => {
+        setColumnWidths(prev => {
+            const currentWidth = prev[columnId] || DEFAULT_COLUMN_WIDTH;
+            const newWidth = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, currentWidth + delta));
+            return { ...prev, [columnId]: newWidth };
+        });
+    }, []);
+
+    // Persist column width to database when resize ends
+    const handleResizeEnd = useCallback((columnId: string) => {
+        const newWidth = columnWidths[columnId];
+        if (newWidth) {
+            onUpdateColumn(columnId, { width: newWidth });
+        }
+    }, [columnWidths, onUpdateColumn]);
 
     // Check if time tracking is enabled
     const hasTimeTracking = timeTracking?.enabled;
@@ -992,12 +1092,12 @@ export function DataGrid({
 
     // Calculate total width for the table
     const totalWidth = useMemo(() => {
-        const columnWidths = columns.reduce((sum, col) => sum + (col.width || 150), 0);
+        const colWidthsSum = columns.reduce((sum, col) => sum + (columnWidths[col.id] || DEFAULT_COLUMN_WIDTH), 0);
         const checkboxWidth = 40;
         const addColumnWidth = 40;
         const progressWidth = hasTimeTracking ? 130 : 0;
-        return columnWidths + checkboxWidth + addColumnWidth + progressWidth;
-    }, [columns, hasTimeTracking]);
+        return colWidthsSum + checkboxWidth + addColumnWidth + progressWidth;
+    }, [columns, columnWidths, hasTimeTracking]);
 
     // Calculate visible height - limit to MAX_VISIBLE_ROWS
     const visibleHeight = Math.min(sortedRows.length, MAX_VISIBLE_ROWS) * ROW_HEIGHT;
@@ -1081,8 +1181,8 @@ export function DataGrid({
                         {columns.map((col) => (
                             <div
                                 key={col.id}
-                                className="text-left font-medium border-l shrink-0"
-                                style={{ width: col.width || 150 }}
+                                className="text-left font-medium border-l shrink-0 relative"
+                                style={{ width: columnWidths[col.id] || DEFAULT_COLUMN_WIDTH }}
                             >
                                 <ColumnHeader
                                     column={col}
@@ -1091,6 +1191,10 @@ export function DataGrid({
                                     sortDirection={sortColumn === col.id ? sortDirection : null}
                                     onSort={() => handleSort(col.id)}
                                     onConfigure={() => handleOpenConfig(col)}
+                                />
+                                <ColumnResizeHandle
+                                    onResize={(delta) => handleColumnResize(col.id, delta)}
+                                    onResizeEnd={() => handleResizeEnd(col.id)}
                                 />
                             </div>
                         ))}
@@ -1162,6 +1266,7 @@ export function DataGrid({
                                             key={row.id}
                                             row={row}
                                             columns={columns}
+                                            columnWidths={columnWidths}
                                             isSelected={isSelected}
                                             onToggleRow={toggleRow}
                                             onUpdateRow={onUpdateRow}
