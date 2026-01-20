@@ -95,7 +95,10 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            message: `Formatted ${totalUpdated} phone numbers`
+            message: `Formatted ${totalUpdated} phone numbers`,
+            debug: {
+                tablesFound: tables?.length || 0,
+            }
         });
     } catch (error) {
         console.error('Error formatting phone numbers:', error);
