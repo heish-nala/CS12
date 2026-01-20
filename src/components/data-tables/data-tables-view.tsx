@@ -9,7 +9,6 @@ import { PeriodDataDialog } from './period-data-dialog';
 import { DownloadReportDialog } from './download-report-dialog';
 import { TimeTrackingConfigDialog } from './time-tracking-config-dialog';
 import { ImportCSVDialog } from './import-csv-dialog';
-import { PersonDetailPanel, PersonInfo } from '@/components/person-detail-panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -125,10 +124,6 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
     const [periodData, setPeriodData] = useState<Record<string, PeriodData[]>>({});
     const [periodDialogOpen, setPeriodDialogOpen] = useState(false);
     const [selectedRowForPeriod, setSelectedRowForPeriod] = useState<{ id: string; name: string } | null>(null);
-
-    // Person detail panel state
-    const [personPanelOpen, setPersonPanelOpen] = useState(false);
-    const [selectedPerson, setSelectedPerson] = useState<PersonInfo | null>(null);
 
     // Loading states for better UX
     const [isAddingRow, setIsAddingRow] = useState(false);
@@ -539,45 +534,6 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
 
     const activeTable = tables.find((t) => t.id === activeTableId);
 
-    // Handle row click to open person detail panel
-    const handleRowClick = useCallback((row: DataRow) => {
-        if (!activeTable) return;
-
-        const detected = detectContactColumns(activeTable.columns);
-
-        // Get person name - try detected column first, then fall back to first text column value
-        let personName = detected.nameColumnId
-            ? String(row.data[detected.nameColumnId] || '')
-            : '';
-
-        // If no name found via detected column, try to find any reasonable name
-        if (!personName) {
-            for (const col of activeTable.columns) {
-                if (col.type === 'text' && row.data[col.id]) {
-                    personName = String(row.data[col.id]);
-                    break;
-                }
-            }
-        }
-
-        // If still no name, use row ID
-        if (!personName) {
-            personName = `Row ${row.id.slice(0, 8)}`;
-        }
-
-        const personInfo: PersonInfo = {
-            id: row.id,
-            name: personName,
-            email: detected.emailColumnId ? String(row.data[detected.emailColumnId] || '') || null : null,
-            phone: detected.phoneColumnId ? String(row.data[detected.phoneColumnId] || '') || null : null,
-            source: 'data_row',
-            sourceId: activeTable.id,
-        };
-
-        setSelectedPerson(personInfo);
-        setPersonPanelOpen(true);
-    }, [activeTable]);
-
     // Fetch period data when active table changes and has time tracking
     useEffect(() => {
         if (activeTable?.time_tracking?.enabled && activeTable.rows?.length) {
@@ -759,7 +715,6 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
                     onConfigureTimeTracking={() => handleOpenTimeTrackingConfig(activeTable)}
                     isAddingRow={isAddingRow}
                     isAddingColumn={isAddingColumn}
-                    onRowClick={handleRowClick}
                 />
             )}
 
@@ -858,13 +813,6 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
                 </DialogContent>
             </Dialog>
 
-            {/* Person Detail Panel */}
-            <PersonDetailPanel
-                open={personPanelOpen}
-                onOpenChange={setPersonPanelOpen}
-                person={selectedPerson}
-                clientId={clientId}
-            />
         </div>
     );
 }
