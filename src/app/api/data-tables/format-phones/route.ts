@@ -47,6 +47,12 @@ export async function POST(request: NextRequest) {
         if (tablesError) throw tablesError;
 
         let totalUpdated = 0;
+        const debugInfo: any = {
+            tablesFound: tables?.length || 0,
+            phoneColumnsFound: 0,
+            rowsChecked: 0,
+            samples: [] as any[],
+        };
 
         for (const table of tables || []) {
             // Get phone columns for this table
@@ -59,6 +65,8 @@ export async function POST(request: NextRequest) {
             if (colError) throw colError;
             if (!columns || columns.length === 0) continue;
 
+            debugInfo.phoneColumnsFound += columns.length;
+
             // Get all rows for this table
             const { data: rows, error: rowsError } = await supabase
                 .from('data_rows')
@@ -66,6 +74,8 @@ export async function POST(request: NextRequest) {
                 .eq('table_id', table.id);
 
             if (rowsError) throw rowsError;
+
+            debugInfo.rowsChecked += rows?.length || 0;
 
             // Update each row's phone numbers
             for (const row of rows || []) {
@@ -76,6 +86,14 @@ export async function POST(request: NextRequest) {
                     const currentValue = newData[col.id];
                     if (currentValue && typeof currentValue === 'string') {
                         const formatted = formatPhoneNumber(currentValue);
+                        // Add sample for debugging
+                        if (debugInfo.samples.length < 3) {
+                            debugInfo.samples.push({
+                                original: currentValue,
+                                formatted: formatted,
+                                changed: formatted !== currentValue
+                            });
+                        }
                         if (formatted !== currentValue) {
                             newData[col.id] = formatted;
                             updated = true;
@@ -84,11 +102,13 @@ export async function POST(request: NextRequest) {
                 }
 
                 if (updated) {
-                    await supabase
+                    const { error: updateError } = await supabase
                         .from('data_rows')
                         .update({ data: newData })
                         .eq('id', row.id);
-                    totalUpdated++;
+                    if (!updateError) {
+                        totalUpdated++;
+                    }
                 }
             }
         }
@@ -96,9 +116,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             success: true,
             message: `Formatted ${totalUpdated} phone numbers`,
-            debug: {
-                tablesFound: tables?.length || 0,
-            }
+            debug: debugInfo
         });
     } catch (error) {
         console.error('Error formatting phone numbers:', error);
