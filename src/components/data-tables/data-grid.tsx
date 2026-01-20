@@ -719,13 +719,16 @@ function EditableCell({
     }
 
     // Email cell
-    if (column.type === 'email' && value) {
+    if (column.type === 'email' && value && !isEditing) {
         return (
-            <div className="px-3 py-2 flex items-center gap-2 group">
+            <div
+                className="px-3 py-2 flex items-center gap-2 group cursor-text"
+                onClick={() => setIsEditing(true)}
+            >
                 <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="text-sm text-blue-600 truncate flex-1">{value}</span>
                 <button
-                    onClick={() => navigator.clipboard.writeText(value)}
+                    onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(value); }}
                     className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
                 >
                     <Copy className="h-3.5 w-3.5" />
@@ -735,13 +738,16 @@ function EditableCell({
     }
 
     // Phone cell
-    if (column.type === 'phone' && value) {
+    if (column.type === 'phone' && value && !isEditing) {
         return (
-            <div className="px-3 py-2 flex items-center gap-2 group">
+            <div
+                className="px-3 py-2 flex items-center gap-2 group cursor-text"
+                onClick={() => setIsEditing(true)}
+            >
                 <Phone className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="text-sm truncate flex-1">{value}</span>
                 <button
-                    onClick={() => navigator.clipboard.writeText(value)}
+                    onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(value); }}
                     className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
                 >
                     <Copy className="h-3.5 w-3.5" />
