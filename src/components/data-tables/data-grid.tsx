@@ -104,6 +104,36 @@ const MIN_COLUMN_WIDTH = 80;
 const MAX_COLUMN_WIDTH = 500;
 const DEFAULT_COLUMN_WIDTH = 150;
 
+// Phone number formatting helper
+function formatPhoneNumber(input: string): string {
+    // Extract only digits
+    const digits = input.replace(/\D/g, '');
+
+    // Handle different lengths
+    if (digits.length === 0) return '';
+
+    // US/Canada format (10 digits): (XXX) XXX-XXXX
+    if (digits.length === 10) {
+        return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+
+    // With country code (11 digits starting with 1): +1 (XXX) XXX-XXXX
+    if (digits.length === 11 && digits.startsWith('1')) {
+        return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    }
+
+    // International or other formats - just group digits
+    if (digits.length > 10) {
+        // Try to format as international: +XX XXX XXX XXXX
+        return '+' + digits.replace(/(\d{1,3})(\d{3})(\d{3})(\d{4})$/, '$1 $2 $3 $4').trim();
+    }
+
+    // Partial numbers - return as-is with some basic formatting
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 interface DataGridProps {
     tableId: string;
     columns: DataColumn[];
@@ -588,6 +618,10 @@ function EditableCell({
         let finalValue: any = editValue;
         if (['number', 'currency', 'percentage'].includes(column.type)) {
             finalValue = parseFloat(editValue) || 0;
+        }
+        // Format phone numbers automatically
+        if (column.type === 'phone' && editValue) {
+            finalValue = formatPhoneNumber(editValue);
         }
         if (editValue !== (value?.toString() || '')) {
             onSave(finalValue);
