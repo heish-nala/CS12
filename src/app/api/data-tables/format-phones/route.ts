@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/db/client';
+import { supabaseAdmin } from '@/lib/db/client';
 
 // Phone number formatting helper
 function formatPhoneNumber(input: string): string {
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Get all tables for this client
-        const { data: tables, error: tablesError } = await supabase
+        const { data: tables, error: tablesError } = await supabaseAdmin
             .from('data_tables')
             .select('id, name')
             .eq('client_id', clientId);
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
         for (const table of tables || []) {
             // Get phone columns for this table
-            const { data: columns, error: colError } = await supabase
+            const { data: columns, error: colError } = await supabaseAdmin
                 .from('data_columns')
                 .select('id')
                 .eq('table_id', table.id)
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
             debugInfo.phoneColumnsFound += columns.length;
 
             // Get all rows for this table
-            const { data: rows, error: rowsError } = await supabase
+            const { data: rows, error: rowsError } = await supabaseAdmin
                 .from('data_rows')
                 .select('id, data')
                 .eq('table_id', table.id);
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
                 }
 
                 if (updated) {
-                    const { error: updateError } = await supabase
+                    const { error: updateError } = await supabaseAdmin
                         .from('data_rows')
                         .update({ data: newData })
                         .eq('id', row.id);
