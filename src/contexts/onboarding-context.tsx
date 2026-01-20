@@ -136,6 +136,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
   const stopOnboarding = useCallback(() => {
     setIsOnboardingActive(false)
+    // Mark as completed so it doesn't restart
+    setHasCompletedOnboarding(true)
+    localStorage.setItem(STORAGE_KEY, 'true')
   }, [])
 
   const setStepIndex = useCallback((index: number) => {
