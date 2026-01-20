@@ -107,24 +107,23 @@ const DEFAULT_COLUMN_WIDTH = 150;
 // Phone number formatting helper
 function formatPhoneNumber(input: string): string {
     // Extract only digits
-    const digits = input.replace(/\D/g, '');
+    let digits = input.replace(/\D/g, '');
 
     // Handle different lengths
     if (digits.length === 0) return '';
+
+    // Strip leading 1 for US numbers (11 digits starting with 1)
+    if (digits.length === 11 && digits.startsWith('1')) {
+        digits = digits.slice(1);
+    }
 
     // US/Canada format (10 digits): (XXX) XXX-XXXX
     if (digits.length === 10) {
         return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
     }
 
-    // With country code (11 digits starting with 1): +1 (XXX) XXX-XXXX
-    if (digits.length === 11 && digits.startsWith('1')) {
-        return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
-    }
-
     // International or other formats - just group digits
     if (digits.length > 10) {
-        // Try to format as international: +XX XXX XXX XXXX
         return '+' + digits.replace(/(\d{1,3})(\d{3})(\d{3})(\d{4})$/, '$1 $2 $3 $4').trim();
     }
 
