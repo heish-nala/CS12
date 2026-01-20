@@ -1,102 +1,110 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Activity, ActivityType, DataTable, DataColumn, DataRow } from '@/lib/db/types';
+import { Activity, DataTable, DataColumn, DataRow } from '@/lib/db/types';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+    ToggleGroup,
+    ToggleGroupItem,
+} from '@/components/ui/toggle-group';
 import {
     Phone,
     Mail,
-    Users,
-    FileText,
-    GraduationCap,
-    MoreHorizontal,
-    MessageSquare,
-    Plus,
-    Download,
-    Filter,
-    ChevronDown,
-    ChevronRight,
     Clock,
-    AlertCircle,
+    LayoutGrid,
+    List,
+    Table2,
+    Search,
+    Users,
 } from 'lucide-react';
-import { ActivityLoggingDialog, Contact } from '@/components/doctors/activity-logging-dialog';
+import { PersonDetailPanel, PersonInfo } from '@/components/person-detail-panel';
 
 interface ActivityTimelineProps {
     clientId: string;
 }
 
-// Using design system CSS variables for consistent theming
-const activityTypeConfig: Record<ActivityType, { label: string; icon: React.ElementType; color: string }> = {
-    call: { label: 'Phone Call', icon: Phone, color: 'bg-[var(--notion-blue)] text-[var(--notion-blue-text)]' },
-    sms: { label: 'Text Message', icon: MessageSquare, color: 'bg-[var(--notion-purple)] text-[var(--notion-purple-text)]' },
-    email: { label: 'Email', icon: Mail, color: 'bg-[var(--notion-green)] text-[var(--notion-green-text)]' },
-    meeting: { label: 'Meeting', icon: Users, color: 'bg-[var(--notion-orange)] text-[var(--notion-orange-text)]' },
-    case_review: { label: 'Case Review', icon: FileText, color: 'bg-[var(--notion-blue)] text-[var(--notion-blue-text)]' },
-    training: { label: 'Training', icon: GraduationCap, color: 'bg-[var(--notion-pink)] text-[var(--notion-pink-text)]' },
-    other: { label: 'Other', icon: MoreHorizontal, color: 'bg-[var(--notion-gray)] text-[var(--notion-gray-text)]' },
-};
+type ViewMode = 'cards' | 'table' | 'grid';
 
-const outcomeConfig: Record<string, { label: string; color: string }> = {
-    positive: { label: 'Positive', color: 'bg-[var(--notion-green)] text-[var(--notion-green-text)]' },
-    neutral: { label: 'Neutral', color: 'bg-[var(--notion-gray)] text-[var(--notion-gray-text)]' },
-    negative: { label: 'Negative', color: 'bg-[var(--notion-red)] text-[var(--notion-red-text)]' },
-    follow_up_needed: { label: 'Follow-up Needed', color: 'bg-[var(--notion-orange)] text-[var(--notion-orange-text)]' },
-};
-
-interface GroupedActivities {
-    [monthYear: string]: Activity[];
+interface ContactWithActivity {
+    id: string;
+    name: string;
+    email?: string;
+    phone?: string;
+    tableId?: string;
+    tableName?: string;
+    lastActivityDate?: string;
+    activityCount: number;
 }
 
 export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
+    const [contacts, setContacts] = useState<ContactWithActivity[]>([]);
     const [activities, setActivities] = useState<Activity[]>([]);
-    const [contacts, setContacts] = useState<Contact[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filterType, setFilterType] = useState<string>('all');
-    const [filterContact, setFilterContact] = useState<string>('all');
-    const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
-    const [logDialogOpen, setLogDialogOpen] = useState(false);
+    const [viewMode, setViewMode] = useState<ViewMode>('cards');
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Panel state
+    const [selectedPerson, setSelectedPerson] = useState<PersonInfo | null>(null);
+    const [panelOpen, setPanelOpen] = useState(false);
 
     useEffect(() => {
-        fetchActivities();
-        fetchContacts();
+        fetchData();
     }, [clientId]);
 
-    const fetchActivities = async () => {
+    const fetchData = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/activities');
-            if (response.ok) {
-                const data = await response.json();
-                setActivities(data);
-                // Auto-expand the current month
-                const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                setExpandedMonths(new Set([currentMonth]));
-            }
+
+            // Fetch contacts and activities in parallel
+            const [contactsData, activitiesData] = await Promise.all([
+                fetchContacts(),
+                fetchActivities()
+            ]);
+
+            // Merge activity data into contacts
+            const contactsWithActivity = contactsData.map(contact => {
+                const contactActivities = activitiesData.filter(
+                    a => a.contact_name === contact.name
+                );
+                const lastActivity = contactActivities.length > 0
+                    ? contactActivities.sort((a, b) =>
+                        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                      )[0]
+                    : null;
+
+                return {
+                    ...contact,
+                    lastActivityDate: lastActivity?.created_at,
+                    activityCount: contactActivities.length,
+                };
+            });
+
+            setContacts(contactsWithActivity);
+            setActivities(activitiesData);
         } catch (error) {
-            console.error('Error fetching activities:', error);
+            console.error('Error fetching data:', error);
         } finally {
             setLoading(false);
         }
     };
 
-    const fetchContacts = async () => {
+    const fetchActivities = async (): Promise<Activity[]> => {
         try {
-            const allContacts: Contact[] = [];
+            const response = await fetch('/api/activities');
+            if (response.ok) {
+                return await response.json();
+            }
+        } catch (error) {
+            console.error('Error fetching activities:', error);
+        }
+        return [];
+    };
 
+    const fetchContacts = async (): Promise<ContactWithActivity[]> => {
+        const allContacts: ContactWithActivity[] = [];
+
+        try {
             // Fetch tables and doctors in parallel
             const [tablesResponse, doctorsResponse] = await Promise.all([
                 fetch(`/api/data-tables?client_id=${clientId}`),
@@ -107,13 +115,16 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
             if (tablesResponse.ok) {
                 const { tables } = await tablesResponse.json();
 
-                // Fetch all table rows in parallel
-                // Tables from API include columns, but TypeScript needs explicit typing
                 const rowsPromises = tables.map(async (table: DataTable & { columns?: DataColumn[] }) => {
                     const columns: DataColumn[] = table.columns || [];
                     const primaryColumn = columns.find(c => c.is_primary);
 
-                    if (!primaryColumn) return [];
+                    // If no primary column, try to find a "name" column
+                    const nameColumn = primaryColumn || columns.find(c =>
+                        c.name.toLowerCase().includes('name') && c.type === 'text'
+                    ) || columns.find(c => c.type === 'text');
+
+                    if (!nameColumn) return [];
 
                     try {
                         const rowsResponse = await fetch(`/api/data-tables/${table.id}/rows`);
@@ -124,14 +135,15 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
                         const phoneColumn = columns.find(c => c.type === 'phone');
 
                         return rows
-                            .filter((row: DataRow) => row.data[primaryColumn.id])
+                            .filter((row: DataRow) => row.data[nameColumn.id])
                             .map((row: DataRow) => ({
                                 id: `table-${table.id}-row-${row.id}`,
-                                name: String(row.data[primaryColumn.id]),
-                                email: emailColumn ? row.data[emailColumn.id] : undefined,
-                                phone: phoneColumn ? row.data[phoneColumn.id] : undefined,
+                                name: String(row.data[nameColumn.id]),
+                                email: emailColumn ? String(row.data[emailColumn.id] || '') : undefined,
+                                phone: phoneColumn ? String(row.data[phoneColumn.id] || '') : undefined,
                                 tableId: table.id,
                                 tableName: table.name,
+                                activityCount: 0,
                             }));
                     } catch {
                         return [];
@@ -154,333 +166,251 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
                         phone: doctor.phone || undefined,
                         tableId: undefined,
                         tableName: 'Doctors',
+                        activityCount: 0,
                     });
                 }
             }
-
-            setContacts(allContacts);
         } catch (error) {
             console.error('Error fetching contacts:', error);
         }
+
+        return allContacts;
     };
 
-    const filteredActivities = useMemo(() => {
-        let filtered = activities;
-        if (filterType !== 'all') {
-            filtered = filtered.filter(a => a.activity_type === filterType);
-        }
-        if (filterContact !== 'all') {
-            // Match by contact name since IDs may differ between sources
-            const selectedContact = contacts.find(c => c.id === filterContact);
-            if (selectedContact) {
-                filtered = filtered.filter(a =>
-                    a.contact_name === selectedContact.name ||
-                    a.doctor_id === filterContact
-                );
-            }
-        }
-        return filtered;
-    }, [activities, filterType, filterContact, contacts]);
+    const filteredContacts = useMemo(() => {
+        if (!searchQuery.trim()) return contacts;
 
-    const groupedByMonth: GroupedActivities = useMemo(() => {
-        const groups: GroupedActivities = {};
+        const query = searchQuery.toLowerCase();
+        return contacts.filter(contact =>
+            contact.name.toLowerCase().includes(query) ||
+            contact.email?.toLowerCase().includes(query) ||
+            contact.phone?.toLowerCase().includes(query) ||
+            contact.tableName?.toLowerCase().includes(query)
+        );
+    }, [contacts, searchQuery]);
 
-        filteredActivities.forEach(activity => {
-            const date = new Date(activity.created_at);
-            const monthYear = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
-            if (!groups[monthYear]) {
-                groups[monthYear] = [];
-            }
-            groups[monthYear].push(activity);
-        });
-
-        // Sort activities within each month by date descending
-        Object.keys(groups).forEach(key => {
-            groups[key].sort((a, b) =>
-                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-            );
-        });
-
-        return groups;
-    }, [filteredActivities]);
-
-    const sortedMonths = useMemo(() => {
-        return Object.keys(groupedByMonth).sort((a, b) => {
-            const dateA = new Date(a);
-            const dateB = new Date(b);
-            return dateB.getTime() - dateA.getTime();
-        });
-    }, [groupedByMonth]);
-
-    const toggleMonth = (month: string) => {
-        const newExpanded = new Set(expandedMonths);
-        if (newExpanded.has(month)) {
-            newExpanded.delete(month);
-        } else {
-            newExpanded.add(month);
-        }
-        setExpandedMonths(newExpanded);
+    const handleContactClick = (contact: ContactWithActivity) => {
+        const personInfo: PersonInfo = {
+            id: contact.id,
+            name: contact.name,
+            email: contact.email || null,
+            phone: contact.phone || null,
+            source: contact.tableId ? 'data_row' : 'doctor',
+            sourceId: contact.tableId,
+        };
+        setSelectedPerson(personInfo);
+        setPanelOpen(true);
     };
 
-    const exportMonth = (month: string) => {
-        const monthActivities = groupedByMonth[month];
-        if (!monthActivities) return;
+    const formatLastActivity = (dateStr?: string) => {
+        if (!dateStr) return 'No activity yet';
 
-        const csvContent = [
-            ['Date', 'Type', 'Contact', 'Description', 'Outcome', 'Email', 'Phone'].join(','),
-            ...monthActivities.map(a => [
-                new Date(a.created_at).toLocaleString(),
-                activityTypeConfig[a.activity_type]?.label || a.activity_type,
-                a.contact_name || '',
-                `"${a.description.replace(/"/g, '""')}"`,
-                outcomeConfig[a.outcome || 'neutral']?.label || '',
-                a.contact_email || '',
-                a.contact_phone || '',
-            ].join(','))
-        ].join('\n');
-
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `activities-${month.toLowerCase().replace(' ', '-')}.csv`;
-        link.click();
-        URL.revokeObjectURL(url);
-    };
-
-    const formatTime = (dateStr: string) => {
         const date = new Date(dateStr);
-        return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-    };
+        const now = new Date();
+        const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
 
-    const formatDate = (dateStr: string) => {
-        const date = new Date(dateStr);
-        return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        if (diffDays === 0) return 'Today';
+        if (diffDays === 1) return 'Yesterday';
+        if (diffDays < 7) return `${diffDays} days ago`;
+        if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+        return date.toLocaleDateString();
     };
-
-    const followUpCount = activities.filter(a => a.outcome === 'follow_up_needed').length;
 
     if (loading) {
         return (
             <div className="space-y-4">
-                <div className="h-10 bg-muted animate-pulse rounded" />
-                <div className="h-32 bg-muted animate-pulse rounded" />
-                <div className="h-32 bg-muted animate-pulse rounded" />
+                <div className="flex items-center justify-between">
+                    <div className="h-10 w-64 bg-muted animate-pulse rounded" />
+                    <div className="h-10 w-32 bg-muted animate-pulse rounded" />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                    {[...Array(6)].map((_, i) => (
+                        <div key={i} className="h-32 bg-muted animate-pulse rounded-lg" />
+                    ))}
+                </div>
             </div>
         );
     }
 
     return (
         <div className="space-y-4">
-            {/* Header with actions */}
+            {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <h3 className="text-lg font-semibold">Activity Log</h3>
-                    {followUpCount > 0 && (
-                        <Badge variant="outline" className="bg-[var(--notion-orange)] text-[var(--notion-orange-text)] border-[var(--notion-orange)]">
-                            <AlertCircle className="h-3 w-3 mr-1" />
-                            {followUpCount} follow-up{followUpCount > 1 ? 's' : ''} needed
-                        </Badge>
-                    )}
+                    <h3 className="text-lg font-semibold">Contacts</h3>
+                    <span className="text-sm text-muted-foreground">
+                        {contacts.length} contact{contacts.length !== 1 ? 's' : ''}
+                    </span>
                 </div>
-                <div className="flex items-center gap-2">
-                    <Select value={filterContact} onValueChange={setFilterContact}>
-                        <SelectTrigger className="w-[180px]">
-                            <Users className="h-4 w-4 mr-2" />
-                            <SelectValue placeholder="Filter by contact" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Contacts</SelectItem>
-                            {contacts.map((contact) => (
-                                <SelectItem key={contact.id} value={contact.id}>
-                                    <div className="flex items-center gap-2">
-                                        <span>{contact.name}</span>
-                                        {contact.tableName && (
-                                            <span className="text-xs text-muted-foreground">
-                                                ({contact.tableName})
+                <div className="flex items-center gap-3">
+                    {/* Search */}
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search contacts..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-9 w-64"
+                        />
+                    </div>
+
+                    {/* View Toggle */}
+                    <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as ViewMode)}>
+                        <ToggleGroupItem value="cards" aria-label="Cards view">
+                            <LayoutGrid className="h-4 w-4" />
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="table" aria-label="Table view">
+                            <List className="h-4 w-4" />
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="grid" aria-label="Grid view">
+                            <Table2 className="h-4 w-4" />
+                        </ToggleGroupItem>
+                    </ToggleGroup>
+                </div>
+            </div>
+
+            {/* Empty State */}
+            {filteredContacts.length === 0 ? (
+                <div className="text-center py-16 border border-dashed rounded-lg">
+                    <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                    <p className="font-medium text-muted-foreground">
+                        {searchQuery ? 'No contacts found' : 'No contacts yet'}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                        {searchQuery
+                            ? 'Try a different search term'
+                            : 'Add contacts in the Data tab to see them here'
+                        }
+                    </p>
+                </div>
+            ) : (
+                <>
+                    {/* Cards View */}
+                    {viewMode === 'cards' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {filteredContacts.map((contact) => (
+                                <button
+                                    key={contact.id}
+                                    onClick={() => handleContactClick(contact)}
+                                    className="text-left p-4 border rounded-lg hover:border-primary/50 hover:bg-muted/30 transition-colors"
+                                >
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div>
+                                            <h4 className="font-medium">{contact.name}</h4>
+                                            {contact.tableName && (
+                                                <span className="text-xs text-muted-foreground">
+                                                    {contact.tableName}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {contact.activityCount > 0 && (
+                                            <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                                {contact.activityCount} activities
                                             </span>
                                         )}
                                     </div>
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Select value={filterType} onValueChange={setFilterType}>
-                        <SelectTrigger className="w-auto">
-                            <Filter className="h-4 w-4 mr-2 shrink-0" />
-                            <SelectValue placeholder="Filter by type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Activities</SelectItem>
-                            {Object.entries(activityTypeConfig).map(([key, config]) => {
-                                const Icon = config.icon;
-                                return (
-                                    <SelectItem key={key} value={key}>
-                                        <div className="flex items-center gap-2">
-                                            <Icon className="h-4 w-4" />
-                                            {config.label}
-                                        </div>
-                                    </SelectItem>
-                                );
-                            })}
-                        </SelectContent>
-                    </Select>
-                    <Button onClick={() => setLogDialogOpen(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Log Activity
-                    </Button>
-                </div>
-            </div>
-
-            {/* Activity summary stats */}
-            <div className="grid grid-cols-4 gap-4">
-                {Object.entries(activityTypeConfig).slice(0, 4).map(([type, config]) => {
-                    const Icon = config.icon;
-                    const count = activities.filter(a => a.activity_type === type).length;
-                    return (
-                        <div
-                            key={type}
-                            className="bg-muted/50 rounded-lg p-3 flex items-center gap-3"
-                        >
-                            <div className={`p-2 rounded-lg ${config.color}`}>
-                                <Icon className="h-4 w-4" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-semibold">{count}</p>
-                                <p className="text-xs text-muted-foreground">{config.label}s</p>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-
-            {/* Timeline grouped by month */}
-            <div className="space-y-3">
-                {sortedMonths.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                        <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p className="font-medium">No activities logged yet</p>
-                        <p className="text-sm">Click "Log Activity" to record your first interaction</p>
-                    </div>
-                ) : (
-                    sortedMonths.map(month => {
-                        const monthActivities = groupedByMonth[month];
-                        const isExpanded = expandedMonths.has(month);
-
-                        return (
-                            <div key={month} className="border rounded-lg overflow-hidden">
-                                {/* Month header */}
-                                <div className="w-full flex items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 transition-colors">
-                                    <button
-                                        onClick={() => toggleMonth(month)}
-                                        className="flex items-center gap-3 flex-1"
-                                    >
-                                        {isExpanded ? (
-                                            <ChevronDown className="h-4 w-4" />
-                                        ) : (
-                                            <ChevronRight className="h-4 w-4" />
+                                    <div className="space-y-1.5 text-sm text-muted-foreground">
+                                        {contact.email && (
+                                            <div className="flex items-center gap-2">
+                                                <Mail className="h-3.5 w-3.5" />
+                                                <span className="truncate">{contact.email}</span>
+                                            </div>
                                         )}
-                                        <span className="font-medium">{month}</span>
-                                        <Badge variant="secondary" className="ml-2">
-                                            {monthActivities.length} activit{monthActivities.length === 1 ? 'y' : 'ies'}
-                                        </Badge>
-                                    </button>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="sm">
-                                                <Download className="h-4 w-4 mr-1" />
-                                                Export
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent>
-                                            <DropdownMenuItem onClick={() => exportMonth(month)}>
-                                                Export as CSV
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
-
-                                {/* Activities list */}
-                                {isExpanded && (
-                                    <div className="divide-y">
-                                        {monthActivities.map(activity => {
-                                            const typeConfig = activityTypeConfig[activity.activity_type];
-                                            const TypeIcon = typeConfig?.icon || MoreHorizontal;
-                                            const outcomeInfo = outcomeConfig[activity.outcome || 'neutral'];
-
-                                            return (
-                                                <div
-                                                    key={activity.id}
-                                                    className="p-4 hover:bg-muted/20 transition-colors"
-                                                >
-                                                    <div className="flex items-start gap-4">
-                                                        {/* Icon */}
-                                                        <div className={`p-2 rounded-lg shrink-0 ${typeConfig?.color || 'bg-[var(--notion-gray)]'}`}>
-                                                            <TypeIcon className="h-4 w-4" />
-                                                        </div>
-
-                                                        {/* Content */}
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                                <span className="font-medium text-sm">
-                                                                    {typeConfig?.label || activity.activity_type}
-                                                                </span>
-                                                                {activity.contact_name && (
-                                                                    <>
-                                                                        <span className="text-muted-foreground">with</span>
-                                                                        <span className="font-medium text-sm">
-                                                                            {activity.contact_name}
-                                                                        </span>
-                                                                    </>
-                                                                )}
-                                                                {activity.outcome && (
-                                                                    <Badge
-                                                                        variant="secondary"
-                                                                        className={`text-xs ${outcomeInfo?.color || ''}`}
-                                                                    >
-                                                                        {outcomeInfo?.label || activity.outcome}
-                                                                    </Badge>
-                                                                )}
-                                                            </div>
-                                                            <p className="text-sm text-muted-foreground mb-2">
-                                                                {activity.description}
-                                                            </p>
-                                                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                                                <span>{formatDate(activity.created_at)}</span>
-                                                                <span>{formatTime(activity.created_at)}</span>
-                                                                {activity.contact_email && (
-                                                                    <span className="flex items-center gap-1">
-                                                                        <Mail className="h-3 w-3" />
-                                                                        {activity.contact_email}
-                                                                    </span>
-                                                                )}
-                                                                {activity.contact_phone && (
-                                                                    <span className="flex items-center gap-1">
-                                                                        <Phone className="h-3 w-3" />
-                                                                        {activity.contact_phone}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                                        {contact.phone && (
+                                            <div className="flex items-center gap-2">
+                                                <Phone className="h-3.5 w-3.5" />
+                                                <span>{contact.phone}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex items-center gap-2">
+                                            <Clock className="h-3.5 w-3.5" />
+                                            <span>{formatLastActivity(contact.lastActivityDate)}</span>
+                                        </div>
                                     </div>
-                                )}
-                            </div>
-                        );
-                    })
-                )}
-            </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
 
-            {/* Log Activity Dialog */}
-            <ActivityLoggingDialog
-                open={logDialogOpen}
-                onOpenChange={setLogDialogOpen}
+                    {/* Table View */}
+                    {viewMode === 'table' && (
+                        <div className="border rounded-lg overflow-hidden">
+                            <table className="w-full">
+                                <thead className="bg-muted/50">
+                                    <tr>
+                                        <th className="text-left px-4 py-3 text-sm font-medium">Name</th>
+                                        <th className="text-left px-4 py-3 text-sm font-medium">Email</th>
+                                        <th className="text-left px-4 py-3 text-sm font-medium">Phone</th>
+                                        <th className="text-left px-4 py-3 text-sm font-medium">Source</th>
+                                        <th className="text-left px-4 py-3 text-sm font-medium">Last Activity</th>
+                                        <th className="text-left px-4 py-3 text-sm font-medium">Activities</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {filteredContacts.map((contact) => (
+                                        <tr
+                                            key={contact.id}
+                                            onClick={() => handleContactClick(contact)}
+                                            className="hover:bg-muted/30 cursor-pointer transition-colors"
+                                        >
+                                            <td className="px-4 py-3 font-medium">{contact.name}</td>
+                                            <td className="px-4 py-3 text-sm text-muted-foreground">
+                                                {contact.email || '-'}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-muted-foreground">
+                                                {contact.phone || '-'}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-muted-foreground">
+                                                {contact.tableName || '-'}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-muted-foreground">
+                                                {formatLastActivity(contact.lastActivityDate)}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm">
+                                                {contact.activityCount > 0 ? (
+                                                    <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                                        {contact.activityCount}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted-foreground">0</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {/* Grid View (Compact) */}
+                    {viewMode === 'grid' && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                            {filteredContacts.map((contact) => (
+                                <button
+                                    key={contact.id}
+                                    onClick={() => handleContactClick(contact)}
+                                    className="text-left p-3 border rounded-lg hover:border-primary/50 hover:bg-muted/30 transition-colors"
+                                >
+                                    <h4 className="font-medium text-sm truncate">{contact.name}</h4>
+                                    <p className="text-xs text-muted-foreground truncate mt-1">
+                                        {contact.tableName || 'Contact'}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-2">
+                                        {formatLastActivity(contact.lastActivityDate)}
+                                    </p>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </>
+            )}
+
+            {/* Person Detail Panel */}
+            <PersonDetailPanel
+                open={panelOpen}
+                onOpenChange={setPanelOpen}
+                person={selectedPerson}
                 clientId={clientId}
-                onSuccess={fetchActivities}
             />
         </div>
     );
