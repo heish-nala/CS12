@@ -117,6 +117,8 @@ interface DataGridProps {
     // Loading states for better UX
     isAddingRow?: boolean;
     isAddingColumn?: boolean;
+    // Row click handler for detail panel
+    onRowClick?: (row: DataRow) => void;
 }
 
 // Column type categories for Monday-style picker
@@ -811,6 +813,7 @@ interface VirtualRowProps {
     timeTracking?: TimeTrackingConfig | null;
     periodData?: Record<string, PeriodData[]>;
     onOpenPeriodDialog?: (rowId: string, rowName: string) => void;
+    onRowClick?: (row: DataRow) => void;
     style: React.CSSProperties;
 }
 
@@ -824,6 +827,7 @@ const VirtualRow = memo(function VirtualRow({
     timeTracking,
     periodData,
     onOpenPeriodDialog,
+    onRowClick,
     style,
 }: VirtualRowProps) {
     return (
@@ -834,8 +838,8 @@ const VirtualRow = memo(function VirtualRow({
             )}
             style={style}
         >
-            {/* Checkbox */}
-            <div className="w-[40px] shrink-0 px-3 flex items-center">
+            {/* Checkbox and Expand */}
+            <div className="w-[40px] shrink-0 px-2 flex items-center gap-1">
                 <button
                     onClick={() => onToggleRow(row.id)}
                     className="flex items-center justify-center"
@@ -851,6 +855,15 @@ const VirtualRow = memo(function VirtualRow({
                         {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
                     </div>
                 </button>
+                {onRowClick && (
+                    <button
+                        onClick={() => onRowClick(row)}
+                        className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                        title="View details"
+                    >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                    </button>
+                )}
             </div>
 
             {/* Data cells */}
@@ -904,6 +917,7 @@ export function DataGrid({
     onConfigureTimeTracking,
     isAddingRow = false,
     isAddingColumn = false,
+    onRowClick,
 }: DataGridProps) {
     const [sortColumn, setSortColumn] = useState<string | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -1169,6 +1183,7 @@ export function DataGrid({
                                             timeTracking={timeTracking}
                                             periodData={periodData}
                                             onOpenPeriodDialog={onOpenPeriodDialog}
+                                            onRowClick={onRowClick}
                                             style={{
                                                 position: 'absolute',
                                                 top: 0,
