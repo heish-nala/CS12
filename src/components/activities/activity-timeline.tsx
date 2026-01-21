@@ -17,6 +17,8 @@ import {
     Table2,
     Search,
     Users,
+    Copy,
+    Check,
 } from 'lucide-react';
 import { PersonDetailPanel, PersonInfo } from '@/components/person-detail-panel';
 
@@ -47,6 +49,20 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
     // Panel state
     const [selectedPerson, setSelectedPerson] = useState<PersonInfo | null>(null);
     const [panelOpen, setPanelOpen] = useState(false);
+
+    // Copy state
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+
+    const handleCopy = async (e: React.MouseEvent, text: string, id: string) => {
+        e.stopPropagation();
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopiedId(id);
+            setTimeout(() => setCopiedId(null), 1500);
+        } catch (err) {
+            console.error('Failed to copy:', err);
+        }
+    };
 
     useEffect(() => {
         fetchData();
@@ -295,14 +311,7 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
                                     className="text-left p-4 border rounded-lg hover:border-primary/50 hover:bg-muted/30 transition-colors"
                                 >
                                     <div className="flex items-start justify-between mb-3">
-                                        <div>
-                                            <h4 className="font-medium">{contact.name}</h4>
-                                            {contact.tableName && (
-                                                <span className="text-xs text-muted-foreground">
-                                                    {contact.tableName}
-                                                </span>
-                                            )}
-                                        </div>
+                                        <h4 className="font-medium">{contact.name}</h4>
                                         {contact.activityCount > 0 && (
                                             <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
                                                 {contact.activityCount} activities
@@ -311,15 +320,35 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
                                     </div>
                                     <div className="space-y-1.5 text-sm text-muted-foreground">
                                         {contact.email && (
-                                            <div className="flex items-center gap-2">
-                                                <Mail className="h-3.5 w-3.5" />
-                                                <span className="truncate">{contact.email}</span>
+                                            <div className="flex items-center gap-2 group/email">
+                                                <Mail className="h-3.5 w-3.5 flex-shrink-0" />
+                                                <span className="truncate flex-1">{contact.email}</span>
+                                                <span
+                                                    onClick={(e) => handleCopy(e, contact.email!, `email-${contact.id}`)}
+                                                    className="opacity-0 group-hover/email:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
+                                                >
+                                                    {copiedId === `email-${contact.id}` ? (
+                                                        <Check className="h-3.5 w-3.5 text-green-500" />
+                                                    ) : (
+                                                        <Copy className="h-3.5 w-3.5" />
+                                                    )}
+                                                </span>
                                             </div>
                                         )}
                                         {contact.phone && (
-                                            <div className="flex items-center gap-2">
-                                                <Phone className="h-3.5 w-3.5" />
-                                                <span>{contact.phone}</span>
+                                            <div className="flex items-center gap-2 group/phone">
+                                                <Phone className="h-3.5 w-3.5 flex-shrink-0" />
+                                                <span className="flex-1">{contact.phone}</span>
+                                                <span
+                                                    onClick={(e) => handleCopy(e, contact.phone!, `phone-${contact.id}`)}
+                                                    className="opacity-0 group-hover/phone:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
+                                                >
+                                                    {copiedId === `phone-${contact.id}` ? (
+                                                        <Check className="h-3.5 w-3.5 text-green-500" />
+                                                    ) : (
+                                                        <Copy className="h-3.5 w-3.5" />
+                                                    )}
+                                                </span>
                                             </div>
                                         )}
                                         <div className="flex items-center gap-2">
@@ -341,7 +370,6 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
                                         <th className="text-left px-4 py-3 text-sm font-medium">Name</th>
                                         <th className="text-left px-4 py-3 text-sm font-medium">Email</th>
                                         <th className="text-left px-4 py-3 text-sm font-medium">Phone</th>
-                                        <th className="text-left px-4 py-3 text-sm font-medium">Source</th>
                                         <th className="text-left px-4 py-3 text-sm font-medium">Last Activity</th>
                                         <th className="text-left px-4 py-3 text-sm font-medium">Activities</th>
                                     </tr>
@@ -355,13 +383,38 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
                                         >
                                             <td className="px-4 py-3 font-medium">{contact.name}</td>
                                             <td className="px-4 py-3 text-sm text-muted-foreground">
-                                                {contact.email || '-'}
+                                                {contact.email ? (
+                                                    <div className="flex items-center gap-2 group/email">
+                                                        <span className="truncate">{contact.email}</span>
+                                                        <span
+                                                            onClick={(e) => handleCopy(e, contact.email!, `table-email-${contact.id}`)}
+                                                            className="opacity-0 group-hover/email:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
+                                                        >
+                                                            {copiedId === `table-email-${contact.id}` ? (
+                                                                <Check className="h-3.5 w-3.5 text-green-500" />
+                                                            ) : (
+                                                                <Copy className="h-3.5 w-3.5" />
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                ) : '-'}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-muted-foreground">
-                                                {contact.phone || '-'}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-muted-foreground">
-                                                {contact.tableName || '-'}
+                                                {contact.phone ? (
+                                                    <div className="flex items-center gap-2 group/phone">
+                                                        <span>{contact.phone}</span>
+                                                        <span
+                                                            onClick={(e) => handleCopy(e, contact.phone!, `table-phone-${contact.id}`)}
+                                                            className="opacity-0 group-hover/phone:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
+                                                        >
+                                                            {copiedId === `table-phone-${contact.id}` ? (
+                                                                <Check className="h-3.5 w-3.5 text-green-500" />
+                                                            ) : (
+                                                                <Copy className="h-3.5 w-3.5" />
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                ) : '-'}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-muted-foreground">
                                                 {formatLastActivity(contact.lastActivityDate)}
@@ -392,9 +445,6 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
                                     className="text-left p-3 border rounded-lg hover:border-primary/50 hover:bg-muted/30 transition-colors"
                                 >
                                     <h4 className="font-medium text-sm truncate">{contact.name}</h4>
-                                    <p className="text-xs text-muted-foreground truncate mt-1">
-                                        {contact.tableName || 'Contact'}
-                                    </p>
                                     <p className="text-xs text-muted-foreground mt-2">
                                         {formatLastActivity(contact.lastActivityDate)}
                                     </p>
