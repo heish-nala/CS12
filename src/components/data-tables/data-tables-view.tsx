@@ -132,6 +132,9 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
     // Track which tables have been fully loaded (for tab caching)
     const loadedTablesRef = useRef<Set<string>>(new Set());
 
+    // Track in-flight requests to prevent duplicates
+    const pendingRequestsRef = useRef<Set<string>>(new Set());
+
     useEffect(() => {
         fetchTables();
     }, [clientId]);
@@ -155,6 +158,15 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
     };
 
     const fetchTables = async () => {
+        const requestKey = `tables-${clientId}`;
+
+        // Skip if request is already in flight
+        if (pendingRequestsRef.current.has(requestKey)) {
+            return;
+        }
+
+        pendingRequestsRef.current.add(requestKey);
+
         try {
             const response = await fetch(`/api/data-tables?client_id=${clientId}`);
             const data = await response.json();
@@ -179,6 +191,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
         } catch (error) {
             console.error('Error fetching tables:', error);
         } finally {
+            pendingRequestsRef.current.delete(requestKey);
             setLoading(false);
         }
     };
@@ -188,6 +201,15 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
         if (!force && loadedTablesRef.current.has(tableId)) {
             return;
         }
+
+        const requestKey = `table-${tableId}`;
+
+        // Skip if request is already in flight
+        if (pendingRequestsRef.current.has(requestKey)) {
+            return;
+        }
+
+        pendingRequestsRef.current.add(requestKey);
 
         try {
             const response = await fetch(`/api/data-tables/${tableId}`);
@@ -205,6 +227,8 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
             loadedTablesRef.current.add(tableId);
         } catch (error) {
             console.error('Error fetching table data:', error);
+        } finally {
+            pendingRequestsRef.current.delete(requestKey);
         }
     };
 
@@ -478,22 +502,38 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
             if (!table?.time_tracking?.enabled) return;
         }
 
-        const newPeriodData: Record<string, PeriodData[]> = {};
+        const requestKey = `periods-${tableId}`;
 
-        await Promise.all(
-            rows.map(async (row) => {
-                try {
-                    const response = await fetch(`/api/data-tables/${tableId}/rows/${row.id}/periods`);
-                    const data = await response.json();
-                    newPeriodData[row.id] = data;
-                } catch (error) {
-                    console.error(`Error fetching periods for row ${row.id}:`, error);
-                    newPeriodData[row.id] = [];
-                }
-            })
-        );
+        // Skip if request is already in flight
+        if (pendingRequestsRef.current.has(requestKey)) {
+            return;
+        }
 
-        setPeriodData(newPeriodData);
+        pendingRequestsRef.current.add(requestKey);
+
+        try {
+            // Use batch endpoint to fetch all periods in a single request
+            const response = await fetch(`/api/data-tables/${tableId}/periods/batch`);
+            const groupedPeriods = await response.json();
+
+            // Initialize empty arrays for rows that don't have periods yet
+            const newPeriodData: Record<string, PeriodData[]> = {};
+            for (const row of rows) {
+                newPeriodData[row.id] = groupedPeriods[row.id] || [];
+            }
+
+            setPeriodData(newPeriodData);
+        } catch (error) {
+            console.error('Error fetching period data:', error);
+            // Initialize empty arrays on error
+            const emptyPeriodData: Record<string, PeriodData[]> = {};
+            for (const row of rows) {
+                emptyPeriodData[row.id] = [];
+            }
+            setPeriodData(emptyPeriodData);
+        } finally {
+            pendingRequestsRef.current.delete(requestKey);
+        }
     };
 
     // Handle opening period dialog
