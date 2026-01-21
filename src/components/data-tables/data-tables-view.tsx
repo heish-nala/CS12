@@ -739,23 +739,45 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
 
             {/* Active Table Content */}
             {activeTable && (
-                <DataGrid
-                    tableId={activeTable.id}
-                    columns={activeTable.columns || []}
-                    rows={activeTable.rows || []}
-                    onAddRow={handleAddRow}
-                    onUpdateRow={handleUpdateRow}
-                    onDeleteRow={handleDeleteRow}
-                    onAddColumn={handleAddColumn}
-                    onUpdateColumn={handleUpdateColumn}
-                    onDeleteColumn={handleDeleteColumn}
-                    timeTracking={activeTable.time_tracking}
-                    periodData={periodData}
-                    onOpenPeriodDialog={handleOpenPeriodDialog}
-                    onConfigureTimeTracking={() => handleOpenTimeTrackingConfig(activeTable)}
-                    isAddingRow={isAddingRow}
-                    isAddingColumn={isAddingColumn}
-                />
+                <>
+                    {/* Show skeleton while row data is loading */}
+                    {(!activeTable.rows || activeTable.rows.length === 0) && (activeTable.row_count || 0) > 0 ? (
+                        <div className="table-skeleton">
+                            <div className="table-skeleton-header">
+                                <div className="table-skeleton-cell w-8" />
+                                {(activeTable.columns || []).slice(0, 4).map((_, i) => (
+                                    <div key={i} className="table-skeleton-cell flex-1 max-w-[120px]" />
+                                ))}
+                            </div>
+                            {[...Array(Math.min(activeTable.row_count || 5, 10))].map((_, i) => (
+                                <div key={i} className="table-skeleton-row" style={{ opacity: 1 - i * 0.08 }}>
+                                    <div className="table-skeleton-cell w-8" />
+                                    {(activeTable.columns || []).slice(0, 4).map((_, j) => (
+                                        <div key={j} className="table-skeleton-cell flex-1 max-w-[120px]" />
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <DataGrid
+                            tableId={activeTable.id}
+                            columns={activeTable.columns || []}
+                            rows={activeTable.rows || []}
+                            onAddRow={handleAddRow}
+                            onUpdateRow={handleUpdateRow}
+                            onDeleteRow={handleDeleteRow}
+                            onAddColumn={handleAddColumn}
+                            onUpdateColumn={handleUpdateColumn}
+                            onDeleteColumn={handleDeleteColumn}
+                            timeTracking={activeTable.time_tracking}
+                            periodData={periodData}
+                            onOpenPeriodDialog={handleOpenPeriodDialog}
+                            onConfigureTimeTracking={() => handleOpenTimeTrackingConfig(activeTable)}
+                            isAddingRow={isAddingRow}
+                            isAddingColumn={isAddingColumn}
+                        />
+                    )}
+                </>
             )}
 
             <CreateTableDialog
