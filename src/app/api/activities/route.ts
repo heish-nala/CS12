@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
+import { requireAuth } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
+        // Require authentication
+        const authResult = await requireAuth(request);
+        if ('response' in authResult) {
+            return authResult.response;
+        }
+
         const { searchParams } = new URL(request.url);
         const doctorId = searchParams.get('doctor_id');
         const contactName = searchParams.get('contact_name');
@@ -39,6 +46,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
+        // Require authentication
+        const authResult = await requireAuth(request);
+        if ('response' in authResult) {
+            return authResult.response;
+        }
+
         const body = await request.json();
 
         const {
@@ -48,7 +61,6 @@ export async function POST(request: NextRequest) {
             contact_name,
             contact_email,
             contact_phone,
-            created_by,
         } = body;
 
         if (!activity_type || !description) {
@@ -67,7 +79,7 @@ export async function POST(request: NextRequest) {
                 contact_name,
                 contact_email,
                 contact_phone,
-                created_by: created_by || 'current-user',
+                created_by: authResult.user.email,
             })
             .select()
             .single();

@@ -1,12 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
+import { requireDsoAccess } from '@/lib/auth';
 
 // GET /api/data-tables/[id]/rows/[rowId]/periods/[periodId] - Get a specific period
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string; rowId: string; periodId: string }> }
 ) {
-    const { periodId } = await params;
+    const { id, periodId } = await params;
+
+    // Get table to check client_id for auth
+    const { data: table } = await supabaseAdmin
+        .from('data_tables')
+        .select('client_id')
+        .eq('id', id)
+        .single();
+
+    if (!table) {
+        return NextResponse.json({ error: 'Table not found' }, { status: 404 });
+    }
+
+    // Require access to the client/DSO
+    const accessResult = await requireDsoAccess(request, table.client_id);
+    if ('response' in accessResult) {
+        return accessResult.response;
+    }
 
     const { data: period, error } = await supabaseAdmin
         .from('period_data')
@@ -26,8 +44,25 @@ export async function PUT(
     request: NextRequest,
     { params }: { params: Promise<{ id: string; rowId: string; periodId: string }> }
 ) {
-    const { periodId } = await params;
+    const { id, periodId } = await params;
     const body = await request.json();
+
+    // Get table to check client_id for auth
+    const { data: table } = await supabaseAdmin
+        .from('data_tables')
+        .select('client_id')
+        .eq('id', id)
+        .single();
+
+    if (!table) {
+        return NextResponse.json({ error: 'Table not found' }, { status: 404 });
+    }
+
+    // Require write access to the client/DSO
+    const accessResult = await requireDsoAccess(request, table.client_id, true);
+    if ('response' in accessResult) {
+        return accessResult.response;
+    }
 
     const { metrics } = body;
     if (!metrics || typeof metrics !== 'object') {
@@ -71,7 +106,24 @@ export async function DELETE(
     request: NextRequest,
     { params }: { params: Promise<{ id: string; rowId: string; periodId: string }> }
 ) {
-    const { periodId } = await params;
+    const { id, periodId } = await params;
+
+    // Get table to check client_id for auth
+    const { data: table } = await supabaseAdmin
+        .from('data_tables')
+        .select('client_id')
+        .eq('id', id)
+        .single();
+
+    if (!table) {
+        return NextResponse.json({ error: 'Table not found' }, { status: 404 });
+    }
+
+    // Require write access to the client/DSO
+    const accessResult = await requireDsoAccess(request, table.client_id, true);
+    if ('response' in accessResult) {
+        return accessResult.response;
+    }
 
     const { error } = await supabaseAdmin
         .from('period_data')

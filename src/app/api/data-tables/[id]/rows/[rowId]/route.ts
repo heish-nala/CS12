@@ -1,14 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
+import { requireDsoAccess } from '@/lib/auth';
 
 export async function PUT(
     request: NextRequest,
     { params }: { params: Promise<{ id: string; rowId: string }> }
 ) {
     try {
-        const { rowId } = await params;
+        const { id, rowId } = await params;
         const body = await request.json();
         const { data } = body;
+
+        // Get table to check client_id for auth
+        const { data: table } = await supabaseAdmin
+            .from('data_tables')
+            .select('client_id')
+            .eq('id', id)
+            .single();
+
+        if (!table) {
+            return NextResponse.json(
+                { error: 'Table not found' },
+                { status: 404 }
+            );
+        }
+
+        // Require write access to the client/DSO
+        const accessResult = await requireDsoAccess(request, table.client_id, true);
+        if ('response' in accessResult) {
+            return accessResult.response;
+        }
 
         // Get existing row data first
         const { data: existingRow, error: fetchError } = await supabaseAdmin
@@ -55,7 +76,27 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string; rowId: string }> }
 ) {
     try {
-        const { rowId } = await params;
+        const { id, rowId } = await params;
+
+        // Get table to check client_id for auth
+        const { data: table } = await supabaseAdmin
+            .from('data_tables')
+            .select('client_id')
+            .eq('id', id)
+            .single();
+
+        if (!table) {
+            return NextResponse.json(
+                { error: 'Table not found' },
+                { status: 404 }
+            );
+        }
+
+        // Require write access to the client/DSO
+        const accessResult = await requireDsoAccess(request, table.client_id, true);
+        if ('response' in accessResult) {
+            return accessResult.response;
+        }
 
         // Delete associated period data first
         await supabaseAdmin

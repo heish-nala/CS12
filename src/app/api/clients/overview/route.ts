@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
 import { calculateRiskLevel, getDaysSinceActivity } from '@/lib/calculations/risk-level';
+import { requireAuth } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
-        const { searchParams } = new URL(request.url);
-        const userId = searchParams.get('user_id');
-
-        if (!userId) {
-            return NextResponse.json({ clients: [] });
+        // Require authentication and get user from session
+        const authResult = await requireAuth(request);
+        if ('response' in authResult) {
+            return authResult.response;
         }
+        const userId = authResult.user.id;
 
         // Get DSOs that the user has access to
         const { data: accessRecords, error: accessError } = await supabaseAdmin

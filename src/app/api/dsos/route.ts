@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
+import { requireAuth } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
-        const userId = searchParams.get('user_id');
         const includeArchived = searchParams.get('include_archived') === 'true';
 
-        if (!userId) {
-            return NextResponse.json(
-                { error: 'user_id is required' },
-                { status: 400 }
-            );
+        // Require authentication and get user from session
+        const authResult = await requireAuth(request);
+        if ('response' in authResult) {
+            return authResult.response;
         }
+        const userId = authResult.user.id;
 
         // Get DSOs that the user has access to
         const { data: accessRecords, error: accessError } = await supabaseAdmin
@@ -90,18 +90,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { name, user_id } = body;
+        const { name } = body;
+
+        // Require authentication and get user from session
+        const authResult = await requireAuth(request);
+        if ('response' in authResult) {
+            return authResult.response;
+        }
+        const user_id = authResult.user.id;
 
         if (!name) {
             return NextResponse.json(
                 { error: 'Name is required' },
-                { status: 400 }
-            );
-        }
-
-        if (!user_id) {
-            return NextResponse.json(
-                { error: 'user_id is required' },
                 { status: 400 }
             );
         }
@@ -152,18 +152,18 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
     try {
         const body = await request.json();
-        const { id, archived, user_id } = body;
+        const { id, archived } = body;
+
+        // Require authentication and get user from session
+        const authResult = await requireAuth(request);
+        if ('response' in authResult) {
+            return authResult.response;
+        }
+        const user_id = authResult.user.id;
 
         if (!id) {
             return NextResponse.json(
                 { error: 'id is required' },
-                { status: 400 }
-            );
-        }
-
-        if (!user_id) {
-            return NextResponse.json(
-                { error: 'user_id is required' },
                 { status: 400 }
             );
         }

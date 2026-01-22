@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
+import { requireDsoAccess } from '@/lib/auth';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
                      'July', 'August', 'September', 'October', 'November', 'December'];
@@ -11,15 +12,21 @@ export async function GET(
 ) {
     const { id: tableId, rowId } = await params;
 
-    // Get table with time tracking config
+    // Get table with time tracking config and client_id
     const { data: table, error: tableError } = await supabaseAdmin
         .from('data_tables')
-        .select('id, time_tracking')
+        .select('id, client_id, time_tracking')
         .eq('id', tableId)
         .single();
 
     if (tableError || !table) {
         return NextResponse.json({ error: 'Table not found' }, { status: 404 });
+    }
+
+    // Require access to the client/DSO
+    const accessResult = await requireDsoAccess(request, table.client_id);
+    if ('response' in accessResult) {
+        return accessResult.response;
     }
 
     if (!table.time_tracking?.enabled || table.time_tracking.frequency !== 'monthly') {

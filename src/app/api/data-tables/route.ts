@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
 import { mockDataTemplates } from '@/lib/mock-data';
+import { requireDsoAccess } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
@@ -14,11 +15,11 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // TODO: Re-enable auth check once SSR cookie handling is fixed
-        // const accessResult = await requireDsoAccess(request, clientId);
-        // if ('response' in accessResult) {
-        //     return accessResult.response;
-        // }
+        // Require access to the client/DSO
+        const accessResult = await requireDsoAccess(request, clientId);
+        if ('response' in accessResult) {
+            return accessResult.response;
+        }
 
         // Fetch tables from Supabase
         const { data: tables, error: tablesError } = await supabaseAdmin
@@ -97,11 +98,11 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // TODO: Re-enable auth check once SSR cookie handling is fixed
-        // const accessResult = await requireDsoAccess(request, client_id, true);
-        // if ('response' in accessResult) {
-        //     return accessResult.response;
-        // }
+        // Require write access to the client/DSO
+        const accessResult = await requireDsoAccess(request, client_id, true);
+        if ('response' in accessResult) {
+            return accessResult.response;
+        }
 
         // Get template if provided
         const template = template_id ? mockDataTemplates.find(t => t.id === template_id) : undefined;

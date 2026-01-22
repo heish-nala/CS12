@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
+import { requireDsoAccess } from '@/lib/auth';
 
 export async function GET(
     request: NextRequest,
@@ -8,10 +9,10 @@ export async function GET(
     try {
         const { id } = await params;
 
-        // Verify table exists
+        // Verify table exists and get client_id
         const { data: table, error: tableError } = await supabaseAdmin
             .from('data_tables')
-            .select('id')
+            .select('id, client_id')
             .eq('id', id)
             .single();
 
@@ -20,6 +21,12 @@ export async function GET(
                 { error: 'Table not found' },
                 { status: 404 }
             );
+        }
+
+        // Require access to the client/DSO
+        const accessResult = await requireDsoAccess(request, table.client_id);
+        if ('response' in accessResult) {
+            return accessResult.response;
         }
 
         // Fetch columns
@@ -50,10 +57,10 @@ export async function POST(
         const body = await request.json();
         const { name, type, config } = body;
 
-        // Verify table exists
+        // Verify table exists and get client_id
         const { data: table, error: tableError } = await supabaseAdmin
             .from('data_tables')
-            .select('id')
+            .select('id, client_id')
             .eq('id', id)
             .single();
 
@@ -62,6 +69,12 @@ export async function POST(
                 { error: 'Table not found' },
                 { status: 404 }
             );
+        }
+
+        // Require write access to the client/DSO
+        const accessResult = await requireDsoAccess(request, table.client_id, true);
+        if ('response' in accessResult) {
+            return accessResult.response;
         }
 
         if (!name) {

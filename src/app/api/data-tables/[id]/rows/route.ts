@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
+import { requireDsoAccess } from '@/lib/auth';
 
 export async function GET(
     request: NextRequest,
@@ -22,11 +23,11 @@ export async function GET(
             );
         }
 
-        // TODO: Re-enable auth check once SSR cookie handling is fixed
-        // const accessResult = await requireDsoAccess(request, table.client_id);
-        // if ('response' in accessResult) {
-        //     return accessResult.response;
-        // }
+        // Require access to the client/DSO
+        const accessResult = await requireDsoAccess(request, table.client_id);
+        if ('response' in accessResult) {
+            return accessResult.response;
+        }
 
         // Fetch rows
         const { data: rows, error: rowsError } = await supabaseAdmin
@@ -70,11 +71,11 @@ export async function POST(
             );
         }
 
-        // TODO: Re-enable auth check once SSR cookie handling is fixed
-        // const accessResult = await requireDsoAccess(request, table.client_id, true);
-        // if ('response' in accessResult) {
-        //     return accessResult.response;
-        // }
+        // Require write access to the client/DSO
+        const accessResult = await requireDsoAccess(request, table.client_id, true);
+        if ('response' in accessResult) {
+            return accessResult.response;
+        }
 
         // Create row
         const { data: row, error: insertError } = await supabaseAdmin

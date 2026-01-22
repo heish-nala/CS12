@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
 import { UserRole } from '@/lib/db/types';
+import { requireAuth } from '@/lib/auth';
 
 interface TeamMember {
     id: string;
@@ -14,15 +15,12 @@ interface TeamMember {
 
 export async function GET(request: NextRequest) {
     try {
-        const { searchParams } = new URL(request.url);
-        const userId = searchParams.get('user_id');
-
-        if (!userId) {
-            return NextResponse.json(
-                { error: 'user_id is required' },
-                { status: 400 }
-            );
+        // Require authentication and get user from session
+        const authResult = await requireAuth(request);
+        if ('response' in authResult) {
+            return authResult.response;
         }
+        const userId = authResult.user.id;
 
         // Get all DSOs the current user has access to
         const { data: userAccess, error: accessError } = await supabaseAdmin
@@ -163,6 +161,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
+        // Require authentication
+        const authResult = await requireAuth(request);
+        if ('response' in authResult) {
+            return authResult.response;
+        }
+
         const body = await request.json();
         const { email, name, role } = body;
 

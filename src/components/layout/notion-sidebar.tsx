@@ -102,11 +102,11 @@ export function NotionSidebar() {
                     isActive={pathname === '/'}
                 />
 
-                {/* Workspace Section */}
+                {/* Clients Section */}
                 <div className="pt-4 pb-1">
                     <div className="flex items-center justify-between px-2 py-1 group">
                         <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                            Workspace
+                            Clients
                         </span>
                         <Button
                             variant="ghost"
