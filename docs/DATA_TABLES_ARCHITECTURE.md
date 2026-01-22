@@ -77,6 +77,14 @@ When inserting rows programmatically:
    });
    ```
 
+## Phone Number Formatting
+
+Phone numbers are automatically formatted during CSV import via `transformValue()` in `csv-utils.ts`.
+
+Format: `(XXX) XXX-XXXX` for US/Canada 10-digit numbers.
+
+If you insert rows programmatically, use the same `formatPhoneNumber()` function or call the `/api/data-tables/format-phones` API endpoint after import.
+
 ## Reference Implementation
 
 See `import-csv-dialog.tsx` lines 254-282 for the correct pattern used by the CSV import feature.

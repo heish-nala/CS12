@@ -203,9 +203,42 @@ export function transformValue(value: string, targetType: ColumnType): any {
             const rating = parseInt(trimmed, 10);
             return isNaN(rating) ? null : Math.min(5, Math.max(1, rating));
 
+        case 'phone':
+            return formatPhoneNumber(trimmed);
+
         default:
             return trimmed;
     }
+}
+
+/**
+ * Format phone number to (XXX) XXX-XXXX format for US/Canada numbers
+ */
+function formatPhoneNumber(input: string): string {
+    if (!input) return '';
+
+    // Extract only digits
+    let digits = input.replace(/\D/g, '');
+
+    if (digits.length === 0) return input; // Return original if no digits
+
+    // Strip leading 1 for US numbers
+    if (digits.length === 11 && digits.startsWith('1')) {
+        digits = digits.slice(1);
+    }
+
+    // US/Canada format (10 digits): (XXX) XXX-XXXX
+    if (digits.length === 10) {
+        return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+
+    // International or other formats
+    if (digits.length > 10) {
+        return '+' + digits.replace(/(\d{1,3})(\d{3})(\d{3})(\d{4})$/, '$1 $2 $3 $4').trim();
+    }
+
+    // Partial numbers - return original
+    return input;
 }
 
 /**
