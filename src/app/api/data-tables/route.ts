@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
             .select('*', { count: 'exact', head: true })
             .eq('client_id', client_id);
 
-        // Build time_tracking config from template
+        // Build time_tracking config from template or attendee list defaults
         let timeTracking = null;
         if (template?.time_tracking?.enabled) {
             timeTracking = {
@@ -123,6 +123,17 @@ export async function POST(request: NextRequest) {
                     name: m.name,
                     type: m.type,
                 })),
+            };
+        } else if (isAttendeeList) {
+            // Attendee lists always have time tracking enabled by default
+            timeTracking = {
+                enabled: true,
+                frequency: 'monthly',
+                metrics: [
+                    { id: `metric-${Date.now()}-0`, name: 'Scans', type: 'number' },
+                    { id: `metric-${Date.now()}-1`, name: 'Accepted', type: 'number' },
+                    { id: `metric-${Date.now()}-2`, name: 'Diagnosed', type: 'number' },
+                ],
             };
         }
 
