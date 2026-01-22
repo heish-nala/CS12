@@ -1241,7 +1241,7 @@ export function DataGrid({
                     {sortedRows.length > 0 ? (
                         <div
                             ref={parentRef}
-                            className="overflow-y-auto virtual-scroll"
+                            className="overflow-y-auto overflow-x-hidden virtual-scroll"
                             style={{
                                 height: visibleHeight,
                                 minWidth: totalWidth,
