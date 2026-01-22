@@ -109,7 +109,8 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
         try {
             const response = await fetch('/api/activities');
             if (response.ok) {
-                return await response.json();
+                const data = await response.json();
+                return data.activities || [];
             }
         } catch (error) {
             console.error('Error fetching activities:', error);

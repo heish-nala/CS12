@@ -5,6 +5,7 @@ export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
         const doctorId = searchParams.get('doctor_id');
+        const contactName = searchParams.get('contact_name');
         const limit = parseInt(searchParams.get('limit') || '100');
 
         let query = supabase
@@ -17,11 +18,16 @@ export async function GET(request: NextRequest) {
             query = query.eq('doctor_id', doctorId);
         }
 
+        // Support filtering by contact_name for data table rows
+        if (contactName) {
+            query = query.eq('contact_name', contactName);
+        }
+
         const { data: activities, error } = await query;
 
         if (error) throw error;
 
-        return NextResponse.json(activities || []);
+        return NextResponse.json({ activities: activities || [] });
     } catch (error) {
         console.error('Error fetching activities:', error);
         return NextResponse.json(

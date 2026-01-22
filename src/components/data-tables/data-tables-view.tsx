@@ -7,6 +7,7 @@ import { DataGrid } from './data-grid';
 import { DownloadReportDialog } from './download-report-dialog';
 import { TimeTrackingConfigDialog } from './time-tracking-config-dialog';
 import { ImportCSVDialog } from './import-csv-dialog';
+import { PersonDetailPanel, PersonInfo } from '@/components/person-detail-panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -34,6 +35,7 @@ import {
     Upload,
     BarChart3,
     FileSpreadsheet,
+    Activity,
 } from 'lucide-react';
 
 const STORAGE_KEY_PREFIX = 'activity-contact-source-';
@@ -108,6 +110,10 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
     // Loading states for better UX
     const [isAddingRow, setIsAddingRow] = useState(false);
     const [isAddingColumn, setIsAddingColumn] = useState(false);
+
+    // Person detail panel state (for activity logging)
+    const [detailPanelOpen, setDetailPanelOpen] = useState(false);
+    const [selectedPerson, setSelectedPerson] = useState<PersonInfo | null>(null);
 
     // Track which tables have been fully loaded (for tab caching)
     const loadedTablesRef = useRef<Set<string>>(new Set());
@@ -527,6 +533,30 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
         }
     }, [activeTableId, activeTable?.rows?.length]);
 
+    // Handle row click to open person detail panel
+    const handleRowClick = useCallback((row: DataRow) => {
+        if (!activeTable) return;
+
+        // Detect contact columns
+        const detected = detectContactColumns(activeTable.columns);
+        if (!detected.nameColumnId) return;
+
+        const name = row.data[detected.nameColumnId];
+        if (!name) return;
+
+        const personInfo: PersonInfo = {
+            id: row.id,
+            name: String(name),
+            email: detected.emailColumnId ? row.data[detected.emailColumnId] : null,
+            phone: detected.phoneColumnId ? row.data[detected.phoneColumnId] : null,
+            source: 'data_row',
+            sourceId: activeTable.id,
+        };
+
+        setSelectedPerson(personInfo);
+        setDetailPanelOpen(true);
+    }, [activeTable]);
+
     const createBlankAttendeeList = async () => {
         setIsCreatingBlankList(true);
         try {
@@ -728,6 +758,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
                             onConfigureTimeTracking={() => handleOpenTimeTrackingConfig(activeTable)}
                             isAddingRow={isAddingRow}
                             isAddingColumn={isAddingColumn}
+                            onRowClick={handleRowClick}
                         />
                     )}
                 </>
@@ -807,6 +838,14 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Person Detail Panel for Activity Logging */}
+            <PersonDetailPanel
+                open={detailPanelOpen}
+                onOpenChange={setDetailPanelOpen}
+                person={selectedPerson}
+                clientId={clientId}
+            />
 
         </div>
     );
