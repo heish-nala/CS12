@@ -162,8 +162,6 @@ interface DataGridProps {
     // Loading states for better UX
     isAddingRow?: boolean;
     isAddingColumn?: boolean;
-    // Row click handler for opening detail panel
-    onRowClick?: (row: DataRow) => void;
 }
 
 // Column type categories for Monday-style picker
@@ -919,7 +917,6 @@ interface VirtualRowProps {
     isSelected: boolean;
     onToggleRow: (rowId: string) => void;
     onUpdateRow: (rowId: string, data: Record<string, any>) => void;
-    onRowClick?: (row: DataRow) => void;
     style: React.CSSProperties;
 }
 
@@ -930,7 +927,6 @@ const VirtualRow = memo(function VirtualRow({
     isSelected,
     onToggleRow,
     onUpdateRow,
-    onRowClick,
     style,
 }: VirtualRowProps) {
     return (
@@ -940,7 +936,6 @@ const VirtualRow = memo(function VirtualRow({
                 isSelected ? 'bg-primary/5' : 'hover:bg-muted/20'
             )}
             style={style}
-            onDoubleClick={() => onRowClick?.(row)}
         >
             {/* Checkbox and Expand */}
             <div className="w-[40px] shrink-0 px-2 flex items-center gap-1">
@@ -998,7 +993,6 @@ export function DataGrid({
     onConfigureTimeTracking,
     isAddingRow = false,
     isAddingColumn = false,
-    onRowClick,
 }: DataGridProps) {
     const [sortColumn, setSortColumn] = useState<string | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -1273,7 +1267,6 @@ export function DataGrid({
                                             isSelected={isSelected}
                                             onToggleRow={toggleRow}
                                             onUpdateRow={onUpdateRow}
-                                            onRowClick={onRowClick}
                                             style={{
                                                 position: 'absolute',
                                                 top: 0,

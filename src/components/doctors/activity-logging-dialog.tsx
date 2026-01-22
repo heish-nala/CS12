@@ -19,9 +19,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { ActivityType } from '@/lib/db/types';
+import { ActivityType, DataColumn } from '@/lib/db/types';
 import { toast } from 'sonner';
-import { Phone, Mail, Users, FileText, GraduationCap, MoreHorizontal, MessageSquare, User, Settings } from 'lucide-react';
+import { Phone, Mail, Users, FileText, GraduationCap, MoreHorizontal, MessageSquare, User, Loader2 } from 'lucide-react';
 
 export interface Contact {
     id: string;
@@ -32,22 +32,12 @@ export interface Contact {
     tableName?: string;
 }
 
-interface ContactSourceConfig {
-    tableId: string;
-    tableName: string;
-    nameColumnId: string;
-    emailColumnId?: string;
-    phoneColumnId?: string;
-}
-
 interface ActivityLoggingDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     clientId: string;
     onSuccess?: () => void;
 }
-
-const STORAGE_KEY_PREFIX = 'activity-contact-source-';
 
 const activityTypes: { value: ActivityType; label: string; icon: React.ElementType }[] = [
     { value: 'call', label: 'Phone Call', icon: Phone },
@@ -67,6 +57,46 @@ const outcomeOptions = [
     { value: 'follow_up_needed', label: 'Follow-up Needed', color: 'bg-[var(--notion-orange)] text-[var(--notion-orange-text)]' },
 ];
 
+// Auto-detect contact columns based on name and type
+function detectContactColumns(columns: DataColumn[]): {
+    nameColumnId?: string;
+    emailColumnId?: string;
+    phoneColumnId?: string;
+} {
+    const result: {
+        nameColumnId?: string;
+        emailColumnId?: string;
+        phoneColumnId?: string;
+    } = {};
+
+    for (const col of columns) {
+        const nameLower = col.name.toLowerCase();
+
+        // Detect name column
+        if (!result.nameColumnId) {
+            if (nameLower === 'name' || nameLower === 'full name' || nameLower === 'contact name' || nameLower === 'attendee' || nameLower === 'doctor') {
+                result.nameColumnId = col.id;
+            }
+        }
+
+        // Detect email column
+        if (!result.emailColumnId) {
+            if (col.type === 'email' || nameLower === 'email' || nameLower.includes('email')) {
+                result.emailColumnId = col.id;
+            }
+        }
+
+        // Detect phone column
+        if (!result.phoneColumnId) {
+            if (col.type === 'phone' || nameLower === 'phone' || nameLower.includes('phone')) {
+                result.phoneColumnId = col.id;
+            }
+        }
+    }
+
+    return result;
+}
+
 export function ActivityLoggingDialog({
     open,
     onOpenChange,
@@ -78,31 +108,15 @@ export function ActivityLoggingDialog({
     const [notes, setNotes] = useState('');
     const [outcome, setOutcome] = useState<string>('neutral');
 
-    // Configuration and contacts
-    const [config, setConfig] = useState<ContactSourceConfig | null>(null);
+    // Contacts state
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [selectedContactId, setSelectedContactId] = useState<string>('');
     const [loadingContacts, setLoadingContacts] = useState(false);
-    const [notConfigured, setNotConfigured] = useState(false);
 
-    // Load config and contacts when dialog opens
+    // Auto-fetch contacts when dialog opens
     useEffect(() => {
         if (open && clientId) {
-            const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${clientId}`);
-            if (stored) {
-                try {
-                    const savedConfig = JSON.parse(stored) as ContactSourceConfig;
-                    setConfig(savedConfig);
-                    setNotConfigured(false);
-                    fetchContacts(savedConfig);
-                } catch {
-                    setConfig(null);
-                    setNotConfigured(true);
-                }
-            } else {
-                setConfig(null);
-                setNotConfigured(true);
-            }
+            fetchContactsFromTables();
         }
     }, [open, clientId]);
 
@@ -117,30 +131,57 @@ export function ActivityLoggingDialog({
         }
     }, [open]);
 
-    const fetchContacts = async (cfg: ContactSourceConfig) => {
+    const fetchContactsFromTables = async () => {
         setLoadingContacts(true);
         try {
-            const response = await fetch(`/api/data-tables/${cfg.tableId}/rows`);
-            if (response.ok) {
-                const { rows } = await response.json();
-                const allContacts: Contact[] = [];
+            // Fetch all tables for this client
+            const tablesResponse = await fetch(`/api/data-tables?client_id=${clientId}`);
+            if (!tablesResponse.ok) {
+                throw new Error('Failed to fetch tables');
+            }
+            const { tables } = await tablesResponse.json();
 
-                for (const row of rows || []) {
-                    const name = row.data[cfg.nameColumnId];
+            if (!tables || tables.length === 0) {
+                setContacts([]);
+                return;
+            }
+
+            const allContacts: Contact[] = [];
+
+            // Process each table
+            for (const table of tables) {
+                // Fetch full table data with rows
+                const tableResponse = await fetch(`/api/data-tables/${table.id}`);
+                if (!tableResponse.ok) continue;
+
+                const { table: fullTable } = await tableResponse.json();
+                const columns = fullTable.columns || [];
+                const rows = fullTable.rows || [];
+
+                // Auto-detect contact columns
+                const detected = detectContactColumns(columns);
+                if (!detected.nameColumnId) continue;
+
+                // Extract contacts from rows
+                for (const row of rows) {
+                    const name = row.data[detected.nameColumnId];
                     if (!name) continue;
 
                     allContacts.push({
-                        id: `row-${row.id}`,
+                        id: row.id,
                         name: String(name),
-                        email: cfg.emailColumnId ? row.data[cfg.emailColumnId] : undefined,
-                        phone: cfg.phoneColumnId ? row.data[cfg.phoneColumnId] : undefined,
+                        email: detected.emailColumnId ? row.data[detected.emailColumnId] : undefined,
+                        phone: detected.phoneColumnId ? row.data[detected.phoneColumnId] : undefined,
+                        tableId: table.id,
+                        tableName: table.name,
                     });
                 }
-
-                setContacts(allContacts);
             }
+
+            setContacts(allContacts);
         } catch (error) {
             console.error('Error fetching contacts:', error);
+            toast.error('Failed to load contacts');
         } finally {
             setLoadingContacts(false);
         }
@@ -195,39 +236,6 @@ export function ActivityLoggingDialog({
         }
     };
 
-    // Not configured state
-    if (notConfigured) {
-        return (
-            <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="sm:max-w-[400px]">
-                    <DialogHeader>
-                        <DialogTitle>Contact Source Not Configured</DialogTitle>
-                        <DialogDescription>
-                            Please configure your contact source in Settings before logging activities.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="p-4 pt-4">
-                        <div className="text-center">
-                            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-4">
-                                <Settings className="h-6 w-6 text-muted-foreground" />
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                                Go to <span className="font-medium text-foreground">Settings → Activity</span> to configure which columns contain your contact information.
-                            </p>
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button onClick={() => onOpenChange(false)}>
-                            Close
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        );
-    }
-
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[500px]">
@@ -247,12 +255,17 @@ export function ActivityLoggingDialog({
                             onValueChange={setSelectedContactId}
                         >
                             <SelectTrigger>
-                                <SelectValue placeholder={loadingContacts ? "Loading..." : "Select a contact..."} />
+                                <SelectValue placeholder={loadingContacts ? "Loading contacts..." : "Select a contact..."} />
                             </SelectTrigger>
                             <SelectContent>
-                                {contacts.length === 0 ? (
+                                {loadingContacts ? (
                                     <div className="py-6 text-center text-sm text-muted-foreground">
-                                        {loadingContacts ? 'Loading contacts...' : 'No contacts found'}
+                                        <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                                        Loading contacts...
+                                    </div>
+                                ) : contacts.length === 0 ? (
+                                    <div className="py-6 text-center text-sm text-muted-foreground">
+                                        No contacts found. Add attendees first.
                                     </div>
                                 ) : (
                                     contacts.map((contact) => (
@@ -354,7 +367,7 @@ export function ActivityLoggingDialog({
                         >
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={loading || !selectedContactId}>
+                        <Button type="submit" disabled={loading || !selectedContactId || loadingContacts}>
                             {loading ? 'Logging...' : 'Log Activity'}
                         </Button>
                     </DialogFooter>
