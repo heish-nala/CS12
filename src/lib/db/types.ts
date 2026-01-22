@@ -3,7 +3,7 @@
 
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 export type DoctorStatus = 'active' | 'inactive' | 'completed';
-export type ActivityType = 'call' | 'sms' | 'email' | 'meeting' | 'case_review' | 'training' | 'other';
+export type ActivityType = 'phone' | 'email' | 'text';
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'blocked';
 export type UserRole = 'admin' | 'manager' | 'viewer';
 export type CustomColumnType = 'text' | 'number' | 'percentage' | 'select' | 'date' | 'checkbox' | 'email' | 'phone' | 'url';

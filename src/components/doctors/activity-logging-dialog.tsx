@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { ActivityType, DataColumn } from '@/lib/db/types';
 import { toast } from 'sonner';
-import { Phone, Mail, Users, FileText, GraduationCap, MoreHorizontal, MessageSquare, User, Loader2 } from 'lucide-react';
+import { Phone, Mail, MessageSquare, User, Loader2 } from 'lucide-react';
 
 export interface Contact {
     id: string;
@@ -40,13 +40,9 @@ interface ActivityLoggingDialogProps {
 }
 
 const activityTypes: { value: ActivityType; label: string; icon: React.ElementType }[] = [
-    { value: 'call', label: 'Phone Call', icon: Phone },
-    { value: 'sms', label: 'Text Message', icon: MessageSquare },
+    { value: 'phone', label: 'Phone', icon: Phone },
     { value: 'email', label: 'Email', icon: Mail },
-    { value: 'meeting', label: 'Meeting', icon: Users },
-    { value: 'case_review', label: 'Case Review', icon: FileText },
-    { value: 'training', label: 'Training Session', icon: GraduationCap },
-    { value: 'other', label: 'Other', icon: MoreHorizontal },
+    { value: 'text', label: 'Text', icon: MessageSquare },
 ];
 
 // Using design system CSS variables for consistent theming
@@ -104,7 +100,7 @@ export function ActivityLoggingDialog({
     onSuccess,
 }: ActivityLoggingDialogProps) {
     const [loading, setLoading] = useState(false);
-    const [activityType, setActivityType] = useState<ActivityType>('call');
+    const [activityType, setActivityType] = useState<ActivityType>('phone');
     const [notes, setNotes] = useState('');
     const [outcome, setOutcome] = useState<string>('neutral');
 
@@ -125,7 +121,7 @@ export function ActivityLoggingDialog({
         if (!open) {
             setSelectedContactId('');
             setNotes('');
-            setActivityType('call');
+            setActivityType('phone');
             setOutcome('neutral');
             setContacts([]);
         }
@@ -209,7 +205,6 @@ export function ActivityLoggingDialog({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    doctor_id: selectedContactId,
                     activity_type: activityType,
                     description: notes.trim(),
                     outcome,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/db/client';
+import { supabaseAdmin } from '@/lib/db/client';
 
 export async function GET(request: NextRequest) {
     try {
@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
         const contactName = searchParams.get('contact_name');
         const limit = parseInt(searchParams.get('limit') || '100');
 
-        let query = supabase
+        let query = supabaseAdmin
             .from('activities')
             .select('*')
             .order('created_at', { ascending: false })
@@ -42,7 +42,6 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
 
         const {
-            doctor_id,
             activity_type,
             description,
             outcome,
@@ -59,10 +58,9 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
             .from('activities')
             .insert({
-                doctor_id: doctor_id || null,
                 activity_type,
                 description,
                 outcome,

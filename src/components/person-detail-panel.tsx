@@ -41,13 +41,9 @@ import { useAuth } from '@/contexts/auth-context';
 
 // Activity type configuration
 const activityTypeConfig: Record<ActivityType, { label: string; icon: React.ElementType; color: string }> = {
-    call: { label: 'Phone Call', icon: Phone, color: 'bg-[var(--notion-blue)]' },
-    sms: { label: 'Text Message', icon: MessageSquare, color: 'bg-[var(--notion-purple)]' },
+    phone: { label: 'Phone', icon: Phone, color: 'bg-[var(--notion-blue)]' },
     email: { label: 'Email', icon: Mail, color: 'bg-[var(--notion-green)]' },
-    meeting: { label: 'Meeting', icon: Video, color: 'bg-[var(--notion-orange)]' },
-    case_review: { label: 'Case Review', icon: Briefcase, color: 'bg-[var(--notion-yellow)]' },
-    training: { label: 'Training', icon: BookOpen, color: 'bg-[var(--notion-pink)]' },
-    other: { label: 'Other', icon: MoreHorizontal, color: 'bg-[var(--notion-gray)]' },
+    text: { label: 'Text', icon: MessageSquare, color: 'bg-[var(--notion-purple)]' },
 };
 
 // Outcome configuration
@@ -87,7 +83,7 @@ export function PersonDetailPanel({
     const [showLogForm, setShowLogForm] = useState(false);
 
     // Form state
-    const [activityType, setActivityType] = useState<ActivityType>('call');
+    const [activityType, setActivityType] = useState<ActivityType>('phone');
     const [outcome, setOutcome] = useState<string>('neutral');
     const [notes, setNotes] = useState('');
     const [submitting, setSubmitting] = useState(false);
@@ -124,7 +120,7 @@ export function PersonDetailPanel({
             setShowLogForm(false);
             setNotes('');
             setOutcome('neutral');
-            setActivityType('call');
+            setActivityType('phone');
         }
     }, [open, person, fetchActivities]);
 
