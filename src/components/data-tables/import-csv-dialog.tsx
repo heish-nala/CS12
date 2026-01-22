@@ -42,7 +42,20 @@ interface ColumnConfig {
     name: string;
     type: ColumnType;
     include: boolean;
+    isAutoAdded?: boolean;
 }
+
+// Standard columns that will be auto-added if missing
+const STANDARD_COLUMNS = [
+    { name: 'Blueprint', type: 'percentage' as ColumnType, config: { default_value: 0 } },
+    { name: 'Status', type: 'status' as ColumnType, config: { options: [
+        { id: 's1', value: 'not_started', label: 'Not Started', color: 'gray', group: 'todo' },
+        { id: 's2', value: 'active', label: 'Active', color: 'blue', group: 'in_progress' },
+        { id: 's3', value: 'at_risk', label: 'At Risk', color: 'orange', group: 'in_progress' },
+        { id: 's4', value: 'completed', label: 'Completed', color: 'green', group: 'complete' },
+        { id: 's5', value: 'inactive', label: 'Inactive', color: 'red', group: 'complete' },
+    ] } },
+];
 
 interface ImportCSVDialogProps {
     open: boolean;
@@ -50,6 +63,8 @@ interface ImportCSVDialogProps {
     tableId: string;
     tableName: string;
     onImportComplete: () => void;
+    clientId?: string;
+    isNewTable?: boolean;
 }
 
 export function ImportCSVDialog({
@@ -58,6 +73,8 @@ export function ImportCSVDialog({
     tableId,
     tableName,
     onImportComplete,
+    clientId,
+    isNewTable = false,
 }: ImportCSVDialogProps) {
     const [step, setStep] = useState<Step>('upload');
     const [parsedData, setParsedData] = useState<ParsedCSV | null>(null);
@@ -66,6 +83,7 @@ export function ImportCSVDialog({
     const [error, setError] = useState<string | null>(null);
     const [dragOver, setDragOver] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [createdTableId, setCreatedTableId] = useState<string | null>(null);
 
     const resetState = () => {
         setStep('upload');
@@ -73,6 +91,7 @@ export function ImportCSVDialog({
         setColumnConfigs([]);
         setImporting(false);
         setError(null);
+        setCreatedTableId(null);
     };
 
     const handleClose = (isOpen: boolean) => {
@@ -107,6 +126,32 @@ export function ImportCSVDialog({
                 type: data.detectedTypes[header],
                 include: true,
             }));
+
+            // Check if Blueprint and Status columns need to be auto-added
+            const hasBlueprint = configs.some(c => c.name.toLowerCase() === 'blueprint');
+            const hasStatus = configs.some(c => c.name.toLowerCase() === 'status');
+
+            // Auto-add Blueprint if missing
+            if (!hasBlueprint) {
+                configs.push({
+                    csvHeader: '__auto_blueprint__',
+                    name: 'Blueprint',
+                    type: 'percentage',
+                    include: true,
+                    isAutoAdded: true,
+                });
+            }
+
+            // Auto-add Status if missing
+            if (!hasStatus) {
+                configs.push({
+                    csvHeader: '__auto_status__',
+                    name: 'Status',
+                    type: 'status',
+                    include: true,
+                    isAutoAdded: true,
+                });
+            }
 
             setColumnConfigs(configs);
             setStep('mapping');
@@ -154,20 +199,52 @@ export function ImportCSVDialog({
         setError(null);
 
         try {
+            let targetTableId = tableId;
+
+            // If this is a new table, create it first
+            if (isNewTable && clientId) {
+                const createResponse = await fetch('/api/data-tables', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        client_id: clientId,
+                        name: 'Attendee List',
+                    }),
+                });
+
+                if (!createResponse.ok) {
+                    throw new Error('Failed to create table');
+                }
+
+                const { table } = await createResponse.json();
+                targetTableId = table.id;
+                setCreatedTableId(table.id);
+            }
+
             // First, create columns for the table
             for (const col of includedColumns) {
-                await fetch(`/api/data-tables/${tableId}/columns`, {
+                // For auto-added columns, use the standard config
+                let config = {};
+                if (col.isAutoAdded) {
+                    const standardCol = STANDARD_COLUMNS.find(sc => sc.name === col.name);
+                    if (standardCol) {
+                        config = standardCol.config;
+                    }
+                }
+
+                await fetch(`/api/data-tables/${targetTableId}/columns`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         name: col.name,
                         type: col.type,
+                        config,
                     }),
                 });
             }
 
             // Fetch the created columns to get their IDs
-            const tableResponse = await fetch(`/api/data-tables/${tableId}`);
+            const tableResponse = await fetch(`/api/data-tables/${targetTableId}`);
             const tableData = await tableResponse.json();
             const createdColumns = tableData.table?.columns || [];
 
@@ -184,12 +261,21 @@ export function ImportCSVDialog({
                 for (const col of includedColumns) {
                     const columnId = columnNameToId[col.name];
                     if (columnId) {
-                        const rawValue = row[col.csvHeader];
-                        rowData[columnId] = transformValue(rawValue, col.type);
+                        if (col.isAutoAdded) {
+                            // Use default values for auto-added columns
+                            if (col.name === 'Blueprint') {
+                                rowData[columnId] = 0;
+                            } else if (col.name === 'Status') {
+                                rowData[columnId] = 'not_started';
+                            }
+                        } else {
+                            const rawValue = row[col.csvHeader];
+                            rowData[columnId] = transformValue(rawValue, col.type);
+                        }
                     }
                 }
 
-                await fetch(`/api/data-tables/${tableId}/rows`, {
+                await fetch(`/api/data-tables/${targetTableId}/rows`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ data: rowData }),
@@ -206,6 +292,7 @@ export function ImportCSVDialog({
     };
 
     const includedCount = columnConfigs.filter((c) => c.include).length;
+    const autoAddedCount = columnConfigs.filter((c) => c.isAutoAdded && c.include).length;
     const rowCount = parsedData?.rows.length || 0;
 
     return (
@@ -218,7 +305,7 @@ export function ImportCSVDialog({
                         {step === 'preview' && 'Preview Import'}
                     </DialogTitle>
                     <DialogDescription>
-                        {step === 'upload' && `Import data from a CSV file into "${tableName}"`}
+                        {step === 'upload' && `Import attendees from a CSV file${isNewTable ? '' : ` into "${tableName}"`}`}
                         {step === 'mapping' && 'Review detected types and rename columns as needed'}
                         {step === 'preview' && `Ready to import ${rowCount} rows with ${includedCount} columns`}
                     </DialogDescription>
@@ -301,7 +388,7 @@ export function ImportCSVDialog({
                                         {columnConfigs.map((config, index) => (
                                             <tr
                                                 key={config.csvHeader}
-                                                className={!config.include ? 'opacity-50' : ''}
+                                                className={`${!config.include ? 'opacity-50' : ''} ${config.isAutoAdded ? 'bg-blue-500/5' : ''}`}
                                             >
                                                 <td className="px-3 py-2">
                                                     <input
@@ -316,7 +403,11 @@ export function ImportCSVDialog({
                                                     />
                                                 </td>
                                                 <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-                                                    {config.csvHeader}
+                                                    {config.isAutoAdded ? (
+                                                        <span className="text-blue-600 dark:text-blue-400">Auto-added</span>
+                                                    ) : (
+                                                        config.csvHeader
+                                                    )}
                                                 </td>
                                                 <td className="px-3 py-2">
                                                     <Input
@@ -327,7 +418,7 @@ export function ImportCSVDialog({
                                                             })
                                                         }
                                                         className="h-8 text-sm"
-                                                        disabled={!config.include}
+                                                        disabled={!config.include || config.isAutoAdded}
                                                     />
                                                 </td>
                                                 <td className="px-3 py-2">
@@ -338,7 +429,7 @@ export function ImportCSVDialog({
                                                                 type: value as ColumnType,
                                                             })
                                                         }
-                                                        disabled={!config.include}
+                                                        disabled={!config.include || config.isAutoAdded}
                                                     >
                                                         <SelectTrigger className="h-8 text-sm w-32">
                                                             <SelectValue />
@@ -353,7 +444,13 @@ export function ImportCSVDialog({
                                                     </Select>
                                                 </td>
                                                 <td className="px-3 py-2 font-mono text-xs text-muted-foreground truncate max-w-[150px]">
-                                                    {parsedData.rows[0]?.[config.csvHeader] || '-'}
+                                                    {config.isAutoAdded ? (
+                                                        <span className="italic">
+                                                            {config.name === 'Blueprint' ? '0%' : 'Not Started'}
+                                                        </span>
+                                                    ) : (
+                                                        parsedData.rows[0]?.[config.csvHeader] || '-'
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))}
@@ -376,6 +473,7 @@ export function ImportCSVDialog({
                             <div className="flex items-center gap-2 text-sm bg-green-500/10 text-green-700 p-3 rounded-lg">
                                 <CheckCircle2 className="h-4 w-4 shrink-0" />
                                 Ready to import {rowCount} rows with {includedCount} columns
+                                {autoAddedCount > 0 && ` (including ${autoAddedCount} auto-added)`}
                             </div>
 
                             <div className="border rounded-lg overflow-hidden">
@@ -391,11 +489,12 @@ export function ImportCSVDialog({
                                                     .map((config) => (
                                                         <th
                                                             key={config.csvHeader}
-                                                            className="px-3 py-2 text-left font-medium"
+                                                            className={`px-3 py-2 text-left font-medium ${config.isAutoAdded ? 'bg-blue-500/5' : ''}`}
                                                         >
                                                             <div>{config.name}</div>
                                                             <div className="text-[10px] font-normal text-muted-foreground">
                                                                 {getColumnTypeLabel(config.type)}
+                                                                {config.isAutoAdded && ' (auto)'}
                                                             </div>
                                                         </th>
                                                     ))}
@@ -409,9 +508,12 @@ export function ImportCSVDialog({
                                                         .map((config) => (
                                                             <td
                                                                 key={config.csvHeader}
-                                                                className="px-3 py-2 truncate max-w-[200px]"
+                                                                className={`px-3 py-2 truncate max-w-[200px] ${config.isAutoAdded ? 'bg-blue-500/5 text-muted-foreground italic' : ''}`}
                                                             >
-                                                                {row[config.csvHeader] || '-'}
+                                                                {config.isAutoAdded
+                                                                    ? (config.name === 'Blueprint' ? '0%' : 'Not Started')
+                                                                    : (row[config.csvHeader] || '-')
+                                                                }
                                                             </td>
                                                         ))}
                                                 </tr>

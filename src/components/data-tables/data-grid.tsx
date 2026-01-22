@@ -52,6 +52,18 @@ import {
 import { ColumnConfigDialog } from './column-config-dialog';
 import { cn } from '@/lib/utils';
 
+/**
+ * IMPORTANT: Row Data Format
+ *
+ * The `data_rows.data` JSON field MUST use column IDs (UUIDs) as keys, NOT column names.
+ * This component looks up values using `row.data[col.id]`.
+ *
+ * Correct:   { "abe82b1a-deed-4580-...": "John Doe" }
+ * Incorrect: { "Name": "John Doe" }  // Will NOT display!
+ *
+ * See docs/DATA_TABLES_ARCHITECTURE.md for details.
+ */
+
 // Column type configurations
 const COLUMN_TYPES: Record<ColumnType, { label: string; icon: React.ReactNode }> = {
     text: { label: 'Text', icon: <Type className="h-4 w-4" /> },
@@ -145,8 +157,7 @@ interface DataGridProps {
     onDeleteColumn: (columnId: string) => void;
     // Time tracking props
     timeTracking?: TimeTrackingConfig | null;
-    periodData?: Record<string, PeriodData[]>; // rowId -> periods
-    onOpenPeriodDialog?: (rowId: string, rowName: string) => void;
+    periodData?: Record<string, PeriodData[]>; // rowId -> periods (used by download report)
     onConfigureTimeTracking?: () => void;
     // Loading states for better UX
     isAddingRow?: boolean;
@@ -906,10 +917,6 @@ interface VirtualRowProps {
     isSelected: boolean;
     onToggleRow: (rowId: string) => void;
     onUpdateRow: (rowId: string, data: Record<string, any>) => void;
-    hasTimeTracking: boolean;
-    timeTracking?: TimeTrackingConfig | null;
-    periodData?: Record<string, PeriodData[]>;
-    onOpenPeriodDialog?: (rowId: string, rowName: string) => void;
     style: React.CSSProperties;
 }
 
@@ -920,10 +927,6 @@ const VirtualRow = memo(function VirtualRow({
     isSelected,
     onToggleRow,
     onUpdateRow,
-    hasTimeTracking,
-    timeTracking,
-    periodData,
-    onOpenPeriodDialog,
     style,
 }: VirtualRowProps) {
     return (
@@ -968,19 +971,6 @@ const VirtualRow = memo(function VirtualRow({
                 </div>
             ))}
 
-            {/* Progress cell for time tracking */}
-            {hasTimeTracking && timeTracking && (
-                <div className="border-l shrink-0" style={{ width: 130 }}>
-                    <ProgressIndicatorCell
-                        rowId={row.id}
-                        rowName={row.data[columns.find(c => c.is_primary)?.id || columns[0]?.id] || 'Item'}
-                        timeTracking={timeTracking}
-                        periods={periodData?.[row.id]}
-                        onOpenDialog={onOpenPeriodDialog}
-                    />
-                </div>
-            )}
-
             {/* Empty cell for add column button alignment */}
             <div className="w-[40px] shrink-0"></div>
         </div>
@@ -1000,7 +990,6 @@ export function DataGrid({
     onDeleteColumn,
     timeTracking,
     periodData,
-    onOpenPeriodDialog,
     onConfigureTimeTracking,
     isAddingRow = false,
     isAddingColumn = false,
@@ -1238,37 +1227,6 @@ export function DataGrid({
                             </div>
                         ))}
 
-                        {/* Progress column for time tracking */}
-                        {hasTimeTracking && (
-                            <div className="text-left font-medium border-l group/progress shrink-0" style={{ width: 130 }} data-onboarding="period-tracker">
-                                <div className="px-3 py-2 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-                                    <BarChart3 className="h-4 w-4 text-blue-500" />
-                                    <span className="flex-1">Progress</span>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <button className="h-5 w-5 rounded flex items-center justify-center opacity-0 group-hover/progress:opacity-100 hover:bg-muted transition-all" data-onboarding="time-tracking-config">
-                                                <Settings className="h-3.5 w-3.5" />
-                                            </button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuItem onClick={onConfigureTimeTracking}>
-                                                <Settings className="h-3.5 w-3.5 mr-2" />
-                                                Configure Metrics
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem
-                                                onClick={onConfigureTimeTracking}
-                                                className="text-destructive"
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5 mr-2" />
-                                                Remove Progress Tracking
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
-                            </div>
-                        )}
-
                         {/* Add column button */}
                         <div className="w-[40px] shrink-0 border-l">
                             <AddColumnDialog
@@ -1309,10 +1267,6 @@ export function DataGrid({
                                             isSelected={isSelected}
                                             onToggleRow={toggleRow}
                                             onUpdateRow={onUpdateRow}
-                                            hasTimeTracking={!!hasTimeTracking}
-                                            timeTracking={timeTracking}
-                                            periodData={periodData}
-                                            onOpenPeriodDialog={onOpenPeriodDialog}
                                             style={{
                                                 position: 'absolute',
                                                 top: 0,

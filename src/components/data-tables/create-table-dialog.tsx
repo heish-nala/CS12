@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -8,19 +8,12 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { DataTemplate } from '@/lib/db/types';
-import {
-    UserRound,
-    Building2,
-    Users,
-    MessageCircle,
-    CheckSquare,
-    Table,
-    Plus,
-} from 'lucide-react';
 import { DataColumn } from '@/lib/db/types';
+import {
+    Users,
+    FileSpreadsheet,
+    Loader2,
+} from 'lucide-react';
 
 const STORAGE_KEY_PREFIX = 'activity-contact-source-';
 
@@ -64,29 +57,12 @@ function detectContactColumns(columns: DataColumn[]): {
     return result;
 }
 
-const iconMap: Record<string, React.ReactNode> = {
-    'user-round': <UserRound className="h-5 w-5" />,
-    'building-2': <Building2 className="h-5 w-5" />,
-    'users': <Users className="h-5 w-5" />,
-    'message-circle': <MessageCircle className="h-5 w-5" />,
-    'check-square': <CheckSquare className="h-5 w-5" />,
-    'table': <Table className="h-5 w-5" />,
-};
-
-// Using design system CSS variables for consistent theming
-const colorMap: Record<string, string> = {
-    blue: 'bg-[var(--notion-blue)] text-[var(--notion-blue-text)] border-[var(--notion-blue)]',
-    purple: 'bg-[var(--notion-purple)] text-[var(--notion-purple-text)] border-[var(--notion-purple)]',
-    green: 'bg-[var(--notion-green)] text-[var(--notion-green-text)] border-[var(--notion-green)]',
-    orange: 'bg-[var(--notion-orange)] text-[var(--notion-orange-text)] border-[var(--notion-orange)]',
-    indigo: 'bg-[var(--notion-purple)] text-[var(--notion-purple-text)] border-[var(--notion-purple)]',
-};
-
 interface CreateTableDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     clientId: string;
     onTableCreated: () => void;
+    onUploadCSV?: () => void;
 }
 
 export function CreateTableDialog({
@@ -94,30 +70,9 @@ export function CreateTableDialog({
     onOpenChange,
     clientId,
     onTableCreated,
+    onUploadCSV,
 }: CreateTableDialogProps) {
-    const [templates, setTemplates] = useState<DataTemplate[]>([]);
-    const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
-    const [mode, setMode] = useState<'templates' | 'custom'>('templates');
-    const [customName, setCustomName] = useState('');
-
-    useEffect(() => {
-        if (open) {
-            fetchTemplates();
-        }
-    }, [open]);
-
-    const fetchTemplates = async () => {
-        try {
-            const response = await fetch('/api/templates');
-            const data = await response.json();
-            setTemplates(data.templates || []);
-        } catch (error) {
-            console.error('Error fetching templates:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const saveContactSourceConfig = (tableId: string, tableName: string, columns: DataColumn[]) => {
         const detected = detectContactColumns(columns);
@@ -135,7 +90,7 @@ export function CreateTableDialog({
         }
     };
 
-    const createFromTemplate = async (templateId: string) => {
+    const createBlankAttendeeList = async () => {
         setCreating(true);
         try {
             const response = await fetch('/api/data-tables', {
@@ -143,7 +98,7 @@ export function CreateTableDialog({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     client_id: clientId,
-                    template_id: templateId,
+                    type: 'attendee_list',
                 }),
             });
 
@@ -155,7 +110,6 @@ export function CreateTableDialog({
                 }
                 onTableCreated();
                 onOpenChange(false);
-                setMode('templates');
             }
         } catch (error) {
             console.error('Error creating table:', error);
@@ -164,133 +118,60 @@ export function CreateTableDialog({
         }
     };
 
-    const createCustomTable = async () => {
-        if (!customName.trim()) return;
-
-        setCreating(true);
-        try {
-            const response = await fetch('/api/data-tables', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    client_id: clientId,
-                    name: customName.trim(),
-                }),
-            });
-
-            if (response.ok) {
-                const { table } = await response.json();
-                // Auto-save contact source config if columns detected
-                if (table?.columns) {
-                    saveContactSourceConfig(table.id, table.name, table.columns);
-                }
-                onTableCreated();
-                onOpenChange(false);
-                setCustomName('');
-                setMode('templates');
-            }
-        } catch (error) {
-            console.error('Error creating table:', error);
-        } finally {
-            setCreating(false);
+    const handleUploadCSV = () => {
+        onOpenChange(false);
+        if (onUploadCSV) {
+            onUploadCSV();
         }
     };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-xl">
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Create a Data Table</DialogTitle>
+                    <DialogTitle>Add Attendees</DialogTitle>
                 </DialogHeader>
 
-                <div className="p-4 pt-4">
-                {mode === 'templates' ? (
-                    <div className="space-y-4">
-                        <p className="text-sm text-muted-foreground">
-                            Start with a template or create a blank table
-                        </p>
+                <div className="py-4 space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                        Your list should include <span className="font-medium text-foreground">Name</span>, <span className="font-medium text-foreground">Email</span>, and <span className="font-medium text-foreground">Phone</span>. We'll add Blueprint and Status columns for tracking.
+                    </p>
 
-                        {/* Templates Grid */}
-                        <div className="grid grid-cols-2 gap-3" data-onboarding="template-grid">
-                            {loading ? (
-                                [...Array(4)].map((_, i) => (
-                                    <div
-                                        key={i}
-                                        className="h-24 rounded-lg border border-border bg-muted/30 animate-pulse"
-                                    />
-                                ))
+                    <div className="grid gap-3">
+                        <Button
+                            variant="outline"
+                            className="w-full h-auto py-4 justify-start gap-3"
+                            onClick={createBlankAttendeeList}
+                            disabled={creating}
+                        >
+                            {creating ? (
+                                <Loader2 className="h-5 w-5 animate-spin" />
                             ) : (
-                                templates.map((template) => (
-                                    <button
-                                        key={template.id}
-                                        onClick={() => createFromTemplate(template.id)}
-                                        disabled={creating}
-                                        className={`relative flex flex-col items-start gap-2 p-4 rounded-lg border transition-all hover:shadow-md disabled:opacity-50 ${colorMap[template.color] || colorMap.blue}`}
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            {iconMap[template.icon] || iconMap.table}
-                                            <span className="font-medium text-sm">
-                                                {template.name}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground text-left line-clamp-2">
-                                            {template.description}
-                                        </p>
-                                        <div className="text-[10px] text-muted-foreground">
-                                            {template.columns?.length || 0} columns
-                                        </div>
-                                    </button>
-                                ))
+                                <div className="rounded-full bg-primary/10 p-2">
+                                    <Users className="h-5 w-5 text-primary" />
+                                </div>
                             )}
-                        </div>
+                            <div className="text-left">
+                                <div className="font-medium">Create Blank List</div>
+                                <div className="text-xs text-muted-foreground">Start with an empty attendee list</div>
+                            </div>
+                        </Button>
 
-                        {/* Create Blank */}
-                        <div className="pt-2 border-t">
-                            <Button
-                                variant="outline"
-                                className="w-full justify-start gap-2"
-                                onClick={() => setMode('custom')}
-                            >
-                                <Plus className="h-4 w-4" />
-                                Create blank table
-                            </Button>
-                        </div>
+                        <Button
+                            variant="outline"
+                            className="w-full h-auto py-4 justify-start gap-3"
+                            onClick={handleUploadCSV}
+                            disabled={creating}
+                        >
+                            <div className="rounded-full bg-green-500/10 p-2">
+                                <FileSpreadsheet className="h-5 w-5 text-green-600" />
+                            </div>
+                            <div className="text-left">
+                                <div className="font-medium">Upload CSV</div>
+                                <div className="text-xs text-muted-foreground">Import attendees from a spreadsheet</div>
+                            </div>
+                        </Button>
                     </div>
-                ) : (
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="table-name">Table Name</Label>
-                            <Input
-                                id="table-name"
-                                placeholder="e.g., Customers, Leads, Projects..."
-                                value={customName}
-                                onChange={(e) => setCustomName(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        createCustomTable();
-                                    }
-                                }}
-                            />
-                        </div>
-
-                        <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                onClick={() => setMode('templates')}
-                                disabled={creating}
-                            >
-                                Back
-                            </Button>
-                            <Button
-                                onClick={createCustomTable}
-                                disabled={!customName.trim() || creating}
-                                className="flex-1"
-                            >
-                                Create Table
-                            </Button>
-                        </div>
-                    </div>
-                )}
                 </div>
             </DialogContent>
         </Dialog>

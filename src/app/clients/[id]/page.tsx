@@ -8,6 +8,7 @@ import { ClientSettingsDialog } from '@/components/clients/client-settings-dialo
 import { MetricConfigDialog } from '@/components/metrics/metric-config-dialog';
 import { MetricConfigProvider, useMetricConfig } from '@/contexts/metric-config-context';
 import { ActivityTimeline } from '@/components/activities/activity-timeline';
+import { ProgressTab } from '@/components/clients/progress-tab';
 import { Button } from '@/components/ui/button';
 import { Settings } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -183,14 +184,15 @@ function ClientDetailContent({
                     )}
 
                     {/* Tabs */}
-                    <Tabs defaultValue="data" className="space-y-6">
+                    <Tabs defaultValue="attendees" className="space-y-6">
                         <TabsList>
-                            <TabsTrigger value="data" data-onboarding="data-tables-tab">Data</TabsTrigger>
+                            <TabsTrigger value="attendees" data-onboarding="data-tables-tab">Attendees</TabsTrigger>
                             <TabsTrigger value="overview">Overview</TabsTrigger>
                             <TabsTrigger value="activity">Activity</TabsTrigger>
+                            <TabsTrigger value="progress">Progress</TabsTrigger>
                         </TabsList>
 
-                        <TabsContent value="data" className="space-y-6 mt-0">
+                        <TabsContent value="attendees" className="space-y-6 mt-0">
                             <DataTablesView clientId={clientId} />
                         </TabsContent>
 
@@ -200,6 +202,10 @@ function ClientDetailContent({
 
                         <TabsContent value="activity" className="space-y-6 mt-0">
                             <ActivityTimeline clientId={clientId} />
+                        </TabsContent>
+
+                        <TabsContent value="progress" className="space-y-6 mt-0">
+                            <ProgressTab clientId={clientId} />
                         </TabsContent>
                     </Tabs>
                 </div>

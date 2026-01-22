@@ -378,6 +378,12 @@ export interface DataColumn {
 export interface DataRow {
     id: string;
     table_id: string;
+    /**
+     * Row data keyed by COLUMN ID (UUID), NOT column name.
+     * Example: { "abe82b1a-deed-4580-...": "John Doe" }
+     * NOT:     { "Name": "John Doe" }
+     * See docs/DATA_TABLES_ARCHITECTURE.md
+     */
     data: Record<string, any>;
     created_at: string;
     updated_at: string;

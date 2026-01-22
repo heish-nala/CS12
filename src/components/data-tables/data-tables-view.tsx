@@ -4,14 +4,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
 import { DataTable, DataColumn, DataRow, ColumnType, PeriodData, TimeTrackingConfig } from '@/lib/db/types';
 import { DataGrid } from './data-grid';
-import { CreateTableDialog } from './create-table-dialog';
-import { PeriodDataDialog } from './period-data-dialog';
 import { DownloadReportDialog } from './download-report-dialog';
 import { TimeTrackingConfigDialog } from './time-tracking-config-dialog';
 import { ImportCSVDialog } from './import-csv-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
     Dialog,
     DialogContent,
@@ -32,27 +29,12 @@ import {
     MoreHorizontal,
     Trash2,
     Edit,
-    UserRound,
-    Building2,
     Users,
-    MessageCircle,
-    CheckSquare,
-    Table,
-    Database,
     Download,
     Upload,
     BarChart3,
-    Loader2,
+    FileSpreadsheet,
 } from 'lucide-react';
-
-const iconMap: Record<string, React.ReactNode> = {
-    'user-round': <UserRound className="h-4 w-4" />,
-    'building-2': <Building2 className="h-4 w-4" />,
-    'users': <Users className="h-4 w-4" />,
-    'message-circle': <MessageCircle className="h-4 w-4" />,
-    'check-square': <CheckSquare className="h-4 w-4" />,
-    'table': <Table className="h-4 w-4" />,
-};
 
 const STORAGE_KEY_PREFIX = 'activity-contact-source-';
 
@@ -111,8 +93,8 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
     const [tables, setTables] = useState<DataTableWithMeta[]>([]);
     const [activeTableId, setActiveTableId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-    const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+    const [isCreatingBlankList, setIsCreatingBlankList] = useState(false);
     const [importDialogOpen, setImportDialogOpen] = useState(false);
     const [timeTrackingDialogOpen, setTimeTrackingDialogOpen] = useState(false);
     const [selectedTableForConfig, setSelectedTableForConfig] = useState<DataTableWithMeta | null>(null);
@@ -120,10 +102,8 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
     const [tableToRename, setTableToRename] = useState<DataTableWithMeta | null>(null);
     const [newTableName, setNewTableName] = useState('');
 
-    // Period data state
+    // Period data state (used by download report)
     const [periodData, setPeriodData] = useState<Record<string, PeriodData[]>>({});
-    const [periodDialogOpen, setPeriodDialogOpen] = useState(false);
-    const [selectedRowForPeriod, setSelectedRowForPeriod] = useState<{ id: string; name: string } | null>(null);
 
     // Loading states for better UX
     const [isAddingRow, setIsAddingRow] = useState(false);
@@ -230,11 +210,6 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
         } finally {
             pendingRequestsRef.current.delete(requestKey);
         }
-    };
-
-    const handleTabChange = (tableId: string) => {
-        setActiveTableId(tableId);
-        fetchTableData(tableId);
     };
 
     const handleAddRow = async () => {
@@ -536,43 +511,14 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
         }
     };
 
-    // Handle opening period dialog
-    const handleOpenPeriodDialog = (rowId: string, rowName: string) => {
-        setSelectedRowForPeriod({ id: rowId, name: rowName });
-        setPeriodDialogOpen(true);
-    };
+    const activeTable = tables.length > 0 ? tables[0] : null;
 
-    // Handle updating period data
-    const handleUpdatePeriod = async (periodId: string, metrics: Record<string, number>) => {
-        if (!activeTableId || !selectedRowForPeriod) return;
-
-        try {
-            const response = await fetch(
-                `/api/data-tables/${activeTableId}/rows/${selectedRowForPeriod.id}/periods/${periodId}`,
-                {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ metrics }),
-                }
-            );
-
-            if (response.ok) {
-                const updatedPeriod = await response.json();
-
-                // Update local state
-                setPeriodData(prev => ({
-                    ...prev,
-                    [selectedRowForPeriod.id]: prev[selectedRowForPeriod.id]?.map(p =>
-                        p.id === periodId ? updatedPeriod : p
-                    ) || [],
-                }));
-            }
-        } catch (error) {
-            console.error('Error updating period:', error);
+    // Always use first table as active (single-table mode)
+    useEffect(() => {
+        if (tables.length > 0 && activeTableId !== tables[0].id) {
+            setActiveTableId(tables[0].id);
         }
-    };
-
-    const activeTable = tables.find((t) => t.id === activeTableId);
+    }, [tables, activeTableId]);
 
     // Fetch period data when active table changes and has time tracking
     useEffect(() => {
@@ -581,13 +527,41 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
         }
     }, [activeTableId, activeTable?.rows?.length]);
 
+    const createBlankAttendeeList = async () => {
+        setIsCreatingBlankList(true);
+        try {
+            const response = await fetch('/api/data-tables', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    client_id: clientId,
+                    type: 'attendee_list',
+                }),
+            });
+
+            if (response.ok) {
+                fetchTables();
+            }
+        } catch (error) {
+            console.error('Error creating table:', error);
+        } finally {
+            setIsCreatingBlankList(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="space-y-4">
-                {/* Tab skeleton */}
-                <div className="flex items-center gap-2 border-b pb-px">
-                    <div className="h-9 w-24 bg-muted/40 animate-pulse rounded" />
-                    <div className="h-9 w-20 bg-muted/30 animate-pulse rounded" />
+                {/* Header skeleton */}
+                <div className="flex items-center justify-between border-b pb-3">
+                    <div className="flex items-center gap-2">
+                        <div className="h-5 w-5 bg-muted/40 animate-pulse rounded" />
+                        <div className="h-6 w-32 bg-muted/40 animate-pulse rounded" />
+                        <div className="h-5 w-8 bg-muted/30 animate-pulse rounded" />
+                    </div>
+                    <div className="flex gap-2">
+                        <div className="h-8 w-24 bg-muted/30 animate-pulse rounded" />
+                    </div>
                 </div>
                 {/* Table skeleton matching actual structure */}
                 <div className="table-skeleton">
@@ -613,128 +587,108 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
     // Empty state
     if (tables.length === 0) {
         return (
-            <div className="border border-dashed border-border/60 rounded-lg content-loaded">
+            <div className="border border-dashed border-border/60 rounded-lg content-loaded mb-6">
                 <div className="flex flex-col items-center justify-center py-16 px-6">
                     <div className="rounded-full bg-muted/60 p-5 mb-4">
-                        <Database className="h-10 w-10 text-muted-foreground/60" />
+                        <Users className="h-10 w-10 text-muted-foreground/60" />
                     </div>
 
                     <h3 className="text-base font-semibold mb-1.5 text-foreground">
-                        No data tables yet
+                        No attendees yet
                     </h3>
                     <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
-                        Create your first data table to start tracking information.
-                        Choose from templates or create a blank table.
+                        Add your attendees with Name, Email, and Phone. We'll automatically track their Blueprint progress and Status.
                     </p>
 
-                    <Button onClick={() => setCreateDialogOpen(true)} data-onboarding="add-table-btn">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Data Table
-                    </Button>
+                    <div className="flex gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={createBlankAttendeeList}
+                            disabled={isCreatingBlankList}
+                            data-onboarding="add-table-btn"
+                        >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Create Blank List
+                        </Button>
+                        <Button onClick={() => setImportDialogOpen(true)}>
+                            <FileSpreadsheet className="h-4 w-4 mr-2" />
+                            Upload CSV
+                        </Button>
+                    </div>
                 </div>
 
-                <CreateTableDialog
-                    open={createDialogOpen}
-                    onOpenChange={setCreateDialogOpen}
+                {/* Import CSV Dialog for empty state */}
+                <ImportCSVDialog
+                    open={importDialogOpen}
+                    onOpenChange={setImportDialogOpen}
+                    tableId=""
+                    tableName="Attendee List"
                     clientId={clientId}
-                    onTableCreated={fetchTables}
+                    isNewTable={true}
+                    onImportComplete={() => {
+                        fetchTables();
+                    }}
                 />
             </div>
         );
     }
 
     return (
-        <div className="space-y-4 content-loaded">
-            {/* Tabs Header */}
-            <div className="flex items-center gap-2 border-b">
-                <div className="flex-1 flex items-center gap-1 overflow-x-auto pb-px">
-                    {tables.map((table) => (
-                        <div
-                            key={table.id}
-                            className={`group flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
-                                activeTableId === table.id
-                                    ? 'border-primary text-foreground'
-                                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-                            }`}
-                            onClick={() => handleTabChange(table.id)}
-                        >
-                            {iconMap[table.icon] || <Table className="h-4 w-4" />}
-                            <span>{table.name}</span>
-                            <span className="text-xs text-muted-foreground ml-1">
-                                {table.row_count || table.rows?.length || 0}
-                            </span>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <button
-                                        className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100 hover:bg-muted rounded flex items-center justify-center"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <MoreHorizontal className="h-3 w-3" />
-                                    </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleOpenRenameDialog(table);
-                                        }}
-                                    >
-                                        <Edit className="h-3.5 w-3.5 mr-2" />
-                                        Rename
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleOpenTimeTrackingConfig(table);
-                                        }}
-                                    >
-                                        <BarChart3 className="h-3.5 w-3.5 mr-2" />
-                                        Progress Tracking
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                        onClick={() => handleDeleteTable(table.id)}
-                                        className="text-destructive"
-                                    >
-                                        <Trash2 className="h-3.5 w-3.5 mr-2" />
-                                        Delete
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-                    ))}
-                    {/* Add Table Button - inline with tabs */}
-                    <button
-                        className="flex items-center justify-center h-8 w-8 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                        onClick={() => setCreateDialogOpen(true)}
-                        title="Add Table"
-                        data-onboarding="add-table-btn"
-                    >
-                        <Plus className="h-4 w-4" />
-                    </button>
+        <div className="space-y-4 content-loaded pb-6">
+            {/* Simplified Header */}
+            <div className="flex items-center justify-between border-b pb-3">
+                <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-muted-foreground" />
+                    <h3 className="font-semibold text-foreground">Attendee List</h3>
+                    <span className="text-sm text-muted-foreground">
+                        {activeTable?.row_count || activeTable?.rows?.length || 0}
+                    </span>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button className="h-6 w-6 p-0 hover:bg-muted rounded flex items-center justify-center">
+                                <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                            <DropdownMenuItem onClick={() => activeTable && handleOpenRenameDialog(activeTable)}>
+                                <Edit className="h-3.5 w-3.5 mr-2" />
+                                Rename
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => activeTable && handleOpenTimeTrackingConfig(activeTable)}>
+                                <BarChart3 className="h-3.5 w-3.5 mr-2" />
+                                Progress Tracking
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                onClick={() => activeTable && handleDeleteTable(activeTable.id)}
+                                className="text-destructive"
+                            >
+                                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                Delete
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
-                {activeTable && (
+                <div className="flex gap-2">
                     <Button
                         variant="ghost"
                         size="sm"
-                        className="shrink-0"
                         onClick={() => setImportDialogOpen(true)}
                     >
                         <Upload className="h-4 w-4 mr-1" />
                         Import CSV
                     </Button>
-                )}
-                {activeTable?.time_tracking?.enabled && (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="shrink-0"
-                        onClick={() => setDownloadDialogOpen(true)}
-                    >
-                        <Download className="h-4 w-4 mr-1" />
-                        Download Report
-                    </Button>
-                )}
+                    {activeTable?.time_tracking?.enabled && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDownloadDialogOpen(true)}
+                        >
+                            <Download className="h-4 w-4 mr-1" />
+                            Download Report
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {/* Active Table Content */}
@@ -771,33 +725,12 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
                             onDeleteColumn={handleDeleteColumn}
                             timeTracking={activeTable.time_tracking}
                             periodData={periodData}
-                            onOpenPeriodDialog={handleOpenPeriodDialog}
                             onConfigureTimeTracking={() => handleOpenTimeTrackingConfig(activeTable)}
                             isAddingRow={isAddingRow}
                             isAddingColumn={isAddingColumn}
                         />
                     )}
                 </>
-            )}
-
-            <CreateTableDialog
-                open={createDialogOpen}
-                onOpenChange={setCreateDialogOpen}
-                clientId={clientId}
-                onTableCreated={fetchTables}
-            />
-
-            {/* Period Data Dialog */}
-            {selectedRowForPeriod && activeTable?.time_tracking && (
-                <PeriodDataDialog
-                    open={periodDialogOpen}
-                    onOpenChange={setPeriodDialogOpen}
-                    rowId={selectedRowForPeriod.id}
-                    rowName={selectedRowForPeriod.name}
-                    timeTracking={activeTable.time_tracking}
-                    periods={periodData[selectedRowForPeriod.id] || []}
-                    onUpdatePeriod={handleUpdatePeriod}
-                />
             )}
 
             {/* Download Report Dialog */}
@@ -832,7 +765,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
                     tableId={activeTable.id}
                     tableName={activeTable.name}
                     onImportComplete={() => {
-                        fetchTableData(activeTable.id);
+                        fetchTableData(activeTable.id, true);
                     }}
                 />
             )}
@@ -841,16 +774,16 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
             <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
                 <DialogContent className="sm:max-w-[400px]">
                     <DialogHeader>
-                        <DialogTitle>Rename Table</DialogTitle>
+                        <DialogTitle>Rename List</DialogTitle>
                         <DialogDescription>
-                            Enter a new name for this table.
+                            Enter a new name for this attendee list.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
                         <Input
                             value={newTableName}
                             onChange={(e) => setNewTableName(e.target.value)}
-                            placeholder="Table name"
+                            placeholder="List name"
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                     handleRenameTable();
