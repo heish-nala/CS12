@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth, requireAuthWithFallback } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
-        // Require authentication
-        const authResult = await requireAuth(request);
+        // Require authentication (with user_id param fallback for GET)
+        const authResult = await requireAuthWithFallback(request);
         if ('response' in authResult) {
             return authResult.response;
         }

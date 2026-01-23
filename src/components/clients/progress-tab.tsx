@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -67,6 +68,7 @@ interface ProgressTabProps {
 }
 
 export function ProgressTab({ clientId }: ProgressTabProps) {
+    const { user } = useAuth();
     const [tables, setTables] = useState<DataTableWithMeta[]>([]);
     const [contacts, setContacts] = useState<ContactWithProgress[]>([]);
     const [loading, setLoading] = useState(true);
@@ -93,7 +95,8 @@ export function ProgressTab({ clientId }: ProgressTabProps) {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const response = await fetch(`/api/data-tables?client_id=${clientId}`);
+            const userIdParam = user?.id ? `&user_id=${user.id}` : '';
+            const response = await fetch(`/api/data-tables?client_id=${clientId}${userIdParam}`);
             const data = await response.json();
             const allTables = (data.tables || []) as DataTableWithMeta[];
 
@@ -108,7 +111,8 @@ export function ProgressTab({ clientId }: ProgressTabProps) {
                 // Fetch full table data if not already loaded
                 let tableData = table;
                 if (!table.rows || table.rows.length === 0) {
-                    const tableResponse = await fetch(`/api/data-tables/${table.id}`);
+                    const tableUserIdParam = user?.id ? `?user_id=${user.id}` : '';
+                    const tableResponse = await fetch(`/api/data-tables/${table.id}${tableUserIdParam}`);
                     const tableJson = await tableResponse.json();
                     tableData = { ...table, ...tableJson.table };
                 }
@@ -116,7 +120,8 @@ export function ProgressTab({ clientId }: ProgressTabProps) {
                 // Fetch period data for all rows in this table
                 let periodsByRow: Record<string, PeriodData[]> = {};
                 try {
-                    const periodsResponse = await fetch(`/api/data-tables/${table.id}/periods/batch`);
+                    const periodsUserIdParam = user?.id ? `?user_id=${user.id}` : '';
+                    const periodsResponse = await fetch(`/api/data-tables/${table.id}/periods/batch${periodsUserIdParam}`);
                     periodsByRow = await periodsResponse.json();
                 } catch (e) {
                     console.error('Error fetching periods batch:', e);
@@ -193,7 +198,8 @@ export function ProgressTab({ clientId }: ProgressTabProps) {
 
         setLoadingPeriods(true);
         try {
-            const response = await fetch(`/api/data-tables/${tableId}/rows/${rowId}/periods`);
+            const userIdParam = user?.id ? `?user_id=${user.id}` : '';
+            const response = await fetch(`/api/data-tables/${tableId}/rows/${rowId}/periods${userIdParam}`);
             const data = await response.json();
             setPeriodData(data || []);
         } catch (error) {

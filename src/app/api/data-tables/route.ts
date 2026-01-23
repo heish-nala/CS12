@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
 import { mockDataTemplates } from '@/lib/mock-data';
-import { requireDsoAccess } from '@/lib/auth';
+import { requireDsoAccess, requireDsoAccessWithFallback } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
@@ -15,8 +15,8 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // Require access to the client/DSO
-        const accessResult = await requireDsoAccess(request, clientId);
+        // Require access to the client/DSO (with user_id param fallback for GET)
+        const accessResult = await requireDsoAccessWithFallback(request, clientId);
         if ('response' in accessResult) {
             return accessResult.response;
         }

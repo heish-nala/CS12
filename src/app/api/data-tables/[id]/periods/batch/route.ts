@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
-import { requireDsoAccess } from '@/lib/auth';
+import { requireDsoAccessWithFallback } from '@/lib/auth';
 
 // GET /api/data-tables/[id]/periods/batch - Get all periods for all rows in a table
 export async function GET(
@@ -20,8 +20,8 @@ export async function GET(
         return NextResponse.json({ error: 'Table not found' }, { status: 404 });
     }
 
-    // Require access to the client/DSO
-    const accessResult = await requireDsoAccess(request, table.client_id);
+    // Require access to the client/DSO (with user_id param fallback for GET)
+    const accessResult = await requireDsoAccessWithFallback(request, table.client_id);
     if ('response' in accessResult) {
         return accessResult.response;
     }

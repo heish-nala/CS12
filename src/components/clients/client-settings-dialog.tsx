@@ -101,7 +101,8 @@ export function ClientSettingsDialog({
     const fetchDataTable = async (clientId: string) => {
         setLoadingTable(true);
         try {
-            const response = await fetch(`/api/data-tables?client_id=${clientId}`);
+            const userIdParam = user?.id ? `&user_id=${user.id}` : '';
+            const response = await fetch(`/api/data-tables?client_id=${clientId}${userIdParam}`);
             if (response.ok) {
                 const { tables } = await response.json();
                 // Use the first (and typically only) table

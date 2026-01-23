@@ -7,6 +7,7 @@ import { DataGrid } from './data-grid';
 import { DownloadReportDialog } from './download-report-dialog';
 import { TimeTrackingConfigDialog } from './time-tracking-config-dialog';
 import { ImportCSVDialog } from './import-csv-dialog';
+import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -90,6 +91,7 @@ interface DataTablesViewProps {
 }
 
 export function DataTablesView({ clientId }: DataTablesViewProps) {
+    const { user } = useAuth();
     const [tables, setTables] = useState<DataTableWithMeta[]>([]);
     const [activeTableId, setActiveTableId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -148,7 +150,8 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
         pendingRequestsRef.current.add(requestKey);
 
         try {
-            const response = await fetch(`/api/data-tables?client_id=${clientId}`);
+            const userIdParam = user?.id ? `&user_id=${user.id}` : '';
+            const response = await fetch(`/api/data-tables?client_id=${clientId}${userIdParam}`);
             const data = await response.json();
             const tablesWithData = data.tables || [];
             setTables(tablesWithData);
@@ -192,7 +195,8 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
         pendingRequestsRef.current.add(requestKey);
 
         try {
-            const response = await fetch(`/api/data-tables/${tableId}`);
+            const userIdParam = user?.id ? `?user_id=${user.id}` : '';
+            const response = await fetch(`/api/data-tables/${tableId}${userIdParam}`);
             const data = await response.json();
 
             setTables((prev) =>
@@ -488,7 +492,8 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
 
         try {
             // Use batch endpoint to fetch all periods in a single request
-            const response = await fetch(`/api/data-tables/${tableId}/periods/batch`);
+            const userIdParam = user?.id ? `?user_id=${user.id}` : '';
+            const response = await fetch(`/api/data-tables/${tableId}/periods/batch${userIdParam}`);
             const groupedPeriods = await response.json();
 
             // Initialize empty arrays for rows that don't have periods yet

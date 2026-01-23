@@ -15,12 +15,21 @@ interface TeamMember {
 
 export async function GET(request: NextRequest) {
     try {
-        // Require authentication and get user from session
+        const { searchParams } = new URL(request.url);
+
+        // Try to get user from session, fall back to user_id param
         const authResult = await requireAuth(request);
+        let userId: string;
         if ('response' in authResult) {
-            return authResult.response;
+            // Session auth failed, try user_id param as fallback
+            const userIdParam = searchParams.get('user_id');
+            if (!userIdParam) {
+                return authResult.response;
+            }
+            userId = userIdParam;
+        } else {
+            userId = authResult.user.id;
         }
-        const userId = authResult.user.id;
 
         // Get all DSOs the current user has access to
         const { data: userAccess, error: accessError } = await supabaseAdmin

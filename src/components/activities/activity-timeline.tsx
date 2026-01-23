@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '@/contexts/auth-context';
 import { Activity, DataTable, DataColumn, DataRow } from '@/lib/db/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,6 +41,7 @@ interface ContactWithActivity {
 }
 
 export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
+    const { user } = useAuth();
     const [contacts, setContacts] = useState<ContactWithActivity[]>([]);
     const [activities, setActivities] = useState<Activity[]>([]);
     const [loading, setLoading] = useState(true);
@@ -120,12 +122,13 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
 
     const fetchContacts = async (): Promise<ContactWithActivity[]> => {
         const allContacts: ContactWithActivity[] = [];
+        const userIdParam = user?.id ? `&user_id=${user.id}` : '';
 
         try {
             // Fetch tables and doctors in parallel
             const [tablesResponse, doctorsResponse] = await Promise.all([
-                fetch(`/api/data-tables?client_id=${clientId}`),
-                fetch(`/api/doctors?dso_id=${clientId}`)
+                fetch(`/api/data-tables?client_id=${clientId}${userIdParam}`),
+                fetch(`/api/doctors?dso_id=${clientId}${userIdParam}`)
             ]);
 
             // Process tables response
@@ -144,7 +147,8 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
                     if (!nameColumn) return [];
 
                     try {
-                        const rowsResponse = await fetch(`/api/data-tables/${table.id}/rows`);
+                        const rowsUserIdParam = user?.id ? `?user_id=${user.id}` : '';
+                        const rowsResponse = await fetch(`/api/data-tables/${table.id}/rows${rowsUserIdParam}`);
                         if (!rowsResponse.ok) return [];
 
                         const { rows } = await rowsResponse.json();

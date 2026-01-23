@@ -110,6 +110,35 @@ export async function requireAuth(request: NextRequest): Promise<
 }
 
 /**
+ * Middleware helper to require authentication with user_id param fallback
+ * Tries session auth first, falls back to user_id query param for GET requests
+ */
+export async function requireAuthWithFallback(request: NextRequest): Promise<
+    { userId: string; response?: never } | { userId?: never; response: NextResponse }
+> {
+    const { user } = await getAuthUser(request);
+
+    if (user) {
+        return { userId: user.id };
+    }
+
+    // Fallback to user_id param for GET requests
+    const { searchParams } = new URL(request.url);
+    const userIdParam = searchParams.get('user_id');
+
+    if (userIdParam) {
+        return { userId: userIdParam };
+    }
+
+    return {
+        response: NextResponse.json(
+            { error: 'Unauthorized' },
+            { status: 401 }
+        ),
+    };
+}
+
+/**
  * Middleware helper to require DSO access
  * Returns an error response if no access, or the access info if authorized
  */
@@ -152,4 +181,60 @@ export async function requireDsoAccess(
     }
 
     return { user, role: role! };
+}
+
+/**
+ * Middleware helper to require DSO access with user_id param fallback
+ * Tries session auth first, falls back to user_id query param for GET requests
+ */
+export async function requireDsoAccessWithFallback(
+    request: NextRequest,
+    dsoId: string,
+    requireWrite = false
+): Promise<
+    { userId: string; role: string; response?: never } | { userId?: never; role?: never; response: NextResponse }
+> {
+    // Try session auth first
+    const { user } = await getAuthUser(request);
+    let userId: string;
+
+    if (user) {
+        userId = user.id;
+    } else {
+        // Fallback to user_id param for GET requests
+        const { searchParams } = new URL(request.url);
+        const userIdParam = searchParams.get('user_id');
+
+        if (!userIdParam) {
+            return {
+                response: NextResponse.json(
+                    { error: 'Unauthorized' },
+                    { status: 401 }
+                ),
+            };
+        }
+        userId = userIdParam;
+    }
+
+    const { hasAccess, role } = await checkDsoAccess(userId, dsoId);
+
+    if (!hasAccess) {
+        return {
+            response: NextResponse.json(
+                { error: 'Access denied to this workspace' },
+                { status: 403 }
+            ),
+        };
+    }
+
+    if (requireWrite && !hasWriteAccess(role)) {
+        return {
+            response: NextResponse.json(
+                { error: 'Write access required' },
+                { status: 403 }
+            ),
+        };
+    }
+
+    return { userId, role: role! };
 }

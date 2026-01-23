@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db/client';
 import { calculateRiskLevel, getDaysSinceActivity } from '@/lib/calculations/risk-level';
-import { requireAuth, requireDsoAccess } from '@/lib/auth';
+import { requireAuth, requireDsoAccess, requireAuthWithFallback, requireDsoAccessWithFallback } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
@@ -10,15 +10,15 @@ export async function GET(request: NextRequest) {
         const status = searchParams.get('status');
         const search = searchParams.get('search');
 
-        // Require authentication
-        const authResult = await requireAuth(request);
+        // Require authentication (with user_id param fallback for GET)
+        const authResult = await requireAuthWithFallback(request);
         if ('response' in authResult) {
             return authResult.response;
         }
 
         // If dsoId is provided, verify user has access
         if (dsoId) {
-            const accessResult = await requireDsoAccess(request, dsoId);
+            const accessResult = await requireDsoAccessWithFallback(request, dsoId);
             if ('response' in accessResult) {
                 return accessResult.response;
             }

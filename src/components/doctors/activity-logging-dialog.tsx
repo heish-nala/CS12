@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -99,6 +100,7 @@ export function ActivityLoggingDialog({
     clientId,
     onSuccess,
 }: ActivityLoggingDialogProps) {
+    const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [activityType, setActivityType] = useState<ActivityType>('phone');
     const [notes, setNotes] = useState('');
@@ -131,7 +133,8 @@ export function ActivityLoggingDialog({
         setLoadingContacts(true);
         try {
             // Fetch all tables for this client
-            const tablesResponse = await fetch(`/api/data-tables?client_id=${clientId}`);
+            const userIdParam = user?.id ? `&user_id=${user.id}` : '';
+            const tablesResponse = await fetch(`/api/data-tables?client_id=${clientId}${userIdParam}`);
             if (!tablesResponse.ok) {
                 throw new Error('Failed to fetch tables');
             }
@@ -147,7 +150,8 @@ export function ActivityLoggingDialog({
             // Process each table
             for (const table of tables) {
                 // Fetch full table data with rows
-                const tableResponse = await fetch(`/api/data-tables/${table.id}`);
+                const tableUserIdParam = user?.id ? `?user_id=${user.id}` : '';
+                const tableResponse = await fetch(`/api/data-tables/${table.id}${tableUserIdParam}`);
                 if (!tableResponse.ok) continue;
 
                 const { table: fullTable } = await tableResponse.json();
