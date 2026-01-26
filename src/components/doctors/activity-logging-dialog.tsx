@@ -215,7 +215,7 @@ export function ActivityLoggingDialog({
                     contact_name: selectedContact?.name,
                     contact_email: selectedContact?.email,
                     contact_phone: selectedContact?.phone,
-                    created_by: 'current-user',
+                    user_id: user?.id,
                 }),
             });
 

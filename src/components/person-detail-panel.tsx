@@ -141,7 +141,7 @@ export function PersonDetailPanel({
                     contact_name: person.name,
                     contact_email: person.email,
                     contact_phone: person.phone,
-                    created_by: user.id,
+                    user_id: user.id,
                 }),
             });
 
