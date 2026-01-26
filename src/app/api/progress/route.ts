@@ -43,25 +43,26 @@ export async function GET(request: NextRequest) {
         const tableIds = timeTrackingTables.map(t => t.id);
 
         // Step 2: Fetch ALL related data in PARALLEL with single queries
+        // Only fetch the columns we actually need to reduce data transfer
         const [columnsResult, rowsResult, periodsResult] = await Promise.all([
-            // All columns for all time-tracking tables
+            // All columns for all time-tracking tables (need id, table_id, type, is_primary, order_index)
             supabaseAdmin
                 .from('data_columns')
-                .select('*')
+                .select('id, table_id, type, is_primary, order_index')
                 .in('table_id', tableIds)
                 .order('order_index'),
 
-            // All rows for all time-tracking tables
+            // All rows for all time-tracking tables (need id, table_id, data, updated_at)
             supabaseAdmin
                 .from('data_rows')
-                .select('*')
+                .select('id, table_id, data, updated_at')
                 .in('table_id', tableIds)
                 .order('created_at'),
 
-            // All period data for all time-tracking tables
+            // All period data for all time-tracking tables (need key fields only)
             supabaseAdmin
                 .from('period_data')
-                .select('*')
+                .select('id, table_id, row_id, period_start, period_end, period_label, metrics')
                 .in('table_id', tableIds)
                 .order('period_start'),
         ]);
@@ -160,10 +161,15 @@ export async function GET(request: NextRequest) {
             rows: rowsByTableId[table.id] || [],
         }));
 
-        return NextResponse.json({
+        const response = NextResponse.json({
             tables: tablesWithColumns,
             contacts,
         });
+
+        // Cache for 30 seconds, allow stale for 60 seconds while revalidating
+        response.headers.set('Cache-Control', 'private, s-maxage=30, stale-while-revalidate=60');
+
+        return response;
     } catch (error) {
         console.error('Error fetching progress data:', error);
         return NextResponse.json(
