@@ -110,6 +110,12 @@ export function ProgressTab({ clientId }: ProgressTabProps) {
     // Track in-flight requests
     const pendingRequestsRef = useRef<Set<string>>(new Set());
 
+    // Keep ref for latest periodData to avoid stale closures in handleSave
+    const periodDataRef = useRef<PeriodData[]>([]);
+    useEffect(() => {
+        periodDataRef.current = periodData;
+    }, [periodData]);
+
     // Cached fetch helper
     const cachedFetch = useCallback(async (url: string) => {
         const cached = getCache().get(url);
@@ -371,10 +377,12 @@ export function ProgressTab({ clientId }: ProgressTabProps) {
             setPendingChanges({});
 
             // Update the contact card with new values from current period
+            // Use ref to get latest periodData to avoid stale closure issues
+            const latestPeriodData = periodDataRef.current;
             const activeTable = tables.find(t => t.id === selectedContact.tableId);
             const tableMetrics = activeTable?.time_tracking?.metrics || [];
             const today = new Date();
-            const currentPeriod = periodData.find(p => {
+            const currentPeriod = latestPeriodData.find(p => {
                 const start = new Date(p.period_start + 'T12:00:00');
                 const end = new Date(p.period_end + 'T12:00:00');
                 return today >= start && today <= end;
