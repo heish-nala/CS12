@@ -101,6 +101,9 @@ export function PersonDetailPanel({
                 params.set('contact_name', person.name);
             }
             params.set('limit', '50');
+            if (user?.id) {
+                params.set('user_id', user.id);
+            }
 
             const response = await fetch(`/api/activities?${params}`);
             if (response.ok) {
