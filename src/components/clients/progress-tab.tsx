@@ -175,115 +175,15 @@ export function ProgressTab({ clientId }: ProgressTabProps) {
 
         const fetchPromise = (async () => {
             try {
+                // OPTIMIZATION: Single API call for all progress data
                 const userIdParam = user?.id ? `&user_id=${user.id}` : '';
-                const tablesUrl = `/api/data-tables?client_id=${clientId}${userIdParam}`;
-                const data = await cachedFetch(tablesUrl);
-                const allTables = (data.tables || []) as DataTableWithMeta[];
+                const response = await fetch(`/api/progress?client_id=${clientId}${userIdParam}`);
+                const data = await response.json();
 
-                // Filter to tables with time tracking
-                const timeTrackingTables = allTables.filter(t => t.time_tracking?.enabled);
-
-                if (timeTrackingTables.length === 0) {
-                    return { tables: [], contacts: [] };
-                }
-
-                // OPTIMIZATION: Fetch all table data and periods in PARALLEL
-                const tableUserIdParam = user?.id ? `?user_id=${user.id}` : '';
-                const periodsUserIdParam = user?.id ? `?user_id=${user.id}` : '';
-
-                // Parallel fetch: table details for tables missing rows
-                const tableDataPromises = timeTrackingTables.map(async (table): Promise<DataTableWithMeta> => {
-                    if (!table.rows || table.rows.length === 0) {
-                        const tableJson = await cachedFetch(`/api/data-tables/${table.id}${tableUserIdParam}`);
-                        return { ...table, ...tableJson.table } as DataTableWithMeta;
-                    }
-                    return table;
-                });
-
-                // Parallel fetch: period data for all tables
-                const periodDataPromises = timeTrackingTables.map(async (table) => {
-                    try {
-                        const periods = await cachedFetch(`/api/data-tables/${table.id}/periods/batch${periodsUserIdParam}`);
-                        return { tableId: table.id, periods };
-                    } catch (e) {
-                        console.error('Error fetching periods batch:', e);
-                        return { tableId: table.id, periods: {} };
-                    }
-                });
-
-                // Wait for ALL fetches to complete in parallel
-                const [tablesWithData, periodsResults] = await Promise.all([
-                    Promise.all(tableDataPromises),
-                    Promise.all(periodDataPromises),
-                ]);
-
-                // Create a map of tableId -> periods for quick lookup
-                const periodsByTableId = periodsResults.reduce((acc, { tableId, periods }) => {
-                    acc[tableId] = periods;
-                    return acc;
-                }, {} as Record<string, Record<string, PeriodData[]>>);
-
-                // Build contacts list from all fetched data
-                const allContacts: ContactWithProgress[] = [];
-
-                for (const tableData of tablesWithData) {
-                    const periodsByRow = periodsByTableId[tableData.id] || {};
-                    const columns = tableData.columns || [];
-                    const primaryColumn = columns.find(c => c.is_primary);
-                    const nameColumnId = primaryColumn?.id || columns[0]?.id;
-                    const emailColumn = columns.find(c => c.type === 'email');
-                    const phoneColumn = columns.find(c => c.type === 'phone');
-                    const metrics = tableData.time_tracking?.metrics || [];
-
-                    for (const row of tableData.rows || []) {
-                        const name = row.data?.[nameColumnId];
-                        if (!name) continue;
-
-                        // Find current and previous period for this row
-                        const rowPeriods = periodsByRow[row.id] || [];
-                        const today = new Date();
-                        const currentPeriodIdx = rowPeriods.findIndex(p => {
-                            // Parse dates with noon time to avoid timezone issues
-                            const start = new Date(p.period_start + 'T12:00:00');
-                            const end = new Date(p.period_end + 'T12:00:00');
-                            return today >= start && today <= end;
-                        });
-
-                        const currentPeriod = currentPeriodIdx >= 0 ? rowPeriods[currentPeriodIdx] : null;
-                        const previousPeriod = currentPeriodIdx > 0 ? rowPeriods[currentPeriodIdx - 1] : null;
-
-                        // Calculate totals
-                        const calcTotal = (p: PeriodData | null) => {
-                            if (!p?.metrics) return 0;
-                            return Object.values(p.metrics).reduce((sum, val) => sum + (val || 0), 0);
-                        };
-
-                        // Build metrics summary with names
-                        const metricsSummary: Record<string, number> = {};
-                        if (currentPeriod?.metrics) {
-                            for (const metric of metrics) {
-                                metricsSummary[metric.name] = currentPeriod.metrics[metric.id] || 0;
-                            }
-                        }
-
-                        allContacts.push({
-                            id: `${tableData.id}-${row.id}`,
-                            rowId: row.id,
-                            tableId: tableData.id,
-                            name: String(name),
-                            email: emailColumn ? String(row.data?.[emailColumn.id] || '') : undefined,
-                            phone: phoneColumn ? String(row.data?.[phoneColumn.id] || '') : undefined,
-                            tableName: tableData.name,
-                            lastUpdated: row.updated_at,
-                            currentPeriodTotal: calcTotal(currentPeriod),
-                            currentPeriodLabel: currentPeriod?.period_label,
-                            previousPeriodTotal: calcTotal(previousPeriod),
-                            metricsSummary,
-                        });
-                    }
-                }
-
-                return { tables: timeTrackingTables, contacts: allContacts };
+                return {
+                    tables: (data.tables || []) as DataTableWithMeta[],
+                    contacts: (data.contacts || []) as ContactWithProgress[],
+                };
             } catch (error) {
                 console.error('Error fetching data:', error);
                 return { tables: [], contacts: [] };
