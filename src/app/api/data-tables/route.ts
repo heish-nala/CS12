@@ -30,27 +30,52 @@ export async function GET(request: NextRequest) {
 
         if (tablesError) throw tablesError;
 
-        // Fetch columns and row counts for each table
-        const tablesWithMeta = await Promise.all(
-            (tables || []).map(async (table) => {
-                const { data: columns } = await supabaseAdmin
-                    .from('data_columns')
-                    .select('*')
-                    .eq('table_id', table.id)
-                    .order('order_index');
+        if (!tables || tables.length === 0) {
+            return NextResponse.json({ tables: [] });
+        }
 
-                const { count } = await supabaseAdmin
-                    .from('data_rows')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('table_id', table.id);
+        // OPTIMIZATION: Fetch ALL columns for ALL tables in ONE query
+        const tableIds = tables.map(t => t.id);
 
-                return {
-                    ...table,
-                    columns: columns || [],
-                    row_count: count || 0,
-                };
-            })
-        );
+        const [columnsResult, rowCountsResult] = await Promise.all([
+            // Single query to get all columns for all tables
+            supabaseAdmin
+                .from('data_columns')
+                .select('*')
+                .in('table_id', tableIds)
+                .order('order_index'),
+
+            // Parallel row count queries (still needed, but now in parallel with columns)
+            Promise.all(
+                tableIds.map(tableId =>
+                    supabaseAdmin
+                        .from('data_rows')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('table_id', tableId)
+                        .then(r => ({ tableId, count: r.count || 0 }))
+                )
+            ),
+        ]);
+
+        // Group columns by table_id
+        const columnsByTableId = (columnsResult.data || []).reduce((acc, col) => {
+            if (!acc[col.table_id]) acc[col.table_id] = [];
+            acc[col.table_id].push(col);
+            return acc;
+        }, {} as Record<string, typeof columnsResult.data>);
+
+        // Create row count lookup
+        const rowCountByTableId = rowCountsResult.reduce((acc, { tableId, count }) => {
+            acc[tableId] = count;
+            return acc;
+        }, {} as Record<string, number>);
+
+        // Build final response with pre-fetched data
+        const tablesWithMeta = tables.map(table => ({
+            ...table,
+            columns: columnsByTableId[table.id] || [],
+            row_count: rowCountByTableId[table.id] || 0,
+        }));
 
         return NextResponse.json({ tables: tablesWithMeta });
     } catch (error) {

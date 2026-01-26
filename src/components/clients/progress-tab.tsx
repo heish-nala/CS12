@@ -104,29 +104,53 @@ export function ProgressTab({ clientId }: ProgressTabProps) {
             const timeTrackingTables = allTables.filter(t => t.time_tracking?.enabled);
             setTables(timeTrackingTables);
 
-            // Build contacts list from all time-tracking tables
-            const allContacts: ContactWithProgress[] = [];
+            if (timeTrackingTables.length === 0) {
+                setContacts([]);
+                return;
+            }
 
-            for (const table of timeTrackingTables) {
-                // Fetch full table data if not already loaded
-                let tableData = table;
+            // OPTIMIZATION: Fetch all table data and periods in PARALLEL instead of sequentially
+            const tableUserIdParam = user?.id ? `?user_id=${user.id}` : '';
+            const periodsUserIdParam = user?.id ? `?user_id=${user.id}` : '';
+
+            // Parallel fetch: table details for tables missing rows
+            const tableDataPromises = timeTrackingTables.map(async (table): Promise<DataTableWithMeta> => {
                 if (!table.rows || table.rows.length === 0) {
-                    const tableUserIdParam = user?.id ? `?user_id=${user.id}` : '';
                     const tableResponse = await fetch(`/api/data-tables/${table.id}${tableUserIdParam}`);
                     const tableJson = await tableResponse.json();
-                    tableData = { ...table, ...tableJson.table };
+                    return { ...table, ...tableJson.table } as DataTableWithMeta;
                 }
+                return table;
+            });
 
-                // Fetch period data for all rows in this table
-                let periodsByRow: Record<string, PeriodData[]> = {};
+            // Parallel fetch: period data for all tables
+            const periodDataPromises = timeTrackingTables.map(async (table) => {
                 try {
-                    const periodsUserIdParam = user?.id ? `?user_id=${user.id}` : '';
                     const periodsResponse = await fetch(`/api/data-tables/${table.id}/periods/batch${periodsUserIdParam}`);
-                    periodsByRow = await periodsResponse.json();
+                    return { tableId: table.id, periods: await periodsResponse.json() };
                 } catch (e) {
                     console.error('Error fetching periods batch:', e);
+                    return { tableId: table.id, periods: {} };
                 }
+            });
 
+            // Wait for ALL fetches to complete in parallel
+            const [tablesWithData, periodsResults] = await Promise.all([
+                Promise.all(tableDataPromises),
+                Promise.all(periodDataPromises),
+            ]);
+
+            // Create a map of tableId -> periods for quick lookup
+            const periodsByTableId = periodsResults.reduce((acc, { tableId, periods }) => {
+                acc[tableId] = periods;
+                return acc;
+            }, {} as Record<string, Record<string, PeriodData[]>>);
+
+            // Build contacts list from all fetched data
+            const allContacts: ContactWithProgress[] = [];
+
+            for (const tableData of tablesWithData) {
+                const periodsByRow = periodsByTableId[tableData.id] || {};
                 const columns = tableData.columns || [];
                 const primaryColumn = columns.find(c => c.is_primary);
                 const nameColumnId = primaryColumn?.id || columns[0]?.id;
@@ -166,13 +190,13 @@ export function ProgressTab({ clientId }: ProgressTabProps) {
                     }
 
                     allContacts.push({
-                        id: `${table.id}-${row.id}`,
+                        id: `${tableData.id}-${row.id}`,
                         rowId: row.id,
-                        tableId: table.id,
+                        tableId: tableData.id,
                         name: String(name),
                         email: emailColumn ? String(row.data?.[emailColumn.id] || '') : undefined,
                         phone: phoneColumn ? String(row.data?.[phoneColumn.id] || '') : undefined,
-                        tableName: table.name,
+                        tableName: tableData.name,
                         lastUpdated: row.updated_at,
                         currentPeriodTotal: calcTotal(currentPeriod),
                         currentPeriodLabel: currentPeriod?.period_label,

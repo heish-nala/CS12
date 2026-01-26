@@ -8,6 +8,11 @@ export async function GET(
 ) {
     try {
         const { id } = await params;
+        const { searchParams } = new URL(request.url);
+
+        // Pagination params with sensible defaults
+        const limit = parseInt(searchParams.get('limit') || '500'); // Default 500 rows
+        const offset = parseInt(searchParams.get('offset') || '0');
 
         // Fetch table from Supabase
         const { data: table, error: tableError } = await supabaseAdmin
@@ -29,25 +34,41 @@ export async function GET(
             return accessResult.response;
         }
 
-        // Fetch columns
-        const { data: columns } = await supabaseAdmin
-            .from('data_columns')
-            .select('*')
-            .eq('table_id', id)
-            .order('order_index');
+        // OPTIMIZATION: Fetch columns and rows in PARALLEL
+        const [columnsResult, rowsResult, countResult] = await Promise.all([
+            // Fetch columns
+            supabaseAdmin
+                .from('data_columns')
+                .select('*')
+                .eq('table_id', id)
+                .order('order_index'),
 
-        // Fetch rows
-        const { data: rows } = await supabaseAdmin
-            .from('data_rows')
-            .select('*')
-            .eq('table_id', id)
-            .order('created_at');
+            // Fetch rows with pagination
+            supabaseAdmin
+                .from('data_rows')
+                .select('*')
+                .eq('table_id', id)
+                .order('created_at')
+                .range(offset, offset + limit - 1),
+
+            // Get total count for pagination info
+            supabaseAdmin
+                .from('data_rows')
+                .select('*', { count: 'exact', head: true })
+                .eq('table_id', id),
+        ]);
 
         return NextResponse.json({
             table: {
                 ...table,
-                columns: columns || [],
-                rows: rows || [],
+                columns: columnsResult.data || [],
+                rows: rowsResult.data || [],
+            },
+            pagination: {
+                limit,
+                offset,
+                total: countResult.count || 0,
+                hasMore: (offset + limit) < (countResult.count || 0),
             }
         });
     } catch (error) {
