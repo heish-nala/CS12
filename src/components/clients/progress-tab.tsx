@@ -1,7 +1,30 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
+
+// Use window-level cache to persist across hot module reloads in dev
+const CACHE_TTL = 30000; // 30 seconds cache
+
+// Initialize global cache on window if not exists
+declare global {
+    interface Window {
+        __progressCache?: Map<string, { data: any; timestamp: number }>;
+        __progressFetchInProgress?: Map<string, Promise<any>>;
+    }
+}
+
+function getCache() {
+    if (typeof window === 'undefined') return new Map();
+    if (!window.__progressCache) window.__progressCache = new Map();
+    return window.__progressCache;
+}
+
+function getFetchInProgress() {
+    if (typeof window === 'undefined') return new Map();
+    if (!window.__progressFetchInProgress) window.__progressFetchInProgress = new Map();
+    return window.__progressFetchInProgress;
+}
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -87,129 +110,189 @@ export function ProgressTab({ clientId }: ProgressTabProps) {
     // Track in-flight requests
     const pendingRequestsRef = useRef<Set<string>>(new Set());
 
+    // Cached fetch helper
+    const cachedFetch = useCallback(async (url: string) => {
+        const cached = getCache().get(url);
+        if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+            return cached.data;
+        }
+
+        // Check if fetch is already in progress
+        const inProgress = getFetchInProgress().get(url);
+        if (inProgress) {
+            return inProgress;
+        }
+
+        // Start new fetch
+        const fetchPromise = fetch(url).then(res => res.json()).then(data => {
+            getCache().set(url, { data, timestamp: Date.now() });
+            getFetchInProgress().delete(url);
+            return data;
+        }).catch(err => {
+            getFetchInProgress().delete(url);
+            throw err;
+        });
+
+        getFetchInProgress().set(url, fetchPromise);
+        return fetchPromise;
+    }, []);
+
     // Fetch tables and contacts on mount
     useEffect(() => {
         fetchData();
     }, [clientId]);
 
     const fetchData = async () => {
+        const cacheKey = `progress-${clientId}`;
+
+        // Check module-level cache first
+        const cached = getCache().get(cacheKey);
+        if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+            const { tables: cachedTables, contacts: cachedContacts } = cached.data;
+            setTables(cachedTables);
+            setContacts(cachedContacts);
+            setLoading(false);
+            return;
+        }
+
+        // Check if fetch is already in progress
+        const inProgress = getFetchInProgress().get(cacheKey);
+        if (inProgress) {
+            const { tables: cachedTables, contacts: cachedContacts } = await inProgress;
+            setTables(cachedTables);
+            setContacts(cachedContacts);
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
-        try {
-            const userIdParam = user?.id ? `&user_id=${user.id}` : '';
-            const response = await fetch(`/api/data-tables?client_id=${clientId}${userIdParam}`);
-            const data = await response.json();
-            const allTables = (data.tables || []) as DataTableWithMeta[];
 
-            // Filter to tables with time tracking
-            const timeTrackingTables = allTables.filter(t => t.time_tracking?.enabled);
-            setTables(timeTrackingTables);
+        const fetchPromise = (async () => {
+            try {
+                const userIdParam = user?.id ? `&user_id=${user.id}` : '';
+                const tablesUrl = `/api/data-tables?client_id=${clientId}${userIdParam}`;
+                const data = await cachedFetch(tablesUrl);
+                const allTables = (data.tables || []) as DataTableWithMeta[];
 
-            if (timeTrackingTables.length === 0) {
-                setContacts([]);
-                return;
-            }
+                // Filter to tables with time tracking
+                const timeTrackingTables = allTables.filter(t => t.time_tracking?.enabled);
 
-            // OPTIMIZATION: Fetch all table data and periods in PARALLEL instead of sequentially
-            const tableUserIdParam = user?.id ? `?user_id=${user.id}` : '';
-            const periodsUserIdParam = user?.id ? `?user_id=${user.id}` : '';
-
-            // Parallel fetch: table details for tables missing rows
-            const tableDataPromises = timeTrackingTables.map(async (table): Promise<DataTableWithMeta> => {
-                if (!table.rows || table.rows.length === 0) {
-                    const tableResponse = await fetch(`/api/data-tables/${table.id}${tableUserIdParam}`);
-                    const tableJson = await tableResponse.json();
-                    return { ...table, ...tableJson.table } as DataTableWithMeta;
+                if (timeTrackingTables.length === 0) {
+                    return { tables: [], contacts: [] };
                 }
-                return table;
-            });
 
-            // Parallel fetch: period data for all tables
-            const periodDataPromises = timeTrackingTables.map(async (table) => {
-                try {
-                    const periodsResponse = await fetch(`/api/data-tables/${table.id}/periods/batch${periodsUserIdParam}`);
-                    return { tableId: table.id, periods: await periodsResponse.json() };
-                } catch (e) {
-                    console.error('Error fetching periods batch:', e);
-                    return { tableId: table.id, periods: {} };
-                }
-            });
+                // OPTIMIZATION: Fetch all table data and periods in PARALLEL
+                const tableUserIdParam = user?.id ? `?user_id=${user.id}` : '';
+                const periodsUserIdParam = user?.id ? `?user_id=${user.id}` : '';
 
-            // Wait for ALL fetches to complete in parallel
-            const [tablesWithData, periodsResults] = await Promise.all([
-                Promise.all(tableDataPromises),
-                Promise.all(periodDataPromises),
-            ]);
-
-            // Create a map of tableId -> periods for quick lookup
-            const periodsByTableId = periodsResults.reduce((acc, { tableId, periods }) => {
-                acc[tableId] = periods;
-                return acc;
-            }, {} as Record<string, Record<string, PeriodData[]>>);
-
-            // Build contacts list from all fetched data
-            const allContacts: ContactWithProgress[] = [];
-
-            for (const tableData of tablesWithData) {
-                const periodsByRow = periodsByTableId[tableData.id] || {};
-                const columns = tableData.columns || [];
-                const primaryColumn = columns.find(c => c.is_primary);
-                const nameColumnId = primaryColumn?.id || columns[0]?.id;
-                const emailColumn = columns.find(c => c.type === 'email');
-                const phoneColumn = columns.find(c => c.type === 'phone');
-                const metrics = tableData.time_tracking?.metrics || [];
-
-                for (const row of tableData.rows || []) {
-                    const name = row.data?.[nameColumnId];
-                    if (!name) continue;
-
-                    // Find current and previous period for this row
-                    const rowPeriods = periodsByRow[row.id] || [];
-                    const today = new Date();
-                    const currentPeriodIdx = rowPeriods.findIndex(p => {
-                        // Parse dates with noon time to avoid timezone issues
-                        const start = new Date(p.period_start + 'T12:00:00');
-                        const end = new Date(p.period_end + 'T12:00:00');
-                        return today >= start && today <= end;
-                    });
-
-                    const currentPeriod = currentPeriodIdx >= 0 ? rowPeriods[currentPeriodIdx] : null;
-                    const previousPeriod = currentPeriodIdx > 0 ? rowPeriods[currentPeriodIdx - 1] : null;
-
-                    // Calculate totals
-                    const calcTotal = (p: PeriodData | null) => {
-                        if (!p?.metrics) return 0;
-                        return Object.values(p.metrics).reduce((sum, val) => sum + (val || 0), 0);
-                    };
-
-                    // Build metrics summary with names
-                    const metricsSummary: Record<string, number> = {};
-                    if (currentPeriod?.metrics) {
-                        for (const metric of metrics) {
-                            metricsSummary[metric.name] = currentPeriod.metrics[metric.id] || 0;
-                        }
+                // Parallel fetch: table details for tables missing rows
+                const tableDataPromises = timeTrackingTables.map(async (table): Promise<DataTableWithMeta> => {
+                    if (!table.rows || table.rows.length === 0) {
+                        const tableJson = await cachedFetch(`/api/data-tables/${table.id}${tableUserIdParam}`);
+                        return { ...table, ...tableJson.table } as DataTableWithMeta;
                     }
+                    return table;
+                });
 
-                    allContacts.push({
-                        id: `${tableData.id}-${row.id}`,
-                        rowId: row.id,
-                        tableId: tableData.id,
-                        name: String(name),
-                        email: emailColumn ? String(row.data?.[emailColumn.id] || '') : undefined,
-                        phone: phoneColumn ? String(row.data?.[phoneColumn.id] || '') : undefined,
-                        tableName: tableData.name,
-                        lastUpdated: row.updated_at,
-                        currentPeriodTotal: calcTotal(currentPeriod),
-                        currentPeriodLabel: currentPeriod?.period_label,
-                        previousPeriodTotal: calcTotal(previousPeriod),
-                        metricsSummary,
-                    });
+                // Parallel fetch: period data for all tables
+                const periodDataPromises = timeTrackingTables.map(async (table) => {
+                    try {
+                        const periods = await cachedFetch(`/api/data-tables/${table.id}/periods/batch${periodsUserIdParam}`);
+                        return { tableId: table.id, periods };
+                    } catch (e) {
+                        console.error('Error fetching periods batch:', e);
+                        return { tableId: table.id, periods: {} };
+                    }
+                });
+
+                // Wait for ALL fetches to complete in parallel
+                const [tablesWithData, periodsResults] = await Promise.all([
+                    Promise.all(tableDataPromises),
+                    Promise.all(periodDataPromises),
+                ]);
+
+                // Create a map of tableId -> periods for quick lookup
+                const periodsByTableId = periodsResults.reduce((acc, { tableId, periods }) => {
+                    acc[tableId] = periods;
+                    return acc;
+                }, {} as Record<string, Record<string, PeriodData[]>>);
+
+                // Build contacts list from all fetched data
+                const allContacts: ContactWithProgress[] = [];
+
+                for (const tableData of tablesWithData) {
+                    const periodsByRow = periodsByTableId[tableData.id] || {};
+                    const columns = tableData.columns || [];
+                    const primaryColumn = columns.find(c => c.is_primary);
+                    const nameColumnId = primaryColumn?.id || columns[0]?.id;
+                    const emailColumn = columns.find(c => c.type === 'email');
+                    const phoneColumn = columns.find(c => c.type === 'phone');
+                    const metrics = tableData.time_tracking?.metrics || [];
+
+                    for (const row of tableData.rows || []) {
+                        const name = row.data?.[nameColumnId];
+                        if (!name) continue;
+
+                        // Find current and previous period for this row
+                        const rowPeriods = periodsByRow[row.id] || [];
+                        const today = new Date();
+                        const currentPeriodIdx = rowPeriods.findIndex(p => {
+                            // Parse dates with noon time to avoid timezone issues
+                            const start = new Date(p.period_start + 'T12:00:00');
+                            const end = new Date(p.period_end + 'T12:00:00');
+                            return today >= start && today <= end;
+                        });
+
+                        const currentPeriod = currentPeriodIdx >= 0 ? rowPeriods[currentPeriodIdx] : null;
+                        const previousPeriod = currentPeriodIdx > 0 ? rowPeriods[currentPeriodIdx - 1] : null;
+
+                        // Calculate totals
+                        const calcTotal = (p: PeriodData | null) => {
+                            if (!p?.metrics) return 0;
+                            return Object.values(p.metrics).reduce((sum, val) => sum + (val || 0), 0);
+                        };
+
+                        // Build metrics summary with names
+                        const metricsSummary: Record<string, number> = {};
+                        if (currentPeriod?.metrics) {
+                            for (const metric of metrics) {
+                                metricsSummary[metric.name] = currentPeriod.metrics[metric.id] || 0;
+                            }
+                        }
+
+                        allContacts.push({
+                            id: `${tableData.id}-${row.id}`,
+                            rowId: row.id,
+                            tableId: tableData.id,
+                            name: String(name),
+                            email: emailColumn ? String(row.data?.[emailColumn.id] || '') : undefined,
+                            phone: phoneColumn ? String(row.data?.[phoneColumn.id] || '') : undefined,
+                            tableName: tableData.name,
+                            lastUpdated: row.updated_at,
+                            currentPeriodTotal: calcTotal(currentPeriod),
+                            currentPeriodLabel: currentPeriod?.period_label,
+                            previousPeriodTotal: calcTotal(previousPeriod),
+                            metricsSummary,
+                        });
+                    }
                 }
-            }
 
-            setContacts(allContacts);
-        } catch (error) {
-            console.error('Error fetching data:', error);
+                return { tables: timeTrackingTables, contacts: allContacts };
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                return { tables: [], contacts: [] };
+            }
+        })();
+
+        getFetchInProgress().set(cacheKey, fetchPromise);
+
+        try {
+            const result = await fetchPromise;
+            getCache().set(cacheKey, { data: result, timestamp: Date.now() });
+            setTables(result.tables);
+            setContacts(result.contacts);
         } finally {
+            getFetchInProgress().delete(cacheKey);
             setLoading(false);
         }
     };
@@ -286,6 +369,35 @@ export function ProgressTab({ clientId }: ProgressTabProps) {
 
             await Promise.all(savePromises);
             setPendingChanges({});
+
+            // Update the contact card with new values from current period
+            const activeTable = tables.find(t => t.id === selectedContact.tableId);
+            const tableMetrics = activeTable?.time_tracking?.metrics || [];
+            const today = new Date();
+            const currentPeriod = periodData.find(p => {
+                const start = new Date(p.period_start + 'T12:00:00');
+                const end = new Date(p.period_end + 'T12:00:00');
+                return today >= start && today <= end;
+            });
+
+            if (currentPeriod) {
+                const newTotal = Object.values(currentPeriod.metrics || {}).reduce((sum, val) => sum + (val || 0), 0);
+                const newMetricsSummary: Record<string, number> = {};
+                for (const metric of tableMetrics) {
+                    newMetricsSummary[metric.name] = currentPeriod.metrics?.[metric.id] || 0;
+                }
+
+                // Update contacts state to reflect changes on card
+                setContacts(prev => prev.map(c =>
+                    c.id === selectedContact.id
+                        ? { ...c, currentPeriodTotal: newTotal, metricsSummary: newMetricsSummary, lastUpdated: new Date().toISOString() }
+                        : c
+                ));
+
+                // Invalidate cache so next load gets fresh data
+                getCache().delete(`progress-${clientId}`);
+            }
+
             toast.success('Changes saved');
         } catch (error) {
             console.error('Error saving:', error);
