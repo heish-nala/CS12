@@ -67,16 +67,16 @@ export async function GET(request: NextRequest) {
         ]);
 
         // Step 3: Group data by table_id and row_id for quick lookups
-        const columnsByTableId: Record<string, typeof columnsResult.data> = {};
+        const columnsByTableId: Record<string, any[]> = {};
         for (const col of columnsResult.data || []) {
             if (!columnsByTableId[col.table_id]) columnsByTableId[col.table_id] = [];
-            columnsByTableId[col.table_id].push(col);
+            columnsByTableId[col.table_id]!.push(col);
         }
 
-        const rowsByTableId: Record<string, typeof rowsResult.data> = {};
+        const rowsByTableId: Record<string, any[]> = {};
         for (const row of rowsResult.data || []) {
             if (!rowsByTableId[row.table_id]) rowsByTableId[row.table_id] = [];
-            rowsByTableId[row.table_id].push(row);
+            rowsByTableId[row.table_id]!.push(row);
         }
 
         // Group periods by table_id, then by row_id
