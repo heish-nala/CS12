@@ -398,7 +398,13 @@ export function ProgressTab({ clientId }: ProgressTabProps) {
                 // Update contacts state to reflect changes on card
                 setContacts(prev => prev.map(c =>
                     c.id === selectedContact.id
-                        ? { ...c, currentPeriodTotal: newTotal, metricsSummary: newMetricsSummary, lastUpdated: new Date().toISOString() }
+                        ? {
+                            ...c,
+                            currentPeriodTotal: newTotal,
+                            currentPeriodLabel: currentPeriod.period_label,
+                            metricsSummary: newMetricsSummary,
+                            lastUpdated: new Date().toISOString()
+                          }
                         : c
                 ));
 
