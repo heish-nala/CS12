@@ -252,7 +252,7 @@ export function ProgressTab({ clientId }: ProgressTabProps) {
                         {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ metrics }),
+                            body: JSON.stringify({ metrics, user_id: user?.id }),
                         }
                     );
                     if (!response.ok) throw new Error(`Failed to save period ${periodId}`);
