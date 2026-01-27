@@ -165,14 +165,19 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
     try {
         const body = await request.json();
-        const { id, archived } = body;
+        const { id, archived, name, user_id: bodyUserId } = body;
 
-        // Require authentication and get user from session
+        // Try to get user from session, fall back to user_id from body
         const authResult = await requireAuth(request);
+        let user_id: string;
         if ('response' in authResult) {
-            return authResult.response;
+            if (!bodyUserId) {
+                return authResult.response;
+            }
+            user_id = bodyUserId;
+        } else {
+            user_id = authResult.user.id;
         }
-        const user_id = authResult.user.id;
 
         if (!id) {
             return NextResponse.json(
@@ -196,10 +201,15 @@ export async function PATCH(request: NextRequest) {
             );
         }
 
+        // Build update object with only provided fields
+        const updateData: { name?: string; archived?: boolean } = {};
+        if (name !== undefined) updateData.name = name;
+        if (archived !== undefined) updateData.archived = archived;
+
         // Update the DSO
         const { data, error } = await supabaseAdmin
             .from('dsos')
-            .update({ archived: archived ?? false })
+            .update(updateData)
             .eq('id', id)
             .select()
             .single();

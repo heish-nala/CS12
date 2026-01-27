@@ -123,20 +123,33 @@ export function ClientSettingsDialog({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!client) return;
+        if (!client || !user?.id) return;
 
         setLoading(true);
 
         try {
-            // TODO: Replace with actual API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            const response = await fetch('/api/dsos', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: client.id,
+                    name: formData.name,
+                    user_id: user.id,
+                }),
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to update client');
+            }
 
             toast.success('Client settings updated successfully');
+            refreshClients();
             onUpdate?.();
             onOpenChange(false);
         } catch (error) {
             console.error('Error updating client:', error);
-            toast.error('Failed to update client settings');
+            toast.error(error instanceof Error ? error.message : 'Failed to update client settings');
         } finally {
             setLoading(false);
         }
