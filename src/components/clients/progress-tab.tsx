@@ -464,28 +464,23 @@ export function ProgressTab({ clientId }: ProgressTabProps) {
                                         </div>
 
                                         {/* Progress Summary */}
-                                        {contact.currentPeriodLabel && (
+                                        {contact.currentPeriodLabel && contact.metricsSummary && Object.keys(contact.metricsSummary).length > 0 && (
                                             <div className="mb-3 p-2 bg-muted/50 rounded">
-                                                <div className="flex items-center justify-between mb-1">
+                                                <div className="flex items-center justify-between">
                                                     <span className="text-xs text-muted-foreground">{contact.currentPeriodLabel}</span>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="text-sm font-semibold">{contact.currentPeriodTotal || 0}</span>
-                                                        {deltaPercent !== null && (
-                                                            <span className={`text-xs ${deltaPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                                {deltaPercent >= 0 ? '+' : ''}{deltaPercent}%
-                                                            </span>
-                                                        )}
-                                                    </div>
+                                                    {deltaPercent !== null && (
+                                                        <span className={`text-xs ${deltaPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                            {deltaPercent >= 0 ? '+' : ''}{deltaPercent}%
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                {contact.metricsSummary && Object.keys(contact.metricsSummary).length > 0 && (
-                                                    <div className="flex gap-2 flex-wrap">
-                                                        {Object.entries(contact.metricsSummary).map(([name, value]) => (
-                                                            <span key={name} className="text-xs text-muted-foreground">
-                                                                {name}: <span className="font-medium text-foreground">{value}</span>
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                )}
+                                                <div className="flex gap-2 flex-wrap mt-1">
+                                                    {Object.entries(contact.metricsSummary).map(([name, value]) => (
+                                                        <span key={name} className="text-xs text-muted-foreground">
+                                                            {name}: <span className="font-medium text-foreground">{value}</span>
+                                                        </span>
+                                                    ))}
+                                                </div>
                                             </div>
                                         )}
 
