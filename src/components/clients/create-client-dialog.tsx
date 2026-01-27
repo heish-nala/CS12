@@ -52,11 +52,11 @@ export function CreateClientDialog({
                 body: JSON.stringify({ name: formData.name, user_id: user?.id }),
             });
 
-            if (!response.ok) {
-                throw new Error('Failed to create client');
-            }
-
             const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to create client');
+            }
 
             toast.success('Client created successfully');
 
@@ -78,7 +78,7 @@ export function CreateClientDialog({
             }
         } catch (error) {
             console.error('Error creating client:', error);
-            toast.error('Failed to create client');
+            toast.error(error instanceof Error ? error.message : 'Failed to create client');
         } finally {
             setLoading(false);
         }

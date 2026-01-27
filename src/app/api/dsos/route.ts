@@ -97,14 +97,20 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { name } = body;
+        const { name, user_id: bodyUserId } = body;
 
-        // Require authentication and get user from session
+        // Try to get user from session, fall back to user_id from body
         const authResult = await requireAuth(request);
+        let user_id: string;
         if ('response' in authResult) {
-            return authResult.response;
+            // Session auth failed, try user_id from body as fallback
+            if (!bodyUserId) {
+                return authResult.response;
+            }
+            user_id = bodyUserId;
+        } else {
+            user_id = authResult.user.id;
         }
-        const user_id = authResult.user.id;
 
         if (!name) {
             return NextResponse.json(
