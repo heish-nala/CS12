@@ -184,13 +184,16 @@ export async function requireDsoAccess(
 }
 
 /**
- * Middleware helper to require DSO access with user_id param fallback
- * Tries session auth first, falls back to user_id query param for GET requests
+ * Middleware helper to require DSO access with user_id fallback
+ * Tries session auth first, falls back to user_id from:
+ * - Query params (for all requests)
+ * - Request body (for POST/PUT/PATCH - pass parsedBody if already parsed)
  */
 export async function requireDsoAccessWithFallback(
     request: NextRequest,
     dsoId: string,
-    requireWrite = false
+    requireWrite = false,
+    parsedBody?: { user_id?: string }
 ): Promise<
     { userId: string; role: string; response?: never } | { userId?: never; role?: never; response: NextResponse }
 > {
@@ -201,11 +204,16 @@ export async function requireDsoAccessWithFallback(
     if (user) {
         userId = user.id;
     } else {
-        // Fallback to user_id param for GET requests
+        // Fallback to user_id from query params (works for all methods including DELETE)
         const { searchParams } = new URL(request.url);
         const userIdParam = searchParams.get('user_id');
 
-        if (!userIdParam) {
+        if (userIdParam) {
+            userId = userIdParam;
+        } else if (parsedBody?.user_id) {
+            // Fallback to user_id from parsed body (for POST/PUT/PATCH)
+            userId = parsedBody.user_id;
+        } else {
             return {
                 response: NextResponse.json(
                     { error: 'Unauthorized' },
@@ -213,7 +221,6 @@ export async function requireDsoAccessWithFallback(
                 ),
             };
         }
-        userId = userIdParam;
     }
 
     const { hasAccess, role } = await checkDsoAccess(userId, dsoId);

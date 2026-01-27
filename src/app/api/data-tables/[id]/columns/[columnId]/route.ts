@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
-import { requireDsoAccess } from '@/lib/auth';
+import { requireDsoAccessWithFallback } from '@/lib/auth';
 
 export async function PUT(
     request: NextRequest,
@@ -24,8 +24,8 @@ export async function PUT(
             );
         }
 
-        // Require write access to the client/DSO
-        const accessResult = await requireDsoAccess(request, table.client_id, true);
+        // Require write access to the client/DSO (with user_id fallback)
+        const accessResult = await requireDsoAccessWithFallback(request, table.client_id, true, body);
         if ('response' in accessResult) {
             return accessResult.response;
         }
@@ -82,8 +82,8 @@ export async function DELETE(
             );
         }
 
-        // Require write access to the client/DSO
-        const accessResult = await requireDsoAccess(request, table.client_id, true);
+        // Require write access to the client/DSO (with user_id fallback from query params)
+        const accessResult = await requireDsoAccessWithFallback(request, table.client_id, true);
         if ('response' in accessResult) {
             return accessResult.response;
         }

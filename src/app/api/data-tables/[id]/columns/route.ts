@@ -71,8 +71,8 @@ export async function POST(
             );
         }
 
-        // Require write access to the client/DSO
-        const accessResult = await requireDsoAccess(request, table.client_id, true);
+        // Require write access to the client/DSO (with user_id fallback)
+        const accessResult = await requireDsoAccessWithFallback(request, table.client_id, true, body);
         if ('response' in accessResult) {
             return accessResult.response;
         }

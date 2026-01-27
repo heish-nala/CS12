@@ -102,8 +102,8 @@ export async function PUT(
             );
         }
 
-        // Require write access to the client/DSO
-        const accessResult = await requireDsoAccess(request, currentTable.client_id, true);
+        // Require write access to the client/DSO (with user_id fallback)
+        const accessResult = await requireDsoAccessWithFallback(request, currentTable.client_id, true, body);
         if ('response' in accessResult) {
             return accessResult.response;
         }
@@ -163,8 +163,8 @@ export async function DELETE(
             );
         }
 
-        // Require write access to the client/DSO
-        const accessResult = await requireDsoAccess(request, table.client_id, true);
+        // Require write access to the client/DSO (with user_id fallback from query params)
+        const accessResult = await requireDsoAccessWithFallback(request, table.client_id, true);
         if ('response' in accessResult) {
             return accessResult.response;
         }

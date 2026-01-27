@@ -248,12 +248,12 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
 
     // Debounced row update to prevent rapid API calls during inline editing
     const debouncedUpdateRow = useDebouncedCallback(
-        async (rowId: string, data: Record<string, any>, tableId: string) => {
+        async (rowId: string, data: Record<string, any>, tableId: string, userId?: string) => {
             try {
                 await fetch(`/api/data-tables/${tableId}/rows/${rowId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data }),
+                    body: JSON.stringify({ data, user_id: userId }),
                 });
             } catch (error) {
                 console.error('Error updating row:', error);
@@ -280,8 +280,8 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
         );
 
         // Debounced API call
-        debouncedUpdateRow(rowId, data, activeTableId);
-    }, [activeTableId, debouncedUpdateRow]);
+        debouncedUpdateRow(rowId, data, activeTableId, user?.id);
+    }, [activeTableId, debouncedUpdateRow, user?.id]);
 
     const handleDeleteRow = async (rowId: string) => {
         if (!activeTableId) return;
@@ -296,7 +296,8 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
         );
 
         try {
-            await fetch(`/api/data-tables/${activeTableId}/rows/${rowId}`, {
+            const userIdParam = user?.id ? `?user_id=${user.id}` : '';
+            await fetch(`/api/data-tables/${activeTableId}/rows/${rowId}${userIdParam}`, {
                 method: 'DELETE',
             });
         } catch (error) {
@@ -314,7 +315,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
             const response = await fetch(`/api/data-tables/${activeTableId}/columns`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, type }),
+                body: JSON.stringify({ name, type, user_id: user?.id }),
             });
 
             if (response.ok) {
@@ -356,7 +357,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
             await fetch(`/api/data-tables/${activeTableId}/columns/${columnId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updates),
+                body: JSON.stringify({ ...updates, user_id: user?.id }),
             });
         } catch (error) {
             console.error('Error updating column:', error);
@@ -377,7 +378,8 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
         );
 
         try {
-            await fetch(`/api/data-tables/${activeTableId}/columns/${columnId}`, {
+            const userIdParam = user?.id ? `?user_id=${user.id}` : '';
+            await fetch(`/api/data-tables/${activeTableId}/columns/${columnId}${userIdParam}`, {
                 method: 'DELETE',
             });
         } catch (error) {
@@ -388,7 +390,8 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
 
     const handleDeleteTable = async (tableId: string) => {
         try {
-            await fetch(`/api/data-tables/${tableId}`, {
+            const userIdParam = user?.id ? `?user_id=${user.id}` : '';
+            await fetch(`/api/data-tables/${tableId}${userIdParam}`, {
                 method: 'DELETE',
             });
 
@@ -416,7 +419,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
             const response = await fetch(`/api/data-tables/${tableToRename.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: newTableName.trim() }),
+                body: JSON.stringify({ name: newTableName.trim(), user_id: user?.id }),
             });
 
             if (response.ok) {
@@ -448,7 +451,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
             const response = await fetch(`/api/data-tables/${selectedTableForConfig.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ time_tracking: config }),
+                body: JSON.stringify({ time_tracking: config, user_id: user?.id }),
             });
 
             if (response.ok) {
