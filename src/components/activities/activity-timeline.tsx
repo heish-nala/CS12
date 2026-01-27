@@ -22,6 +22,7 @@ import {
     Check,
 } from 'lucide-react';
 import { PersonDetailPanel, PersonInfo } from '@/components/person-detail-panel';
+import { toast } from 'sonner';
 
 interface ActivityTimelineProps {
     clientId: string;
@@ -55,11 +56,12 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
     // Copy state
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
-    const handleCopy = async (e: React.MouseEvent, text: string, id: string) => {
+    const handleCopy = async (e: React.MouseEvent, text: string, id: string, type: 'email' | 'phone') => {
         e.stopPropagation();
         try {
             await navigator.clipboard.writeText(text);
             setCopiedId(id);
+            toast.success(type === 'email' ? 'Email copied' : 'Phone number copied');
             setTimeout(() => setCopiedId(null), 1500);
         } catch (err) {
             console.error('Failed to copy:', err);
@@ -329,7 +331,7 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
                                                 <Mail className="h-3.5 w-3.5 flex-shrink-0" />
                                                 <span className="truncate flex-1">{contact.email}</span>
                                                 <span
-                                                    onClick={(e) => handleCopy(e, contact.email!, `email-${contact.id}`)}
+                                                    onClick={(e) => handleCopy(e, contact.email!, `email-${contact.id}`, 'email')}
                                                     className="opacity-0 group-hover/email:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
                                                 >
                                                     {copiedId === `email-${contact.id}` ? (
@@ -345,7 +347,7 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
                                                 <Phone className="h-3.5 w-3.5 flex-shrink-0" />
                                                 <span className="flex-1">{contact.phone}</span>
                                                 <span
-                                                    onClick={(e) => handleCopy(e, contact.phone!, `phone-${contact.id}`)}
+                                                    onClick={(e) => handleCopy(e, contact.phone!, `phone-${contact.id}`, 'phone')}
                                                     className="opacity-0 group-hover/phone:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
                                                 >
                                                     {copiedId === `phone-${contact.id}` ? (
@@ -392,7 +394,7 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
                                                     <div className="flex items-center gap-2 group/email">
                                                         <span className="truncate">{contact.email}</span>
                                                         <span
-                                                            onClick={(e) => handleCopy(e, contact.email!, `table-email-${contact.id}`)}
+                                                            onClick={(e) => handleCopy(e, contact.email!, `table-email-${contact.id}`, 'email')}
                                                             className="opacity-0 group-hover/email:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
                                                         >
                                                             {copiedId === `table-email-${contact.id}` ? (
@@ -409,7 +411,7 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
                                                     <div className="flex items-center gap-2 group/phone">
                                                         <span>{contact.phone}</span>
                                                         <span
-                                                            onClick={(e) => handleCopy(e, contact.phone!, `table-phone-${contact.id}`)}
+                                                            onClick={(e) => handleCopy(e, contact.phone!, `table-phone-${contact.id}`, 'phone')}
                                                             className="opacity-0 group-hover/phone:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
                                                         >
                                                             {copiedId === `table-phone-${contact.id}` ? (

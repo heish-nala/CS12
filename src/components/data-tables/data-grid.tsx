@@ -51,6 +51,7 @@ import {
 } from 'lucide-react';
 import { ColumnConfigDialog } from './column-config-dialog';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 /**
  * IMPORTANT: Row Data Format
@@ -739,7 +740,11 @@ function EditableCell({
                 <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="text-sm text-blue-600 truncate flex-1">{value}</span>
                 <button
-                    onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(value); }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(value);
+                        toast.success('Email copied');
+                    }}
                     className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
                 >
                     <Copy className="h-3.5 w-3.5" />
@@ -758,7 +763,11 @@ function EditableCell({
                 <Phone className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="text-sm truncate flex-1">{value}</span>
                 <button
-                    onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(value); }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(value);
+                        toast.success('Phone number copied');
+                    }}
                     className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
                 >
                     <Copy className="h-3.5 w-3.5" />
