@@ -1,21 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/db/client';
+import { supabase, supabaseAdmin } from '@/lib/db/client';
 import { DashboardMetrics } from '@/lib/db/types';
 import { calculateRiskLevel, getDaysSinceActivity } from '@/lib/calculations/risk-level';
+import { requireAuth, checkDsoAccess } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
+        // Require authentication
+        const authResult = await requireAuth(request);
+        if (authResult.response) {
+            return authResult.response;
+        }
+        const currentUser = authResult.user;
+
         const searchParams = request.nextUrl.searchParams;
         const dsoId = searchParams.get('dso_id');
 
-        // Fetch doctors with related data
+        // If dso_id is provided, verify user has access
+        if (dsoId) {
+            const { hasAccess } = await checkDsoAccess(currentUser.id, dsoId);
+            if (!hasAccess) {
+                return NextResponse.json(
+                    { error: 'Access denied to this workspace' },
+                    { status: 403 }
+                );
+            }
+        }
+
+        // Get user's accessible DSOs
+        const { data: userAccess } = await supabaseAdmin
+            .from('user_dso_access')
+            .select('dso_id')
+            .eq('user_id', currentUser.id);
+
+        const accessibleDsoIds = userAccess?.map(a => a.dso_id) || [];
+
+        if (accessibleDsoIds.length === 0) {
+            // Return empty metrics if no access
+            const emptyMetrics: DashboardMetrics = {
+                total_doctors: 0,
+                active_doctors: 0,
+                at_risk_count: 0,
+                critical_risk_count: 0,
+                total_cases_this_month: 0,
+                total_courses_this_month: 0,
+                risk_distribution: { low: 0, medium: 0, high: 0, critical: 0 },
+                average_days_in_program: 0,
+                engagement_rate: 0,
+                avg_cases_per_doctor: 0,
+                avg_courses_per_doctor: 0,
+                doctors_needing_attention: 0,
+                recent_activities_count: 0,
+                on_track_count: 0,
+                completion_rate: 0,
+            };
+            return NextResponse.json(emptyMetrics);
+        }
+
+        // Fetch doctors with related data - only from accessible DSOs
         let query = supabase
             .from('doctors')
             .select(`
                 *,
                 period_progress(*),
                 activities(*)
-            `);
+            `)
+            .in('dso_id', accessibleDsoIds);
 
         if (dsoId) {
             query = query.eq('dso_id', dsoId);

@@ -1,21 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
+import { requireAuth } from '@/lib/auth';
 
 // POST: Accept pending invites for the current user
 // Called when a user logs in to check and accept any pending invites
 export async function POST(request: NextRequest) {
     try {
+        // Require authentication
+        const authResult = await requireAuth(request);
+        if (authResult.response) {
+            return authResult.response;
+        }
+        const currentUser = authResult.user;
+
         const body = await request.json();
         const { user_id, email } = body;
 
-        if (!user_id || !email) {
+        // Validate that the request is for the authenticated user
+        if (user_id && user_id !== currentUser.id) {
             return NextResponse.json(
-                { error: 'user_id and email are required' },
-                { status: 400 }
+                { error: 'Cannot accept invites for another user' },
+                { status: 403 }
             );
         }
 
-        const normalizedEmail = email.toLowerCase().trim();
+        // Use authenticated user's info (more secure than trusting body params)
+        const actualUserId = currentUser.id;
+        const normalizedEmail = (email || currentUser.email).toLowerCase().trim();
 
         // Find all pending, non-expired invites for this email
         const { data: pendingInvites, error: fetchError } = await supabaseAdmin
@@ -51,7 +62,7 @@ export async function POST(request: NextRequest) {
                 const { data: existingAccess } = await supabaseAdmin
                     .from('user_dso_access')
                     .select('id')
-                    .eq('user_id', user_id)
+                    .eq('user_id', actualUserId)
                     .eq('dso_id', invite.dso_id)
                     .single();
 
@@ -60,7 +71,7 @@ export async function POST(request: NextRequest) {
                     const { error: accessError } = await supabaseAdmin
                         .from('user_dso_access')
                         .insert({
-                            user_id: user_id,
+                            user_id: actualUserId,
                             dso_id: invite.dso_id,
                             role: invite.role,
                         });

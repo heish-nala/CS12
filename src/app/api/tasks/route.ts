@@ -1,11 +1,86 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
+import { requireAuth, checkDsoAccess } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
+        // Require authentication
+        const authResult = await requireAuth(request);
+        if (authResult.response) {
+            return authResult.response;
+        }
+        const currentUser = authResult.user;
+
         const searchParams = request.nextUrl.searchParams;
         const doctorId = searchParams.get('doctor_id');
         const dsoId = searchParams.get('dso_id');
+
+        // If dso_id is provided, verify user has access
+        if (dsoId) {
+            const { hasAccess } = await checkDsoAccess(currentUser.id, dsoId);
+            if (!hasAccess) {
+                return NextResponse.json(
+                    { error: 'Access denied to this workspace' },
+                    { status: 403 }
+                );
+            }
+        }
+
+        // If doctor_id is provided, verify user has access to the doctor's DSO
+        if (doctorId && !dsoId) {
+            const { data: doctor } = await supabaseAdmin
+                .from('doctors')
+                .select('dso_id')
+                .eq('id', doctorId)
+                .single();
+
+            if (doctor) {
+                const { hasAccess } = await checkDsoAccess(currentUser.id, doctor.dso_id);
+                if (!hasAccess) {
+                    return NextResponse.json(
+                        { error: 'Access denied to this doctor' },
+                        { status: 403 }
+                    );
+                }
+            }
+        }
+
+        // Get user's accessible DSOs to filter results
+        const { data: userAccess } = await supabaseAdmin
+            .from('user_dso_access')
+            .select('dso_id')
+            .eq('user_id', currentUser.id);
+
+        const accessibleDsoIds = userAccess?.map(a => a.dso_id) || [];
+
+        if (accessibleDsoIds.length === 0) {
+            return NextResponse.json({
+                tasks: [],
+                task_groups: [],
+                total: 0,
+            });
+        }
+
+        // Get doctors in accessible DSOs
+        let doctorQuery = supabaseAdmin
+            .from('doctors')
+            .select('id')
+            .in('dso_id', accessibleDsoIds);
+
+        if (dsoId) {
+            doctorQuery = doctorQuery.eq('dso_id', dsoId);
+        }
+
+        const { data: accessibleDoctors } = await doctorQuery;
+        const accessibleDoctorIds = accessibleDoctors?.map(d => d.id) || [];
+
+        if (accessibleDoctorIds.length === 0) {
+            return NextResponse.json({
+                tasks: [],
+                task_groups: [],
+                total: 0,
+            });
+        }
 
         let query = supabaseAdmin
             .from('tasks')
@@ -13,32 +88,12 @@ export async function GET(request: NextRequest) {
                 *,
                 task_groups(*),
                 doctors(id, name)
-            `);
+            `)
+            .in('doctor_id', accessibleDoctorIds);
 
         // Filter by doctor if specified
         if (doctorId) {
             query = query.eq('doctor_id', doctorId);
-        }
-
-        // Filter by DSO if specified
-        if (dsoId) {
-            // Get doctors in this DSO first
-            const { data: dsoDoctors } = await supabaseAdmin
-                .from('doctors')
-                .select('id')
-                .eq('dso_id', dsoId);
-
-            if (dsoDoctors && dsoDoctors.length > 0) {
-                const doctorIds = dsoDoctors.map(d => d.id);
-                query = query.in('doctor_id', doctorIds);
-            } else {
-                // No doctors in this DSO, return empty
-                return NextResponse.json({
-                    tasks: [],
-                    task_groups: [],
-                    total: 0,
-                });
-            }
         }
 
         const { data: tasks, error: tasksError } = await query;
@@ -80,7 +135,33 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
+        // Require authentication
+        const authResult = await requireAuth(request);
+        if (authResult.response) {
+            return authResult.response;
+        }
+        const currentUser = authResult.user;
+
         const body = await request.json();
+
+        // If doctor_id is provided, verify user has write access to the doctor's DSO
+        if (body.doctor_id) {
+            const { data: doctor } = await supabaseAdmin
+                .from('doctors')
+                .select('dso_id')
+                .eq('id', body.doctor_id)
+                .single();
+
+            if (doctor) {
+                const { hasAccess, role } = await checkDsoAccess(currentUser.id, doctor.dso_id);
+                if (!hasAccess || (role !== 'admin' && role !== 'manager')) {
+                    return NextResponse.json(
+                        { error: 'Write access required to create tasks' },
+                        { status: 403 }
+                    );
+                }
+            }
+        }
 
         const { data: task, error } = await supabaseAdmin
             .from('tasks')

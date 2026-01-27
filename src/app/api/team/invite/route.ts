@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
 import { UserRole } from '@/lib/db/types';
+import { requireAuth, checkDsoAccess } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
     try {
+        // Require authentication
+        const authResult = await requireAuth(request);
+        if (authResult.response) {
+            return authResult.response;
+        }
+        const currentUser = authResult.user;
+
         const body = await request.json();
-        const { email, role, dso_id, invited_by, inviter_name } = body;
+        const { email, role, dso_id, inviter_name } = body;
 
         // Validate input
         if (!email) {
@@ -22,10 +30,12 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        if (!invited_by) {
+        // Verify current user has admin access to this DSO
+        const { hasAccess, role: callerRole } = await checkDsoAccess(currentUser.id, dso_id);
+        if (!hasAccess || callerRole !== 'admin') {
             return NextResponse.json(
-                { error: 'Inviter user ID is required' },
-                { status: 400 }
+                { error: 'Admin access required to invite team members' },
+                { status: 403 }
             );
         }
 
@@ -49,6 +59,14 @@ export async function POST(request: NextRequest) {
 
         // Normalize email to lowercase
         const normalizedEmail = email.toLowerCase().trim();
+
+        // Prevent self-invite
+        if (normalizedEmail === currentUser.email.toLowerCase()) {
+            return NextResponse.json(
+                { error: 'You cannot invite yourself' },
+                { status: 400 }
+            );
+        }
 
         // Check if user is already a member
         const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
@@ -137,7 +155,7 @@ export async function POST(request: NextRequest) {
                 email: normalizedEmail,
                 dso_id: dso_id,
                 role: role,
-                invited_by: invited_by,
+                invited_by: currentUser.id,
                 expires_at: expiresAt.toISOString(),
             })
             .select()
@@ -211,6 +229,13 @@ export async function POST(request: NextRequest) {
 // GET endpoint to list pending invites for a DSO
 export async function GET(request: NextRequest) {
     try {
+        // Require authentication
+        const authResult = await requireAuth(request);
+        if (authResult.response) {
+            return authResult.response;
+        }
+        const currentUser = authResult.user;
+
         const { searchParams } = new URL(request.url);
         const dsoId = searchParams.get('dso_id');
 
@@ -218,6 +243,15 @@ export async function GET(request: NextRequest) {
             return NextResponse.json(
                 { error: 'dso_id is required' },
                 { status: 400 }
+            );
+        }
+
+        // Verify current user has admin access to view invites
+        const { hasAccess, role: callerRole } = await checkDsoAccess(currentUser.id, dsoId);
+        if (!hasAccess || callerRole !== 'admin') {
+            return NextResponse.json(
+                { error: 'Admin access required to view pending invites' },
+                { status: 403 }
             );
         }
 
@@ -293,6 +327,13 @@ export async function GET(request: NextRequest) {
 // DELETE endpoint to cancel an invite
 export async function DELETE(request: NextRequest) {
     try {
+        // Require authentication
+        const authResult = await requireAuth(request);
+        if (authResult.response) {
+            return authResult.response;
+        }
+        const currentUser = authResult.user;
+
         const { searchParams } = new URL(request.url);
         const inviteId = searchParams.get('id');
 
@@ -300,6 +341,29 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json(
                 { error: 'Invite ID is required' },
                 { status: 400 }
+            );
+        }
+
+        // Get the invite to check DSO access
+        const { data: invite, error: fetchError } = await supabaseAdmin
+            .from('team_invites')
+            .select('dso_id')
+            .eq('id', inviteId)
+            .single();
+
+        if (fetchError || !invite) {
+            return NextResponse.json(
+                { error: 'Invite not found' },
+                { status: 404 }
+            );
+        }
+
+        // Verify current user has admin access to cancel invites
+        const { hasAccess, role: callerRole } = await checkDsoAccess(currentUser.id, invite.dso_id);
+        if (!hasAccess || callerRole !== 'admin') {
+            return NextResponse.json(
+                { error: 'Admin access required to cancel invites' },
+                { status: 403 }
             );
         }
 

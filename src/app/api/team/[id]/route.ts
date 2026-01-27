@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
 import { UserRole } from '@/lib/db/types';
+import { requireAuth, checkDsoAccess } from '@/lib/auth';
 
 export async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        // Require authentication
+        const authResult = await requireAuth(request);
+        if (authResult.response) {
+            return authResult.response;
+        }
+        const currentUser = authResult.user;
+
         const { id } = await params;
         const body = await request.json();
         const { role } = body;
@@ -31,6 +39,15 @@ export async function PATCH(
             return NextResponse.json(
                 { error: 'Team member not found' },
                 { status: 404 }
+            );
+        }
+
+        // Verify current user has admin access to this DSO
+        const { hasAccess, role: callerRole } = await checkDsoAccess(currentUser.id, member.dso_id);
+        if (!hasAccess || callerRole !== 'admin') {
+            return NextResponse.json(
+                { error: 'Admin access required to manage team members' },
+                { status: 403 }
             );
         }
 
@@ -79,6 +96,13 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        // Require authentication
+        const authResult = await requireAuth(request);
+        if (authResult.response) {
+            return authResult.response;
+        }
+        const currentUser = authResult.user;
+
         const { id } = await params;
 
         // Get the member to check their role
@@ -92,6 +116,15 @@ export async function DELETE(
             return NextResponse.json(
                 { error: 'Team member not found' },
                 { status: 404 }
+            );
+        }
+
+        // Verify current user has admin access to this DSO
+        const { hasAccess, role: callerRole } = await checkDsoAccess(currentUser.id, member.dso_id);
+        if (!hasAccess || callerRole !== 'admin') {
+            return NextResponse.json(
+                { error: 'Admin access required to remove team members' },
+                { status: 403 }
             );
         }
 

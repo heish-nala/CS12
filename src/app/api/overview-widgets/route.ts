@@ -10,9 +10,17 @@ import {
     getChartableColumns,
 } from '@/lib/mock-data';
 import { OverviewMetricCard, OverviewChartWidget } from '@/lib/db/types';
+import { requireAuth, checkDsoAccess } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
+        // Require authentication
+        const authResult = await requireAuth(request);
+        if (authResult.response) {
+            return authResult.response;
+        }
+        const currentUser = authResult.user;
+
         const { searchParams } = new URL(request.url);
         const clientId = searchParams.get('client_id');
 
@@ -20,6 +28,15 @@ export async function GET(request: NextRequest) {
             return NextResponse.json(
                 { error: 'client_id is required' },
                 { status: 400 }
+            );
+        }
+
+        // Verify user has access to this client/DSO
+        const { hasAccess } = await checkDsoAccess(currentUser.id, clientId);
+        if (!hasAccess) {
+            return NextResponse.json(
+                { error: 'Access denied to this workspace' },
+                { status: 403 }
             );
         }
 
@@ -58,6 +75,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
+        // Require authentication
+        const authResult = await requireAuth(request);
+        if (authResult.response) {
+            return authResult.response;
+        }
+        const currentUser = authResult.user;
+
         const body = await request.json();
         const { client_id, type, label, config } = body;
 
@@ -65,6 +89,15 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(
                 { error: 'client_id is required' },
                 { status: 400 }
+            );
+        }
+
+        // Verify user has write access to this client/DSO
+        const { hasAccess, role } = await checkDsoAccess(currentUser.id, client_id);
+        if (!hasAccess || (role !== 'admin' && role !== 'manager')) {
+            return NextResponse.json(
+                { error: 'Write access required to create widgets' },
+                { status: 403 }
             );
         }
 
