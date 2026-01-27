@@ -612,6 +612,7 @@ function EditableCell({
 }) {
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(value?.toString() || '');
+    const [copied, setCopied] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -744,10 +745,16 @@ function EditableCell({
                         e.stopPropagation();
                         navigator.clipboard.writeText(value);
                         toast.success('Email copied');
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 1500);
                     }}
                     className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
                 >
-                    <Copy className="h-3.5 w-3.5" />
+                    {copied ? (
+                        <Check className="h-3.5 w-3.5 text-green-500" />
+                    ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                    )}
                 </button>
             </div>
         );
@@ -767,10 +774,16 @@ function EditableCell({
                         e.stopPropagation();
                         navigator.clipboard.writeText(value);
                         toast.success('Phone number copied');
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 1500);
                     }}
                     className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
                 >
-                    <Copy className="h-3.5 w-3.5" />
+                    {copied ? (
+                        <Check className="h-3.5 w-3.5 text-green-500" />
+                    ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                    )}
                 </button>
             </div>
         );
