@@ -225,7 +225,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
             const response = await fetch(`/api/data-tables/${activeTableId}/rows`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ data: {} }),
+                body: JSON.stringify({ data: {}, user_id: user?.id }),
             });
 
             if (response.ok) {
@@ -541,6 +541,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
                 body: JSON.stringify({
                     client_id: clientId,
                     type: 'attendee_list',
+                    user_id: user?.id,
                 }),
             });
 

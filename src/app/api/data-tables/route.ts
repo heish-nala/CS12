@@ -105,7 +105,7 @@ const ATTENDEE_LIST_COLUMNS = [
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { client_id, name, template_id, type } = body;
+        const { client_id, name, template_id, type, user_id: bodyUserId } = body;
 
         if (!client_id) {
             return NextResponse.json(
@@ -123,10 +123,25 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Require write access to the client/DSO
-        const accessResult = await requireDsoAccess(request, client_id, true);
+        // Require write access to the client/DSO (with user_id body fallback)
+        const accessResult = await requireDsoAccessWithFallback(request, client_id, true);
         if ('response' in accessResult) {
-            return accessResult.response;
+            // If no session and no user_id param, try body user_id
+            if (bodyUserId) {
+                // Verify user has access via body user_id
+                const { data: access } = await supabaseAdmin
+                    .from('user_dso_access')
+                    .select('role')
+                    .eq('user_id', bodyUserId)
+                    .eq('dso_id', client_id)
+                    .single();
+
+                if (!access || (access.role !== 'admin' && access.role !== 'manager')) {
+                    return accessResult.response;
+                }
+            } else {
+                return accessResult.response;
+            }
         }
 
         // Get template if provided

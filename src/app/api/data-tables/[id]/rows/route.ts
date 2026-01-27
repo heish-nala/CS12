@@ -55,7 +55,7 @@ export async function POST(
     try {
         const { id } = await params;
         const body = await request.json();
-        const { data } = body;
+        const { data, user_id: bodyUserId } = body;
 
         // Verify table exists and get client_id
         const { data: table, error: tableError } = await supabaseAdmin
@@ -71,10 +71,25 @@ export async function POST(
             );
         }
 
-        // Require write access to the client/DSO
-        const accessResult = await requireDsoAccess(request, table.client_id, true);
+        // Require write access to the client/DSO (with user_id body fallback)
+        const accessResult = await requireDsoAccessWithFallback(request, table.client_id, true);
         if ('response' in accessResult) {
-            return accessResult.response;
+            // If no session and no user_id param, try body user_id
+            if (bodyUserId) {
+                // Verify user has access via body user_id
+                const { data: access } = await supabaseAdmin
+                    .from('user_dso_access')
+                    .select('role')
+                    .eq('user_id', bodyUserId)
+                    .eq('dso_id', table.client_id)
+                    .single();
+
+                if (!access || (access.role !== 'admin' && access.role !== 'manager')) {
+                    return accessResult.response;
+                }
+            } else {
+                return accessResult.response;
+            }
         }
 
         // Create row
