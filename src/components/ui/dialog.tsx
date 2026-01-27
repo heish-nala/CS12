@@ -63,7 +63,7 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           "fixed top-[50%] left-[50%] z-50 w-full max-w-lg translate-x-[-50%] translate-y-[-50%]",
-          "bg-popover text-popover-foreground rounded-[3px] border border-border shadow-lg",
+          "bg-popover text-popover-foreground rounded-xl border border-border/50 shadow-xl",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           "data-[state=closed]:zoom-out-[0.98] data-[state=open]:zoom-in-[0.98]",
@@ -76,7 +76,7 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="absolute top-3 right-3 p-1 rounded-[3px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors duration-100"
+            className="absolute top-3 right-3 p-1.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors duration-100"
           >
             <XIcon className="size-4" />
             <span className="sr-only">Close</span>

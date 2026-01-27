@@ -49,6 +49,6 @@ beforeEach(() => {
 
 test('Page renders homepage with correct heading', () => {
     render(<Page />)
-    expect(screen.getByText('Home')).toBeDefined()
-    expect(screen.getByText('Welcome to your customer success workspace')).toBeDefined()
+    expect(screen.getByText('Dashboard')).toBeDefined()
+    expect(screen.getByText('Customer Success')).toBeDefined()
 })

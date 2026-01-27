@@ -1,14 +1,24 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Client } from '@/lib/db/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, TrendingUp, AlertTriangle, ArrowRight, Plus, Settings2, BarChart3, FolderOpen } from 'lucide-react';
+import {
+    Users,
+    TrendingUp,
+    AlertTriangle,
+    ArrowUpRight,
+    Plus,
+    Settings2,
+    Building2,
+    Activity,
+    ChevronRight,
+} from 'lucide-react';
 import { CardConfigDialog, MetricConfig, DEFAULT_METRICS } from './card-config-dialog';
 import { CreateClientDialog } from './create-client-dialog';
 import { useAuth } from '@/contexts/auth-context';
+import { SparkChart, generateTrendData } from '@/components/ui/spark-chart';
 
 interface ClientMetrics {
     client_id: string;
@@ -23,6 +33,262 @@ interface ClientMetrics {
 
 interface ClientWithMetrics extends Client {
     metrics: ClientMetrics;
+}
+
+// Summary stat card component
+function StatCard({
+    label,
+    value,
+    trend,
+    icon: Icon,
+    trendData,
+}: {
+    label: string;
+    value: string | number;
+    trend?: { value: number; label: string };
+    icon: React.ElementType;
+    trendData?: number[];
+}) {
+    const isPositive = trend && trend.value >= 0;
+
+    return (
+        <div className="flex items-center gap-4 p-4 rounded-xl bg-card border border-border/50 shadow-sm hover:shadow-md hover:border-border transition-all duration-200">
+            <div className="flex-shrink-0 p-2.5 rounded-lg bg-primary/10">
+                <Icon className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="text-sm text-muted-foreground truncate">{label}</p>
+                <div className="flex items-baseline gap-2">
+                    <p className="text-2xl font-semibold text-foreground tabular-nums">{value}</p>
+                    {trend && (
+                        <span className={`text-xs font-medium ${isPositive ? 'text-emerald-600' : 'text-red-500'}`}>
+                            {isPositive ? '+' : ''}{trend.value}% {trend.label}
+                        </span>
+                    )}
+                </div>
+            </div>
+            {trendData && (
+                <div className="flex-shrink-0">
+                    <SparkChart data={trendData} width={64} height={24} />
+                </div>
+            )}
+        </div>
+    );
+}
+
+// Client card component
+function ClientCard({
+    client,
+    metrics,
+    onClick,
+}: {
+    client: ClientWithMetrics;
+    metrics: MetricConfig[];
+    onClick: () => void;
+}) {
+    const enabledMetrics = metrics.filter(m => m.enabled).sort((a, b) => a.order - b.order);
+
+    const getMetricDisplay = (metricId: string) => {
+        switch (metricId) {
+            case 'total_doctors':
+                return {
+                    label: 'Doctors',
+                    value: client.metrics.total_doctors,
+                    sub: `${client.metrics.active_doctors} active`,
+                    trendData: generateTrendData(client.metrics.total_doctors, 0.1),
+                };
+            case 'active_doctors':
+                return {
+                    label: 'Active',
+                    value: client.metrics.active_doctors,
+                    sub: `of ${client.metrics.total_doctors}`,
+                    trendData: generateTrendData(client.metrics.active_doctors, 0.15),
+                };
+            case 'engagement_rate':
+                return {
+                    label: 'Engagement',
+                    value: `${client.metrics.engagement_rate}%`,
+                    sub: 'Last 7 days',
+                    trendData: generateTrendData(client.metrics.engagement_rate, 0.12),
+                };
+            case 'at_risk_count':
+                return client.metrics.at_risk_count > 0 ? {
+                    label: 'At Risk',
+                    value: client.metrics.at_risk_count,
+                    sub: 'Need attention',
+                    isWarning: true,
+                } : null;
+            case 'total_cases':
+                return {
+                    label: 'Cases',
+                    value: client.metrics.total_cases,
+                    trendData: generateTrendData(client.metrics.total_cases, 0.2),
+                };
+            case 'avg_course_progress':
+                return {
+                    label: 'Progress',
+                    value: `${client.metrics.avg_course_progress}%`,
+                    trendData: generateTrendData(client.metrics.avg_course_progress, 0.1),
+                };
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <div
+            onClick={onClick}
+            className="group relative p-5 rounded-xl bg-card border border-border/50 shadow-sm hover:shadow-lg hover:border-primary/20 transition-all duration-200 cursor-pointer"
+        >
+            {/* Header */}
+            <div className="flex items-start justify-between mb-4">
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-foreground truncate">{client.name}</h3>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    {client.industry && (
+                        <p className="text-sm text-muted-foreground mt-0.5">{client.industry}</p>
+                    )}
+                </div>
+                {client.metrics.at_risk_count > 0 && (
+                    <div className="flex-shrink-0 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/20">
+                        <span className="text-xs font-medium text-amber-600">
+                            {client.metrics.at_risk_count} at risk
+                        </span>
+                    </div>
+                )}
+            </div>
+
+            {/* Metrics Grid */}
+            <div className="grid grid-cols-2 gap-3">
+                {enabledMetrics.slice(0, 4).map(metric => {
+                    const display = getMetricDisplay(metric.id);
+                    if (!display) return null;
+
+                    return (
+                        <div key={metric.id} className="space-y-1">
+                            <p className="text-xs text-muted-foreground">{display.label}</p>
+                            <div className="flex items-center justify-between">
+                                <span className={`text-lg font-semibold tabular-nums ${display.isWarning ? 'text-amber-600' : 'text-foreground'}`}>
+                                    {display.value}
+                                </span>
+                                {display.trendData && (
+                                    <SparkChart data={display.trendData} width={48} height={18} />
+                                )}
+                            </div>
+                            {display.sub && (
+                                <p className="text-xs text-muted-foreground">{display.sub}</p>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Footer */}
+            {client.contact_name && (
+                <div className="mt-4 pt-3 border-t border-border/50">
+                    <p className="text-xs text-muted-foreground">
+                        Contact: <span className="text-foreground">{client.contact_name}</span>
+                    </p>
+                </div>
+            )}
+
+            {/* Hover indicator */}
+            <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-primary/0 via-primary to-primary/0 opacity-0 group-hover:opacity-100 transition-opacity rounded-b-xl" />
+        </div>
+    );
+}
+
+// Empty state component
+function EmptyState({ onCreateClient }: { onCreateClient: () => void }) {
+    return (
+        <div className="relative overflow-hidden rounded-2xl border border-dashed border-border/70 bg-gradient-to-br from-muted/20 to-muted/5">
+            <div className="relative flex flex-col items-center justify-center py-16 px-6">
+                <div className="p-4 rounded-2xl bg-primary/10 mb-4">
+                    <Building2 className="w-8 h-8 text-primary" />
+                </div>
+
+                <h3 className="text-lg font-semibold mb-2 text-foreground">No clients yet</h3>
+                <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
+                    Start managing your customer success by adding your first client.
+                    Track their doctors, monitor engagement, and ensure successful onboarding.
+                </p>
+
+                <Button onClick={onCreateClient} className="shadow-sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Your First Client
+                </Button>
+
+                {/* Feature highlights */}
+                <div className="mt-12 w-full max-w-2xl">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-4 text-center">
+                        What you can track
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                        {[
+                            { icon: Users, title: 'Doctor Metrics', desc: 'Track engagement and activity' },
+                            { icon: Activity, title: 'Performance', desc: 'Cases and course progress' },
+                            { icon: AlertTriangle, title: 'Risk Alerts', desc: 'Identify at-risk doctors' },
+                        ].map((feature) => (
+                            <div
+                                key={feature.title}
+                                className="flex flex-col items-center gap-2 p-4 rounded-xl bg-card border border-border/50 text-center"
+                            >
+                                <feature.icon className="w-5 h-5 text-primary" />
+                                <div>
+                                    <p className="font-medium text-sm">{feature.title}</p>
+                                    <p className="text-xs text-muted-foreground">{feature.desc}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// Loading skeleton
+function LoadingSkeleton() {
+    return (
+        <div className="space-y-6">
+            {/* Stats skeleton */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {[...Array(4)].map((_, i) => (
+                    <div key={i} className="p-4 rounded-xl bg-card border border-border/50">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-muted animate-pulse" />
+                            <div className="flex-1 space-y-2">
+                                <div className="h-3 w-20 bg-muted animate-pulse rounded" />
+                                <div className="h-6 w-16 bg-muted animate-pulse rounded" />
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Cards skeleton */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {[...Array(3)].map((_, i) => (
+                    <div key={i} className="p-5 rounded-xl bg-card border border-border/50">
+                        <div className="space-y-4">
+                            <div className="h-5 w-32 bg-muted animate-pulse rounded" />
+                            <div className="h-3 w-24 bg-muted/60 animate-pulse rounded" />
+                            <div className="grid grid-cols-2 gap-3">
+                                {[...Array(4)].map((_, j) => (
+                                    <div key={j} className="space-y-2">
+                                        <div className="h-3 w-16 bg-muted/60 animate-pulse rounded" />
+                                        <div className="h-5 w-12 bg-muted animate-pulse rounded" />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
 }
 
 export function ClientsOverview() {
@@ -61,95 +327,6 @@ export function ClientsOverview() {
         }
     };
 
-    const renderMetric = (metricId: string, client: ClientWithMetrics) => {
-        switch (metricId) {
-            case 'total_doctors':
-                return (
-                    <div key={metricId}>
-                        <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground mb-1">
-                            <Users className="h-3 w-3" />
-                            Doctors
-                        </div>
-                        <div className="text-[20px] font-semibold text-foreground">
-                            {client.metrics.total_doctors}
-                        </div>
-                        <div className="text-[11px] text-muted-foreground">
-                            {client.metrics.active_doctors} active
-                        </div>
-                    </div>
-                );
-            case 'active_doctors':
-                return (
-                    <div key={metricId}>
-                        <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground mb-1">
-                            <Users className="h-3 w-3" />
-                            Active
-                        </div>
-                        <div className="text-[20px] font-semibold text-foreground">
-                            {client.metrics.active_doctors}
-                        </div>
-                        <div className="text-[11px] text-muted-foreground">
-                            of {client.metrics.total_doctors} total
-                        </div>
-                    </div>
-                );
-            case 'engagement_rate':
-                return (
-                    <div key={metricId}>
-                        <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground mb-1">
-                            <TrendingUp className="h-3 w-3" />
-                            Engagement
-                        </div>
-                        <div className="text-[20px] font-semibold text-foreground">
-                            {client.metrics.engagement_rate}%
-                        </div>
-                        <div className="text-[11px] text-muted-foreground">
-                            Last 7 days
-                        </div>
-                    </div>
-                );
-            case 'at_risk_count':
-                return client.metrics.at_risk_count > 0 ? (
-                    <div key={metricId}>
-                        <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground mb-1">
-                            <AlertTriangle className="h-3 w-3" />
-                            At Risk
-                        </div>
-                        <div className="text-[20px] font-semibold text-[var(--notion-orange-text)]">
-                            {client.metrics.at_risk_count}
-                        </div>
-                        <div className="text-[11px] text-muted-foreground">
-                            Need attention
-                        </div>
-                    </div>
-                ) : null;
-            case 'total_cases':
-                return (
-                    <div key={metricId}>
-                        <div className="text-[12px] text-muted-foreground mb-1">
-                            Total Cases
-                        </div>
-                        <div className="text-[20px] font-semibold text-foreground">
-                            {client.metrics.total_cases}
-                        </div>
-                    </div>
-                );
-            case 'avg_course_progress':
-                return (
-                    <div key={metricId}>
-                        <div className="text-[12px] text-muted-foreground mb-1">
-                            Avg Progress
-                        </div>
-                        <div className="text-[20px] font-semibold text-foreground">
-                            {client.metrics.avg_course_progress}%
-                        </div>
-                    </div>
-                );
-            default:
-                return null;
-        }
-    };
-
     const fetchClients = async () => {
         if (!user?.id) {
             setLoading(false);
@@ -166,147 +343,110 @@ export function ClientsOverview() {
         }
     };
 
+    // Calculate summary stats
+    const summaryStats = useMemo(() => {
+        const totalDoctors = clients.reduce((sum, c) => sum + c.metrics.total_doctors, 0);
+        const activeDoctors = clients.reduce((sum, c) => sum + c.metrics.active_doctors, 0);
+        const atRisk = clients.reduce((sum, c) => sum + c.metrics.at_risk_count, 0);
+        const avgEngagement = clients.length > 0
+            ? Math.round(clients.reduce((sum, c) => sum + c.metrics.engagement_rate, 0) / clients.length)
+            : 0;
+
+        return { totalDoctors, activeDoctors, atRisk, avgEngagement, clientCount: clients.length };
+    }, [clients]);
+
     if (loading) {
-        return (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {[...Array(3)].map((_, i) => (
-                    <Card key={i} className="h-56">
-                        <CardHeader>
-                            <div className="h-5 w-32 bg-muted animate-pulse rounded-[3px]" />
-                            <div className="h-3 w-24 bg-muted/60 animate-pulse rounded-[3px]" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-2">
-                                <div className="h-3 w-full bg-muted animate-pulse rounded-[3px]" />
-                                <div className="h-3 w-3/4 bg-muted/60 animate-pulse rounded-[3px]" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-        );
+        return <LoadingSkeleton />;
     }
 
     return (
         <div className="space-y-6">
-            <div className="flex items-start justify-between">
+            {/* Summary Stats Bar */}
+            {clients.length > 0 && (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <StatCard
+                        label="Total Clients"
+                        value={summaryStats.clientCount}
+                        icon={Building2}
+                        trendData={generateTrendData(summaryStats.clientCount, 0.1)}
+                    />
+                    <StatCard
+                        label="Total Doctors"
+                        value={summaryStats.totalDoctors}
+                        trend={{ value: 12, label: 'this month' }}
+                        icon={Users}
+                        trendData={generateTrendData(summaryStats.totalDoctors, 0.15)}
+                    />
+                    <StatCard
+                        label="Avg Engagement"
+                        value={`${summaryStats.avgEngagement}%`}
+                        trend={{ value: 5, label: 'vs last week' }}
+                        icon={TrendingUp}
+                        trendData={generateTrendData(summaryStats.avgEngagement, 0.12)}
+                    />
+                    <StatCard
+                        label="At Risk"
+                        value={summaryStats.atRisk}
+                        icon={AlertTriangle}
+                        trendData={generateTrendData(summaryStats.atRisk, 0.2)}
+                    />
+                </div>
+            )}
+
+            {/* Section Header */}
+            <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-[20px] font-semibold text-foreground mb-0.5">
-                        Your Clients
+                    <h2 className="text-lg font-semibold text-foreground">
+                        {clients.length > 0 ? 'Your Clients' : 'Get Started'}
                     </h2>
-                    <p className="text-[14px] text-muted-foreground">
-                        Manage and monitor customer success across all clients
+                    <p className="text-sm text-muted-foreground">
+                        {clients.length > 0
+                            ? `Managing ${clients.length} client${clients.length !== 1 ? 's' : ''}`
+                            : 'Add your first client to begin tracking'}
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => setConfigDialogOpen(true)}>
-                        <Settings2 className="h-4 w-4" />
-                        <span>Customize</span>
-                    </Button>
-                    <Button size="sm" onClick={() => setCreateClientOpen(true)}>
-                        <Plus className="h-4 w-4" />
-                        <span>New Client</span>
-                    </Button>
-                </div>
+                {clients.length > 0 && (
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setConfigDialogOpen(true)}
+                            className="text-muted-foreground hover:text-foreground"
+                        >
+                            <Settings2 className="w-4 h-4 mr-1.5" />
+                            Customize
+                        </Button>
+                        <Button size="sm" onClick={() => setCreateClientOpen(true)} className="shadow-sm">
+                            <Plus className="w-4 h-4 mr-1.5" />
+                            New Client
+                        </Button>
+                    </div>
+                )}
             </div>
 
+            {/* Content */}
             {clients.length === 0 ? (
-                <Card className="border-dashed">
-                    <CardContent className="flex flex-col items-center justify-center py-16 px-6">
-                        <div className="rounded-[3px] bg-muted p-5 mb-4">
-                            <FolderOpen className="h-10 w-10 text-muted-foreground" />
-                        </div>
-
-                        <h3 className="text-[16px] font-semibold mb-1.5 text-foreground">No clients yet</h3>
-                        <p className="text-[14px] text-muted-foreground text-center max-w-md mb-6">
-                            Start managing your customer success by adding your first client organization.
-                            Track their doctors, monitor engagement, and ensure successful onboarding.
-                        </p>
-
-                        <Button size="sm" onClick={() => setCreateClientOpen(true)}>
-                            <Plus className="h-4 w-4" />
-                            <span>Add Your First Client</span>
-                        </Button>
-
-                        {/* Quick Overview */}
-                        <div className="mt-12 w-full max-w-2xl">
-                            <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-3">
-                                What you can track for each client:
-                            </div>
-                            <div className="grid gap-3 sm:grid-cols-3">
-                                <div className="flex flex-col items-start gap-1.5 p-3 rounded-[3px] bg-muted/50 border border-border">
-                                    <Users className="h-4 w-4 text-[var(--notion-blue-text)]" />
-                                    <div className="font-medium text-[13px]">Doctor Metrics</div>
-                                    <p className="text-[12px] text-muted-foreground leading-snug">
-                                        Total doctors, active users, and engagement rates
-                                    </p>
-                                </div>
-                                <div className="flex flex-col items-start gap-1.5 p-3 rounded-[3px] bg-muted/50 border border-border">
-                                    <BarChart3 className="h-4 w-4 text-[var(--notion-green-text)]" />
-                                    <div className="font-medium text-[13px]">Performance</div>
-                                    <p className="text-[12px] text-muted-foreground leading-snug">
-                                        Cases submitted and course completion progress
-                                    </p>
-                                </div>
-                                <div className="flex flex-col items-start gap-1.5 p-3 rounded-[3px] bg-muted/50 border border-border">
-                                    <AlertTriangle className="h-4 w-4 text-[var(--notion-orange-text)]" />
-                                    <div className="font-medium text-[13px]">Risk Tracking</div>
-                                    <p className="text-[12px] text-muted-foreground leading-snug">
-                                        Identify and manage at-risk doctors
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                <EmptyState onCreateClient={() => setCreateClientOpen(true)} />
             ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {clients.map((client) => (
-                        <Card
+                        <ClientCard
                             key={client.id}
-                            className="group hover:border-foreground/20 transition-colors duration-100 cursor-pointer"
+                            client={client}
+                            metrics={metrics}
                             onClick={() => router.push(`/clients/${client.id}`)}
-                        >
-                            <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center justify-between text-[15px]">
-                                    <span>{client.name}</span>
-                                    <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-100" />
-                                </CardTitle>
-                                {client.industry && (
-                                    <CardDescription className="text-[13px]">{client.industry}</CardDescription>
-                                )}
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                                {/* Dynamic Metrics */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    {metrics
-                                        .filter(m => m.enabled)
-                                        .sort((a, b) => a.order - b.order)
-                                        .map(metric => renderMetric(metric.id, client))
-                                        .filter(Boolean)}
-                                </div>
-
-                                {/* Contact Info */}
-                                {client.contact_name && (
-                                    <div className="pt-3 border-t border-border text-[12px] text-muted-foreground">
-                                        Contact: {client.contact_name}
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
+                        />
                     ))}
                 </div>
             )}
 
-            {/* Card Configuration Dialog */}
+            {/* Dialogs */}
             <CardConfigDialog
                 open={configDialogOpen}
                 onOpenChange={setConfigDialogOpen}
                 metrics={metrics}
                 onSave={saveMetricsConfig}
             />
-
-            {/* Create Client Dialog */}
             <CreateClientDialog
                 open={createClientOpen}
                 onOpenChange={setCreateClientOpen}

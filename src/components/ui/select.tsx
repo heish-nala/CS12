@@ -37,7 +37,7 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        "flex w-fit items-center justify-between gap-2 rounded-[3px] border border-border bg-transparent px-3 py-1.5 text-sm whitespace-nowrap transition-colors duration-100",
+        "flex w-fit items-center justify-between gap-2 rounded-lg border border-border bg-transparent px-3 py-1.5 text-sm whitespace-nowrap transition-colors duration-100",
         "data-[placeholder]:text-muted-foreground",
         "hover:border-foreground/20",
         "focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20",
@@ -68,7 +68,7 @@ function SelectContent({
       <SelectPrimitive.Content
         data-slot="select-content"
         className={cn(
-          "relative z-50 max-h-[300px] min-w-[8rem] overflow-hidden rounded-[3px] border border-border bg-popover text-popover-foreground shadow-md",
+          "relative z-50 max-h-[300px] min-w-[8rem] overflow-hidden rounded-xl border border-border/50 bg-popover text-popover-foreground shadow-lg",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           "data-[state=closed]:zoom-out-[0.98] data-[state=open]:zoom-in-[0.98]",
@@ -117,7 +117,7 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "relative flex w-full cursor-default items-center gap-2 rounded-[3px] py-1.5 pr-8 pl-2 text-sm outline-none select-none transition-colors duration-75",
+        "relative flex w-full cursor-default items-center gap-2 rounded-lg py-1.5 pr-8 pl-2 text-sm outline-none select-none transition-colors duration-75",
         "focus:bg-accent focus:text-accent-foreground",
         "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",

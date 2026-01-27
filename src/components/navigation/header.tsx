@@ -9,7 +9,7 @@ export function Header() {
                 <nav className="flex items-center justify-between">
                     <div className="flex items-center gap-6">
                         <Link href="/" className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-[3px] bg-primary flex items-center justify-center text-primary-foreground text-[12px] font-semibold">
+                            <div className="w-6 h-6 rounded-lg bg-primary flex items-center justify-center text-primary-foreground text-[12px] font-semibold">
                                 C
                             </div>
                             <span className="font-semibold text-[15px] text-foreground">CS12</span>
@@ -17,7 +17,7 @@ export function Header() {
                         <div className="flex items-center gap-1">
                             <Link
                                 href="/"
-                                className="px-3 py-1.5 text-[14px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground rounded-[3px] transition-colors duration-75"
+                                className="px-3 py-1.5 text-[14px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg transition-colors duration-75"
                             >
                                 Clients
                             </Link>

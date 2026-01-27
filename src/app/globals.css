@@ -44,12 +44,19 @@
 }
 
 :root {
-  /* Notion Typography */
+  /* Typography - Modern Inter-style */
   --font-notion: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
   --font-notion-mono: "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace;
 
-  /* Notion Radius - very subtle */
-  --radius: 3px;
+  /* Modern Radius */
+  --radius: 8px;
+
+  /* Status colors */
+  --color-emerald-500: rgb(16, 185, 129);
+  --color-emerald-600: rgb(5, 150, 105);
+  --color-red-500: rgb(239, 68, 68);
+  --color-amber-500: rgb(245, 158, 11);
+  --color-amber-600: rgb(217, 119, 6);
 
   /* ===== NOTION LIGHT MODE ===== */
   /* Primary text and backgrounds */
@@ -322,7 +329,7 @@
 
   /* Notion clickable item */
   .notion-clickable {
-    @apply cursor-pointer transition-all duration-75 rounded-[3px];
+    @apply cursor-pointer transition-all duration-75 rounded-lg;
   }
 
   .notion-clickable:hover {
@@ -340,7 +347,7 @@
 
   /* Notion inline code */
   .notion-code {
-    @apply font-mono text-[85%] px-[0.4em] py-[0.2em] rounded-[3px] bg-secondary;
+    @apply font-mono text-[85%] px-[0.4em] py-[0.2em] rounded-md bg-secondary;
   }
 
   /* Notion divider */
@@ -350,7 +357,7 @@
 
   /* Notion tag/badge styles */
   .notion-tag {
-    @apply inline-flex items-center px-[6px] py-[2px] rounded-[3px] text-[12px] font-normal;
+    @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium;
   }
 
   .notion-tag-default { background: var(--notion-default); color: var(--notion-default-text); }
