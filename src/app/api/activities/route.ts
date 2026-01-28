@@ -23,6 +23,9 @@ export async function GET(request: NextRequest) {
             .limit(limit);
 
         // Filter by client_id if provided (required for proper scoping)
+        let useClientIdFilter = false;
+        let clientDoctorIds: string[] = [];
+
         if (clientId) {
             // Verify user has access to this client
             const { hasAccess } = await checkDsoAccess(authResult.userId, clientId);
@@ -33,23 +36,14 @@ export async function GET(request: NextRequest) {
                 );
             }
 
-            // Get activities that either:
-            // 1. Have matching client_id, OR
-            // 2. Have a doctor_id that belongs to this client (legacy support)
+            // Get doctors that belong to this client (for legacy activity lookup)
             const { data: clientDoctors } = await supabaseAdmin
                 .from('doctors')
                 .select('id')
                 .eq('dso_id', clientId);
 
-            const doctorIds = clientDoctors?.map(d => d.id) || [];
-
-            if (doctorIds.length > 0) {
-                // Include activities with matching client_id OR doctor from this client
-                query = query.or(`client_id.eq.${clientId},doctor_id.in.(${doctorIds.join(',')})`);
-            } else {
-                // No doctors, just filter by client_id
-                query = query.eq('client_id', clientId);
-            }
+            clientDoctorIds = clientDoctors?.map(d => d.id) || [];
+            useClientIdFilter = true;
         }
 
         if (doctorId) {
@@ -61,7 +55,48 @@ export async function GET(request: NextRequest) {
             query = query.eq('contact_name', contactName);
         }
 
-        const { data: activities, error } = await query;
+        let activities;
+        let error;
+
+        if (useClientIdFilter && clientDoctorIds.length > 0) {
+            // Try with client_id filter first (includes client_id OR doctor_id match)
+            const result = await supabaseAdmin
+                .from('activities')
+                .select('*')
+                .or(`client_id.eq.${clientId},doctor_id.in.(${clientDoctorIds.join(',')})`)
+                .order('created_at', { ascending: false })
+                .limit(limit);
+
+            // If client_id column doesn't exist, fall back to doctor_id only
+            if (result.error?.message?.includes('client_id')) {
+                const fallback = await supabaseAdmin
+                    .from('activities')
+                    .select('*')
+                    .in('doctor_id', clientDoctorIds)
+                    .order('created_at', { ascending: false })
+                    .limit(limit);
+                activities = fallback.data;
+                error = fallback.error;
+            } else {
+                activities = result.data;
+                error = result.error;
+            }
+        } else if (useClientIdFilter) {
+            // No doctors, try client_id only with fallback
+            const result = await query;
+            if (result.error?.message?.includes('client_id')) {
+                // No client_id column and no doctors - return empty
+                activities = [];
+                error = null;
+            } else {
+                activities = result.data;
+                error = result.error;
+            }
+        } else {
+            const result = await query;
+            activities = result.data;
+            error = result.error;
+        }
 
         if (error) throw error;
 
@@ -126,21 +161,38 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        // Build insert object, only including fields that have values
+        const insertData: Record<string, any> = {
+            activity_type,
+            description,
+            created_by: createdBy,
+        };
+
+        // Only include optional fields if they have values
+        if (outcome) insertData.outcome = outcome;
+        if (contact_name) insertData.contact_name = contact_name;
+        if (contact_email) insertData.contact_email = contact_email;
+        if (contact_phone) insertData.contact_phone = contact_phone;
+        if (doctor_id) insertData.doctor_id = doctor_id;
+        if (client_id) insertData.client_id = client_id;
+
         const { data, error } = await supabaseAdmin
             .from('activities')
-            .insert({
-                activity_type,
-                description,
-                outcome,
-                contact_name,
-                contact_email,
-                contact_phone,
-                client_id,
-                doctor_id,
-                created_by: createdBy,
-            })
+            .insert(insertData)
             .select()
             .single();
+
+        // If client_id column doesn't exist yet, retry without it
+        if (error?.message?.includes('client_id')) {
+            delete insertData.client_id;
+            const { data: retryData, error: retryError } = await supabaseAdmin
+                .from('activities')
+                .insert(insertData)
+                .select()
+                .single();
+            if (retryError) throw retryError;
+            return NextResponse.json(retryData, { status: 201 });
+        }
 
         if (error) throw error;
 
