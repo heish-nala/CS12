@@ -111,7 +111,12 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
 
     const fetchActivities = async (): Promise<Activity[]> => {
         try {
-            const response = await fetch('/api/activities');
+            const params = new URLSearchParams();
+            params.set('client_id', clientId);
+            if (user?.id) {
+                params.set('user_id', user.id);
+            }
+            const response = await fetch(`/api/activities?${params}`);
             if (response.ok) {
                 const data = await response.json();
                 return data.activities || [];

@@ -66,7 +66,8 @@ export interface PeriodProgress {
 
 export interface Activity {
     id: string;
-    doctor_id: string;
+    client_id?: string;
+    doctor_id?: string;
     activity_type: ActivityType;
     description: string;
     outcome?: 'positive' | 'neutral' | 'negative' | 'follow_up_needed';

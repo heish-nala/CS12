@@ -209,6 +209,7 @@ export function ActivityLoggingDialog({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    client_id: clientId,
                     activity_type: activityType,
                     description: notes.trim(),
                     outcome,

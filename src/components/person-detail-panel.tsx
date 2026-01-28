@@ -95,6 +95,7 @@ export function PersonDetailPanel({
         setLoading(true);
         try {
             const params = new URLSearchParams();
+            params.set('client_id', clientId);
             if (person.source === 'doctor') {
                 params.set('doctor_id', person.id);
             } else {
@@ -115,7 +116,7 @@ export function PersonDetailPanel({
         } finally {
             setLoading(false);
         }
-    }, [person]);
+    }, [person, clientId]);
 
     useEffect(() => {
         if (open && person) {
@@ -137,6 +138,7 @@ export function PersonDetailPanel({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    client_id: clientId,
                     doctor_id: person.source === 'doctor' ? person.id : null,
                     activity_type: activityType,
                     description: notes || `${activityTypeConfig[activityType].label} with ${person.name}`,
