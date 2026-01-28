@@ -84,9 +84,19 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
 
             // Merge activity data into contacts
             const contactsWithActivity = contactsData.map(contact => {
-                const contactActivities = activitiesData.filter(
-                    a => a.contact_name === contact.name
-                );
+                // Extract doctor ID if this is a doctor contact
+                const doctorId = contact.id.startsWith('doctor-')
+                    ? contact.id.replace('doctor-', '')
+                    : null;
+
+                const contactActivities = activitiesData.filter(a => {
+                    // Match by contact_name
+                    if (a.contact_name && a.contact_name === contact.name) return true;
+                    // Match by doctor_id for doctor contacts
+                    if (doctorId && a.doctor_id === doctorId) return true;
+                    return false;
+                });
+
                 const lastActivity = contactActivities.length > 0
                     ? contactActivities.sort((a, b) =>
                         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
