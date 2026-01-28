@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
+import { requireDsoAccessWithFallback, checkDsoAccess } from '@/lib/auth';
 
 // Phone number formatting helper
 function formatPhoneNumber(input: string): string {
@@ -36,6 +37,20 @@ export async function POST(request: NextRequest) {
 
         if (!clientId) {
             return NextResponse.json({ error: 'client_id required' }, { status: 400 });
+        }
+
+        // Require write access to the DSO
+        const accessResult = await requireDsoAccessWithFallback(request, clientId);
+        if ('response' in accessResult) {
+            // Try user_id from body
+            const body = await request.json().catch(() => ({}));
+            if (!body.user_id) {
+                return accessResult.response;
+            }
+            const { hasAccess, role } = await checkDsoAccess(body.user_id, clientId);
+            if (!hasAccess || (role !== 'admin' && role !== 'manager')) {
+                return NextResponse.json({ error: 'Write access required' }, { status: 403 });
+            }
         }
 
         // Get all tables for this client
