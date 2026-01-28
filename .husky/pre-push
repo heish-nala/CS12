@@ -1,0 +1,15 @@
+#!/bin/sh
+
+echo "Running API health check..."
+
+# Check if dev server is running
+if ! curl -s http://localhost:3000 > /dev/null 2>&1; then
+    echo "Warning: Dev server not running. Skipping API tests."
+    exit 0
+fi
+
+npx tsx scripts/api-health-check.ts
+if [ $? -ne 0 ]; then
+    echo "API health check failed. Push aborted."
+    exit 1
+fi

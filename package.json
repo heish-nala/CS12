@@ -8,9 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest",
+    "test:api": "npx tsx scripts/api-health-check.ts",
     "test:e2e": "playwright test tests/example.spec.ts",
     "test:ux": "playwright test tests/ux.spec.ts",
-    "qa": "npx tsx scripts/qa-agent.ts"
+    "qa": "npx tsx scripts/qa-agent.ts",
+    "precheck": "npm run build && npm run test:api"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.73",

@@ -53,10 +53,8 @@ export async function PATCH(
 ) {
     try {
         const { id } = await params;
-        const body = await request.json();
-        const { periodNumber, updates, user_id } = body;
 
-        // Get doctor to find their DSO for auth
+        // Get doctor to find their DSO for auth (check existence first)
         const { data: doctor } = await supabaseAdmin
             .from('doctors')
             .select('dso_id')
@@ -66,6 +64,15 @@ export async function PATCH(
         if (!doctor) {
             return NextResponse.json({ error: 'Doctor not found' }, { status: 404 });
         }
+
+        // Parse body (after doctor check so we return 404 for invalid IDs)
+        let body;
+        try {
+            body = await request.json();
+        } catch {
+            return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+        }
+        const { periodNumber, updates, user_id } = body;
 
         // Require write access to the DSO
         const accessResult = await requireDsoAccessWithFallback(request, doctor.dso_id);
