@@ -634,8 +634,19 @@ export async function generateActivityReportPDF({
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
 
-        // Contact header
-        checkPageBreak(20);
+        // Calculate height needed for header + first activity card
+        // This prevents orphaned headers at page bottom
+        const headerHeight = 10;
+        let firstCardHeight = 25; // Default estimate
+        if (sorted.length > 0) {
+            doc.setFontSize(9);
+            const firstDesc = sorted[0].description || 'No description';
+            const firstDescLines = doc.splitTextToSize(firstDesc, contentWidth - (cardPadding * 2) - 4);
+            firstCardHeight = 14 + (firstDescLines.length * 4) + 4;
+        }
+
+        // Check if we have room for header + first activity together
+        checkPageBreak(headerHeight + firstCardHeight);
 
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
@@ -652,7 +663,7 @@ export async function generateActivityReportPDF({
         currentY += 10;
 
         // Draw each activity as a card
-        sorted.forEach((activity) => {
+        sorted.forEach((activity, index) => {
             // Calculate card height based on description
             doc.setFontSize(9);
             const descriptionLines = doc.splitTextToSize(activity.description || 'No description', contentWidth - (cardPadding * 2) - 4);
