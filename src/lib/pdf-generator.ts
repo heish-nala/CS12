@@ -7,6 +7,49 @@ const MONTHS = [
     'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
+// ============================================
+// CONSISTENT COLOR PALETTE FOR ALL PDFs
+// ============================================
+
+// Primary accent color (professional blue)
+const ACCENT_COLOR = { r: 59, g: 130, b: 246 }; // #3B82F6
+
+// Text colors
+const TEXT_PRIMARY = { r: 31, g: 41, b: 55 };    // Dark gray for headings
+const TEXT_SECONDARY = { r: 107, g: 114, b: 128 }; // Medium gray for labels
+const TEXT_MUTED = { r: 156, g: 163, b: 175 };   // Light gray for footers
+
+// Background colors
+const BG_HEADER = { r: 239, g: 246, b: 255 };    // Very light blue for headers
+const BG_SECTION = { r: 249, g: 250, b: 251 };   // Light gray for sections
+const BG_ALTERNATE = { r: 248, g: 250, b: 252 }; // Subtle alternate row color
+
+// Border colors
+const BORDER_LIGHT = { r: 229, g: 231, b: 235 }; // Light gray borders
+const BORDER_ACCENT = { r: 147, g: 197, b: 253 }; // Light blue accent border
+
+// Status colors (semantic - for outcomes and statuses)
+const STATUS_COLORS: Record<string, { r: number; g: number; b: number }> = {
+    green: { r: 16, g: 185, b: 129 },    // Success/Positive
+    yellow: { r: 245, g: 158, b: 11 },   // Warning/Follow-up
+    orange: { r: 249, g: 115, b: 22 },   // Caution
+    red: { r: 239, g: 68, b: 68 },       // Error/Negative
+    blue: { r: 59, g: 130, b: 246 },     // Info/Primary
+    purple: { r: 139, g: 92, b: 246 },   // Special
+    gray: { r: 107, g: 114, b: 128 },    // Neutral
+};
+
+// Status background colors (lighter versions for cells)
+const STATUS_BG_COLORS: Record<string, { r: number; g: number; b: number }> = {
+    green: { r: 220, g: 252, b: 231 },   // Light green bg
+    yellow: { r: 254, g: 249, b: 195 },  // Light yellow bg
+    orange: { r: 255, g: 237, b: 213 },  // Light orange bg
+    red: { r: 254, g: 226, b: 226 },     // Light red bg
+    blue: { r: 219, g: 234, b: 254 },    // Light blue bg
+    purple: { r: 237, g: 233, b: 254 },  // Light purple bg
+    gray: { r: 243, g: 244, b: 246 },    // Light gray bg
+};
+
 interface GeneratePDFParams {
     tableName: string;
     columns: DataColumn[];
@@ -16,17 +59,6 @@ interface GeneratePDFParams {
     selectedMonth: number;
     year: number;
 }
-
-// Status color mappings for PDF
-const STATUS_COLORS: Record<string, { r: number; g: number; b: number }> = {
-    green: { r: 16, g: 185, b: 129 },
-    yellow: { r: 245, g: 158, b: 11 },
-    orange: { r: 249, g: 115, b: 22 },
-    red: { r: 239, g: 68, b: 68 },
-    blue: { r: 59, g: 130, b: 246 },
-    purple: { r: 139, g: 92, b: 246 },
-    gray: { r: 107, g: 114, b: 128 },
-};
 
 function getStatusLabel(column: DataColumn, value: string): string {
     const options = column.config?.options as StatusOption[] | undefined;
@@ -127,19 +159,24 @@ export async function generateAttendeeTrackerPDF({
 
     // Header function for each page
     const addHeader = (pageNumber: number, totalPages: number) => {
+        // Accent bar at top
+        doc.setFillColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
+        doc.rect(0, 0, pageWidth, 3, 'F');
+
         // Title
         doc.setFontSize(18);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(31, 41, 55);
+        doc.setTextColor(TEXT_PRIMARY.r, TEXT_PRIMARY.g, TEXT_PRIMARY.b);
         doc.text(tableName, margin, 18);
 
-        // Subtitle with month and date
+        // Subtitle with month and date - with accent color
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(107, 114, 128);
+        doc.setTextColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
         doc.text(`${monthName} ${year} Report`, margin, 25);
 
         // Generated date - right aligned
+        doc.setTextColor(TEXT_SECONDARY.r, TEXT_SECONDARY.g, TEXT_SECONDARY.b);
         const generatedText = `Generated: ${new Date().toLocaleDateString()}`;
         doc.text(generatedText, pageWidth - margin - doc.getTextWidth(generatedText), 18);
 
@@ -147,17 +184,26 @@ export async function generateAttendeeTrackerPDF({
         const pageText = `Page ${pageNumber} of ${totalPages}`;
         doc.text(pageText, pageWidth - margin - doc.getTextWidth(pageText), 25);
 
-        // Divider line
-        doc.setDrawColor(229, 231, 235);
+        // Divider line with subtle accent
+        doc.setDrawColor(BORDER_ACCENT.r, BORDER_ACCENT.g, BORDER_ACCENT.b);
         doc.setLineWidth(0.5);
         doc.line(margin, 29, pageWidth - margin, 29);
     };
 
     // Footer function for each page
     const addFooter = () => {
+        // Footer line
+        doc.setDrawColor(BORDER_LIGHT.r, BORDER_LIGHT.g, BORDER_LIGHT.b);
+        doc.setLineWidth(0.3);
+        doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+
         doc.setFontSize(8);
-        doc.setTextColor(156, 163, 175);
-        doc.text('CS12 - Attendee Tracker Report', margin, pageHeight - 8);
+        doc.setTextColor(TEXT_MUTED.r, TEXT_MUTED.g, TEXT_MUTED.b);
+        doc.text('CS12 - Attendee Tracker Report', margin, pageHeight - 7);
+
+        // Small accent dot
+        doc.setFillColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
+        doc.circle(margin + doc.getTextWidth('CS12') + 2, pageHeight - 8.5, 0.8, 'F');
     };
 
     // Filter and prioritize columns
@@ -315,19 +361,19 @@ export async function generateAttendeeTrackerPDF({
         styles: {
             fontSize: 8,
             cellPadding: 3,
-            lineColor: [229, 231, 235],
+            lineColor: [BORDER_LIGHT.r, BORDER_LIGHT.g, BORDER_LIGHT.b],
             lineWidth: 0.1,
             overflow: 'ellipsize',
             cellWidth: 'wrap',
         },
         headStyles: {
-            fillColor: [249, 250, 251],
-            textColor: [55, 65, 81],
+            fillColor: [BG_HEADER.r, BG_HEADER.g, BG_HEADER.b],
+            textColor: [ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b],
             fontStyle: 'bold',
             fontSize: 8,
         },
         alternateRowStyles: {
-            fillColor: [254, 254, 254],
+            fillColor: [BG_ALTERNATE.r, BG_ALTERNATE.g, BG_ALTERNATE.b],
         },
         columnStyles: Object.fromEntries(
             colWidths.map((width, i) => [i, { cellWidth: width }])
@@ -368,20 +414,35 @@ export async function generateAttendeeTrackerPDF({
         addFooter();
     }
 
-    // Summary section - compact horizontal layout
+    // Summary section - styled card with accent
+    const summaryCardHeight = timeTracking?.enabled ? 28 : 20;
+
+    // Draw summary card background
+    doc.setFillColor(BG_HEADER.r, BG_HEADER.g, BG_HEADER.b);
+    doc.roundedRect(margin, summaryY - 4, availableWidth, summaryCardHeight, 2, 2, 'F');
+
+    // Left accent border
+    doc.setFillColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
+    doc.roundedRect(margin, summaryY - 4, 3, summaryCardHeight, 2, 0, 'F');
+    doc.rect(margin + 1, summaryY - 4, 2, summaryCardHeight, 'F');
+
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(31, 41, 55);
-    doc.text('Summary', margin, summaryY);
-    summaryY += 7;
+    doc.setTextColor(TEXT_PRIMARY.r, TEXT_PRIMARY.g, TEXT_PRIMARY.b);
+    doc.text('Summary', margin + 8, summaryY + 3);
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(75, 85, 99);
+    doc.setTextColor(TEXT_SECONDARY.r, TEXT_SECONDARY.g, TEXT_SECONDARY.b);
 
     // First line: attendee count and period
-    doc.text(`Total Attendees: ${rows.length}  |  Report Period: ${monthName} ${year}`, margin, summaryY);
-    summaryY += 6;
+    const statsY = summaryY + 10;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
+    doc.text(`${rows.length}`, margin + 8, statsY);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(TEXT_SECONDARY.r, TEXT_SECONDARY.g, TEXT_SECONDARY.b);
+    doc.text(` Attendees  •  Report Period: ${monthName} ${year}`, margin + 8 + doc.getTextWidth(`${rows.length}`), statsY);
 
     // Add time tracking summary if enabled - horizontal layout
     if (timeTracking?.enabled) {
@@ -411,7 +472,7 @@ export async function generateAttendeeTrackerPDF({
             metricSummaries.push(`${metric.name}: ${monthTotal} (YTD: ${ytdTotal})`);
         });
 
-        doc.text(metricSummaries.join('  |  '), margin, summaryY);
+        doc.text(metricSummaries.join('  •  '), margin + 8, statsY + 7);
     }
 
     // Save the PDF
@@ -514,16 +575,23 @@ export async function generateActivityReportPDF({
         return false;
     };
 
-    // Draw a rounded rectangle (card)
-    const drawCard = (x: number, y: number, width: number, height: number, fillColor?: {r: number, g: number, b: number}) => {
+    // Draw a rounded rectangle (card) with optional accent border
+    const drawCard = (x: number, y: number, width: number, height: number, fillColor?: {r: number, g: number, b: number}, accentColor?: {r: number, g: number, b: number}) => {
         const radius = 2;
-        doc.setDrawColor(229, 231, 235);
+        doc.setDrawColor(BORDER_LIGHT.r, BORDER_LIGHT.g, BORDER_LIGHT.b);
         doc.setLineWidth(0.3);
         if (fillColor) {
             doc.setFillColor(fillColor.r, fillColor.g, fillColor.b);
             doc.roundedRect(x, y, width, height, radius, radius, 'FD');
         } else {
-            doc.roundedRect(x, y, width, height, radius, radius, 'S');
+            doc.setFillColor(255, 255, 255);
+            doc.roundedRect(x, y, width, height, radius, radius, 'FD');
+        }
+        // Add left accent border if specified
+        if (accentColor) {
+            doc.setFillColor(accentColor.r, accentColor.g, accentColor.b);
+            doc.roundedRect(x, y, 2, height, radius, 0, 'F');
+            doc.rect(x + 1, y, 1, height, 'F');
         }
     };
 
@@ -546,73 +614,82 @@ export async function generateActivityReportPDF({
 
     // Draw header
     const drawHeader = () => {
+        // Accent bar at top
+        doc.setFillColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
+        doc.rect(0, 0, pageWidth, 3, 'F');
+
         doc.setFontSize(18);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(31, 41, 55);
+        doc.setTextColor(TEXT_PRIMARY.r, TEXT_PRIMARY.g, TEXT_PRIMARY.b);
         doc.text('Activity Report', margin, currentY + 6);
 
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(107, 114, 128);
+        doc.setTextColor(TEXT_SECONDARY.r, TEXT_SECONDARY.g, TEXT_SECONDARY.b);
         doc.text(`${clientName}`, margin, currentY + 12);
 
-        // Month badge
+        // Month badge with accent
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(59, 130, 246);
+        doc.setTextColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
         doc.text(`${monthName} ${year}`, margin + doc.getTextWidth(clientName) + 5, currentY + 12);
 
         // Generated date - right aligned
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(156, 163, 175);
+        doc.setTextColor(TEXT_MUTED.r, TEXT_MUTED.g, TEXT_MUTED.b);
         doc.setFontSize(8);
         const generatedText = `Generated: ${new Date().toLocaleDateString()}`;
         doc.text(generatedText, pageWidth - margin - doc.getTextWidth(generatedText), currentY + 6);
 
         currentY += 18;
 
-        // Divider line
-        doc.setDrawColor(229, 231, 235);
+        // Divider line with accent
+        doc.setDrawColor(BORDER_ACCENT.r, BORDER_ACCENT.g, BORDER_ACCENT.b);
         doc.setLineWidth(0.5);
         doc.line(margin, currentY, pageWidth - margin, currentY);
         currentY += 8;
     };
 
-    // Draw summary section as a card
+    // Draw summary section as a card with accent border
     const drawSummary = () => {
         const summaryHeight = 28;
-        drawCard(margin, currentY, contentWidth, summaryHeight, { r: 249, g: 250, b: 251 });
+
+        // Card background
+        doc.setFillColor(BG_HEADER.r, BG_HEADER.g, BG_HEADER.b);
+        doc.roundedRect(margin, currentY, contentWidth, summaryHeight, 2, 2, 'F');
+
+        // Left accent border
+        doc.setFillColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
+        doc.roundedRect(margin, currentY, 3, summaryHeight, 2, 0, 'F');
+        doc.rect(margin + 1, currentY, 2, summaryHeight, 'F');
 
         // Title
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(31, 41, 55);
-        doc.text('Summary', margin + cardPadding, currentY + 6);
+        doc.setTextColor(TEXT_PRIMARY.r, TEXT_PRIMARY.g, TEXT_PRIMARY.b);
+        doc.text('Summary', margin + 8, currentY + 6);
 
         // Stats row
         doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(75, 85, 99);
+        doc.setTextColor(TEXT_SECONDARY.r, TEXT_SECONDARY.g, TEXT_SECONDARY.b);
 
-        let statsX = margin + cardPadding;
+        let statsX = margin + 8;
         const statsY = currentY + 14;
 
-        // Total
+        // Total with accent color
         doc.setFont('helvetica', 'bold');
+        doc.setTextColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
         doc.text(`${totalActivities}`, statsX, statsY);
         doc.setFont('helvetica', 'normal');
+        doc.setTextColor(TEXT_SECONDARY.r, TEXT_SECONDARY.g, TEXT_SECONDARY.b);
         doc.text(' total', statsX + doc.getTextWidth(`${totalActivities}`), statsY);
         statsX += doc.getTextWidth(`${totalActivities} total`) + 10;
 
-        // By type
-        doc.text(`Phone: ${byType.phone}`, statsX, statsY);
-        statsX += doc.getTextWidth(`Phone: ${byType.phone}`) + 8;
-        doc.text(`Email: ${byType.email}`, statsX, statsY);
-        statsX += doc.getTextWidth(`Email: ${byType.email}`) + 8;
-        doc.text(`Text: ${byType.text}`, statsX, statsY);
+        // By type with subtle separators
+        doc.text(`Phone: ${byType.phone}  •  Email: ${byType.email}  •  Text: ${byType.text}`, statsX, statsY);
 
         // Outcome badges row
-        let badgeX = margin + cardPadding;
+        let badgeX = margin + 8;
         const badgeY = currentY + 22;
 
         Object.entries(byOutcome).forEach(([outcome, count]) => {
@@ -636,7 +713,7 @@ export async function generateActivityReportPDF({
 
         // Calculate height needed for header + first activity card
         // This prevents orphaned headers at page bottom
-        const headerHeight = 10;
+        const headerHeight = 14;
         let firstCardHeight = 25; // Default estimate
         if (sorted.length > 0) {
             doc.setFontSize(9);
@@ -648,31 +725,45 @@ export async function generateActivityReportPDF({
         // Check if we have room for header + first activity together
         checkPageBreak(headerHeight + firstCardHeight);
 
+        // Contact section header with accent
+        doc.setFillColor(BG_SECTION.r, BG_SECTION.g, BG_SECTION.b);
+        doc.roundedRect(margin, currentY, contentWidth, 10, 1, 1, 'F');
+
+        // Small accent indicator
+        doc.setFillColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
+        doc.circle(margin + 4, currentY + 5, 1.5, 'F');
+
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(31, 41, 55);
-        doc.text(contactName, margin, currentY + 4);
+        doc.setTextColor(TEXT_PRIMARY.r, TEXT_PRIMARY.g, TEXT_PRIMARY.b);
+        doc.text(contactName, margin + 10, currentY + 6.5);
 
-        // Activity count
-        doc.setFontSize(9);
+        // Activity count badge
+        doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(107, 114, 128);
-        const countText = `${sorted.length} activit${sorted.length !== 1 ? 'ies' : 'y'}`;
-        doc.text(countText, pageWidth - margin - doc.getTextWidth(countText), currentY + 4);
+        const countText = `${sorted.length}`;
+        const countBadgeX = pageWidth - margin - 12;
+        doc.setFillColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
+        doc.roundedRect(countBadgeX, currentY + 2, 8, 6, 2, 2, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.text(countText, countBadgeX + 4 - doc.getTextWidth(countText) / 2, currentY + 6);
 
-        currentY += 10;
+        currentY += 14;
 
         // Draw each activity as a card
         sorted.forEach((activity, index) => {
             // Calculate card height based on description
             doc.setFontSize(9);
-            const descriptionLines = doc.splitTextToSize(activity.description || 'No description', contentWidth - (cardPadding * 2) - 4);
+            const descriptionLines = doc.splitTextToSize(activity.description || 'No description', contentWidth - (cardPadding * 2) - 8);
             const cardHeight = 14 + (descriptionLines.length * 4);
 
             checkPageBreak(cardHeight + 4);
 
-            // Draw card border
-            drawCard(margin, currentY, contentWidth, cardHeight);
+            // Get outcome color for accent
+            const outcomeAccent = activity.outcome ? OUTCOME_COLORS[activity.outcome] : undefined;
+
+            // Draw card with outcome-based accent border
+            drawCard(margin, currentY, contentWidth, cardHeight, undefined, outcomeAccent);
 
             // Header row inside card: Date | Type | Outcome
             const activityDate = new Date(activity.created_at);
@@ -687,18 +778,18 @@ export async function generateActivityReportPDF({
 
             doc.setFontSize(8);
             doc.setFont('helvetica', 'bold');
-            doc.setTextColor(107, 114, 128);
-            doc.text(`${dateStr}, ${timeStr}`, margin + cardPadding, currentY + 5);
+            doc.setTextColor(TEXT_SECONDARY.r, TEXT_SECONDARY.g, TEXT_SECONDARY.b);
+            doc.text(`${dateStr}, ${timeStr}`, margin + cardPadding + 4, currentY + 5);
 
-            // Type badge
+            // Type badge with subtle styling
             const typeLabel = ACTIVITY_TYPE_LABELS[activity.activity_type] || activity.activity_type;
-            const typeX = margin + cardPadding + doc.getTextWidth(`${dateStr}, ${timeStr}`) + 6;
-            doc.setFillColor(229, 231, 235);
-            const typeWidth = doc.getTextWidth(typeLabel) + 4;
-            doc.roundedRect(typeX, currentY + 2, typeWidth, 4.5, 1, 1, 'F');
-            doc.setTextColor(75, 85, 99);
+            const typeX = margin + cardPadding + doc.getTextWidth(`${dateStr}, ${timeStr}`) + 10;
+            doc.setFillColor(BG_SECTION.r, BG_SECTION.g, BG_SECTION.b);
+            const typeWidth = doc.getTextWidth(typeLabel) + 6;
+            doc.roundedRect(typeX, currentY + 1.5, typeWidth, 5, 1.5, 1.5, 'F');
+            doc.setTextColor(TEXT_SECONDARY.r, TEXT_SECONDARY.g, TEXT_SECONDARY.b);
             doc.setFontSize(7);
-            doc.text(typeLabel, typeX + 2, currentY + 5);
+            doc.text(typeLabel, typeX + 3, currentY + 5);
 
             // Outcome badge (right side)
             if (activity.outcome) {
@@ -710,11 +801,11 @@ export async function generateActivityReportPDF({
             // Description
             doc.setFontSize(9);
             doc.setFont('helvetica', 'normal');
-            doc.setTextColor(55, 65, 81);
+            doc.setTextColor(TEXT_PRIMARY.r, TEXT_PRIMARY.g, TEXT_PRIMARY.b);
 
             let descY = currentY + 11;
             descriptionLines.forEach((line: string) => {
-                doc.text(line, margin + cardPadding, descY);
+                doc.text(line, margin + cardPadding + 4, descY);
                 descY += 4;
             });
 
@@ -741,15 +832,27 @@ export async function generateActivityReportPDF({
         });
     }
 
-    // Add page numbers to all pages
+    // Add page numbers and footer to all pages
     const totalPages = doc.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
+
+        // Footer line
+        doc.setDrawColor(BORDER_LIGHT.r, BORDER_LIGHT.g, BORDER_LIGHT.b);
+        doc.setLineWidth(0.3);
+        doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+
         doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(156, 163, 175);
-        doc.text(`Page ${i} of ${totalPages}`, margin, pageHeight - 8);
-        doc.text('Activity Report', pageWidth - margin - doc.getTextWidth('Activity Report'), pageHeight - 8);
+        doc.setTextColor(TEXT_MUTED.r, TEXT_MUTED.g, TEXT_MUTED.b);
+        doc.text(`Page ${i} of ${totalPages}`, margin, pageHeight - 7);
+
+        // Accent dot + report name
+        doc.setFillColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
+        const reportLabel = 'Activity Report';
+        const labelX = pageWidth - margin - doc.getTextWidth(reportLabel);
+        doc.circle(labelX - 3, pageHeight - 8.5, 0.8, 'F');
+        doc.text(reportLabel, labelX, pageHeight - 7);
     }
 
     // Save the PDF
@@ -824,17 +927,28 @@ export async function generateProgressReportPDF({
 
     // Header function for each page
     const addHeader = (pageNumber: number, totalPages: number) => {
+        // Accent bar at top
+        doc.setFillColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
+        doc.rect(0, 0, pageWidth, 3, 'F');
+
         doc.setFontSize(20);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(31, 41, 55);
+        doc.setTextColor(TEXT_PRIMARY.r, TEXT_PRIMARY.g, TEXT_PRIMARY.b);
         doc.text('Progress Report', margin, 20);
 
         doc.setFontSize(11);
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(107, 114, 128);
-        doc.text(`${clientName} • ${monthName} ${year}`, margin, 28);
+        doc.setTextColor(TEXT_SECONDARY.r, TEXT_SECONDARY.g, TEXT_SECONDARY.b);
+        doc.text(`${clientName}`, margin, 28);
+
+        // Month with accent color
+        doc.setTextColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${monthName} ${year}`, margin + doc.getTextWidth(clientName) + 5, 28);
 
         // Generated date - right aligned
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(TEXT_SECONDARY.r, TEXT_SECONDARY.g, TEXT_SECONDARY.b);
         const generatedText = `Generated: ${new Date().toLocaleDateString()}`;
         doc.text(generatedText, pageWidth - margin - doc.getTextWidth(generatedText), 20);
 
@@ -842,17 +956,26 @@ export async function generateProgressReportPDF({
         const pageText = `Page ${pageNumber} of ${totalPages}`;
         doc.text(pageText, pageWidth - margin - doc.getTextWidth(pageText), 28);
 
-        // Divider line
-        doc.setDrawColor(229, 231, 235);
+        // Divider line with accent
+        doc.setDrawColor(BORDER_ACCENT.r, BORDER_ACCENT.g, BORDER_ACCENT.b);
         doc.setLineWidth(0.5);
         doc.line(margin, 32, pageWidth - margin, 32);
     };
 
     // Footer function for each page
     const addFooter = () => {
+        // Footer line
+        doc.setDrawColor(BORDER_LIGHT.r, BORDER_LIGHT.g, BORDER_LIGHT.b);
+        doc.setLineWidth(0.3);
+        doc.line(margin, pageHeight - 14, pageWidth - margin, pageHeight - 14);
+
         doc.setFontSize(8);
-        doc.setTextColor(156, 163, 175);
-        doc.text('Progress Report', margin, pageHeight - 10);
+        doc.setTextColor(TEXT_MUTED.r, TEXT_MUTED.g, TEXT_MUTED.b);
+        doc.text('Progress Report', margin, pageHeight - 9);
+
+        // Accent dot
+        doc.setFillColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
+        doc.circle(margin + doc.getTextWidth('Progress Report') + 3, pageHeight - 10.5, 0.8, 'F');
     };
 
     // Draw each table section
@@ -867,19 +990,33 @@ export async function generateProgressReportPDF({
         }
         isFirstTable = false;
 
-        // Table section header
+        // Table section header with accent
         let startY = 40;
+
+        // Section header background
+        doc.setFillColor(BG_SECTION.r, BG_SECTION.g, BG_SECTION.b);
+        doc.roundedRect(margin, startY - 6, contentWidth, 14, 2, 2, 'F');
+
+        // Accent indicator
+        doc.setFillColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
+        doc.circle(margin + 5, startY + 1, 2, 'F');
+
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(31, 41, 55);
-        doc.text(table.name, margin, startY);
+        doc.setTextColor(TEXT_PRIMARY.r, TEXT_PRIMARY.g, TEXT_PRIMARY.b);
+        doc.text(table.name, margin + 12, startY + 2);
 
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(107, 114, 128);
-        doc.text(`${tableContacts.length} contact${tableContacts.length !== 1 ? 's' : ''}`, margin + doc.getTextWidth(table.name) + 5, startY);
+        // Contact count badge
+        doc.setFontSize(9);
+        const countText = `${tableContacts.length}`;
+        const countBadgeX = pageWidth - margin - 20;
+        doc.setFillColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
+        doc.roundedRect(countBadgeX, startY - 3, 16, 8, 3, 3, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.text(countText, countBadgeX + 8 - doc.getTextWidth(countText) / 2, startY + 2);
 
-        startY += 10;
+        startY += 14;
 
         // Build table headers
         const headers: string[] = ['Name', 'Email'];
@@ -948,7 +1085,7 @@ export async function generateProgressReportPDF({
         metrics.forEach(() => colWidths.push(metricWidth));
         colWidths.push(totalWidth, changeWidth);
 
-        // Generate table
+        // Generate table with styled headers
         autoTable(doc, {
             head: [headers],
             body: body,
@@ -957,17 +1094,17 @@ export async function generateProgressReportPDF({
             styles: {
                 fontSize: 9,
                 cellPadding: 4,
-                lineColor: [229, 231, 235],
+                lineColor: [BORDER_LIGHT.r, BORDER_LIGHT.g, BORDER_LIGHT.b],
                 lineWidth: 0.1,
             },
             headStyles: {
-                fillColor: [249, 250, 251],
-                textColor: [55, 65, 81],
+                fillColor: [BG_HEADER.r, BG_HEADER.g, BG_HEADER.b],
+                textColor: [ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b],
                 fontStyle: 'bold',
                 fontSize: 9,
             },
             alternateRowStyles: {
-                fillColor: [255, 255, 255],
+                fillColor: [BG_ALTERNATE.r, BG_ALTERNATE.g, BG_ALTERNATE.b],
             },
             columnStyles: Object.fromEntries(
                 colWidths.map((width, i) => [i, { cellWidth: width }])
@@ -991,15 +1128,6 @@ export async function generateProgressReportPDF({
         let summaryY = finalY + 10;
 
         if (summaryY < pageHeight - 40) {
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(55, 65, 81);
-            doc.text('Summary', margin, summaryY);
-            summaryY += 7;
-
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(107, 114, 128);
-
             // Calculate totals for each metric
             const metricTotals: Record<string, number> = {};
             metrics.forEach(metric => {
@@ -1014,12 +1142,37 @@ export async function generateProgressReportPDF({
                 });
             });
 
-            const summaryParts: string[] = [`Total: ${grandTotal}`];
-            metrics.forEach(metric => {
-                summaryParts.push(`${metric.name}: ${metricTotals[metric.name]}`);
-            });
+            // Summary card with accent
+            const summaryCardHeight = 16;
+            doc.setFillColor(BG_HEADER.r, BG_HEADER.g, BG_HEADER.b);
+            doc.roundedRect(margin, summaryY - 4, contentWidth, summaryCardHeight, 2, 2, 'F');
 
-            doc.text(summaryParts.join('    '), margin, summaryY);
+            // Left accent
+            doc.setFillColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
+            doc.roundedRect(margin, summaryY - 4, 3, summaryCardHeight, 2, 0, 'F');
+            doc.rect(margin + 1, summaryY - 4, 2, summaryCardHeight, 'F');
+
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(TEXT_PRIMARY.r, TEXT_PRIMARY.g, TEXT_PRIMARY.b);
+            doc.text('Summary', margin + 8, summaryY + 3);
+
+            // Total with accent
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
+            doc.text(`${grandTotal}`, margin + 50, summaryY + 3);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(TEXT_SECONDARY.r, TEXT_SECONDARY.g, TEXT_SECONDARY.b);
+            doc.text(' total', margin + 50 + doc.getTextWidth(`${grandTotal}`), summaryY + 3);
+
+            // Metric totals
+            let metricX = margin + 50 + doc.getTextWidth(`${grandTotal} total`) + 15;
+            metrics.forEach(metric => {
+                const metricText = `${metric.name}: ${metricTotals[metric.name]}`;
+                doc.text(metricText, metricX, summaryY + 3);
+                metricX += doc.getTextWidth(metricText) + 15;
+            });
         }
     });
 
