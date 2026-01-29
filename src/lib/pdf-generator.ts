@@ -439,13 +439,13 @@ const OUTCOME_LABELS: Record<string, string> = {
     positive: 'Positive',
     neutral: 'Neutral',
     negative: 'Negative',
-    follow_up_needed: 'Follow-up Needed',
+    follow_up_needed: 'Follow-up',
 };
 
-const ACTIVITY_TYPE_ICONS: Record<string, string> = {
-    phone: '☎',
-    email: '✉',
-    text: '💬',
+const ACTIVITY_TYPE_LABELS: Record<string, string> = {
+    phone: 'Phone',
+    email: 'Email',
+    text: 'Text',
 };
 
 export async function generateActivityReportPDF({
@@ -465,6 +465,7 @@ export async function generateActivityReportPDF({
     const margin = 15;
     const contentWidth = pageWidth - (margin * 2);
     const monthName = MONTHS[selectedMonth];
+    const cardPadding = 4;
 
     // Filter activities for the selected month
     const filteredActivities = activities.filter(activity => {
@@ -502,36 +503,73 @@ export async function generateActivityReportPDF({
     };
 
     let currentY = margin;
-    let currentPage = 1;
 
     // Helper to check if we need a new page
     const checkPageBreak = (requiredHeight: number) => {
-        if (currentY + requiredHeight > pageHeight - margin) {
+        if (currentY + requiredHeight > pageHeight - margin - 10) {
             doc.addPage();
-            currentPage++;
             currentY = margin;
             return true;
         }
         return false;
     };
 
+    // Draw a rounded rectangle (card)
+    const drawCard = (x: number, y: number, width: number, height: number, fillColor?: {r: number, g: number, b: number}) => {
+        const radius = 2;
+        doc.setDrawColor(229, 231, 235);
+        doc.setLineWidth(0.3);
+        if (fillColor) {
+            doc.setFillColor(fillColor.r, fillColor.g, fillColor.b);
+            doc.roundedRect(x, y, width, height, radius, radius, 'FD');
+        } else {
+            doc.roundedRect(x, y, width, height, radius, radius, 'S');
+        }
+    };
+
+    // Draw a pill/badge
+    const drawBadge = (text: string, x: number, y: number, color: {r: number, g: number, b: number}) => {
+        doc.setFontSize(7);
+        const textWidth = doc.getTextWidth(text);
+        const badgeWidth = textWidth + 6;
+        const badgeHeight = 5;
+
+        doc.setFillColor(color.r, color.g, color.b);
+        doc.roundedRect(x, y - 3.5, badgeWidth, badgeHeight, 1.5, 1.5, 'F');
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.text(text, x + 3, y);
+
+        return badgeWidth;
+    };
+
     // Draw header
     const drawHeader = () => {
-        doc.setFontSize(20);
+        doc.setFontSize(18);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(31, 41, 55);
-        doc.text('Activity Report', margin, currentY + 7);
+        doc.text('Activity Report', margin, currentY + 6);
 
-        doc.setFontSize(11);
+        doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(107, 114, 128);
-        doc.text(`${clientName} • ${monthName} ${year}`, margin, currentY + 14);
+        doc.text(`${clientName}`, margin, currentY + 12);
+
+        // Month badge
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(59, 130, 246);
+        doc.text(`${monthName} ${year}`, margin + doc.getTextWidth(clientName) + 5, currentY + 12);
 
         // Generated date - right aligned
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(156, 163, 175);
+        doc.setFontSize(8);
         const generatedText = `Generated: ${new Date().toLocaleDateString()}`;
-        doc.text(generatedText, pageWidth - margin - doc.getTextWidth(generatedText), currentY + 7);
+        doc.text(generatedText, pageWidth - margin - doc.getTextWidth(generatedText), currentY + 6);
 
-        currentY += 20;
+        currentY += 18;
 
         // Divider line
         doc.setDrawColor(229, 231, 235);
@@ -540,145 +578,139 @@ export async function generateActivityReportPDF({
         currentY += 8;
     };
 
-    // Draw summary section
+    // Draw summary section as a card
     const drawSummary = () => {
-        doc.setFontSize(12);
+        const summaryHeight = 28;
+        drawCard(margin, currentY, contentWidth, summaryHeight, { r: 249, g: 250, b: 251 });
+
+        // Title
+        doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(31, 41, 55);
-        doc.text('Summary', margin, currentY);
-        currentY += 8;
+        doc.text('Summary', margin + cardPadding, currentY + 6);
 
-        doc.setFontSize(10);
+        // Stats row
+        doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(55, 65, 81);
+        doc.setTextColor(75, 85, 99);
 
-        // Total and by type
-        doc.text(`Total Activities: ${totalActivities}`, margin, currentY);
-        currentY += 6;
-        doc.text(`☎ Phone: ${byType.phone}    ✉ Email: ${byType.email}    💬 Text: ${byType.text}`, margin, currentY);
-        currentY += 8;
+        let statsX = margin + cardPadding;
+        const statsY = currentY + 14;
 
-        // By outcome with colored dots
-        let outcomeX = margin;
+        // Total
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${totalActivities}`, statsX, statsY);
+        doc.setFont('helvetica', 'normal');
+        doc.text(' total', statsX + doc.getTextWidth(`${totalActivities}`), statsY);
+        statsX += doc.getTextWidth(`${totalActivities} total`) + 10;
+
+        // By type
+        doc.text(`Phone: ${byType.phone}`, statsX, statsY);
+        statsX += doc.getTextWidth(`Phone: ${byType.phone}`) + 8;
+        doc.text(`Email: ${byType.email}`, statsX, statsY);
+        statsX += doc.getTextWidth(`Email: ${byType.email}`) + 8;
+        doc.text(`Text: ${byType.text}`, statsX, statsY);
+
+        // Outcome badges row
+        let badgeX = margin + cardPadding;
+        const badgeY = currentY + 22;
+
         Object.entries(byOutcome).forEach(([outcome, count]) => {
             if (count > 0) {
                 const color = OUTCOME_COLORS[outcome] || OUTCOME_COLORS.neutral;
-                doc.setFillColor(color.r, color.g, color.b);
-                doc.circle(outcomeX + 2, currentY - 1.5, 2, 'F');
-                doc.setTextColor(55, 65, 81);
                 const label = `${OUTCOME_LABELS[outcome]}: ${count}`;
-                doc.text(label, outcomeX + 6, currentY);
-                outcomeX += doc.getTextWidth(label) + 15;
+                const badgeWidth = drawBadge(label, badgeX, badgeY, color);
+                badgeX += badgeWidth + 4;
             }
         });
-        currentY += 10;
 
-        // Contacts count
-        doc.setTextColor(107, 114, 128);
-        doc.text(`${sortedContacts.length} contact${sortedContacts.length !== 1 ? 's' : ''} with activity this month`, margin, currentY);
-        currentY += 12;
-
-        // Divider
-        doc.setDrawColor(229, 231, 235);
-        doc.setLineWidth(0.3);
-        doc.line(margin, currentY, pageWidth - margin, currentY);
-        currentY += 10;
+        currentY += summaryHeight + 8;
     };
 
-    // Draw a contact section with their activities
+    // Draw a contact section with their activities as cards
     const drawContactSection = (contactName: string, contactActivities: Activity[]) => {
         // Sort activities by date (newest first)
         const sorted = [...contactActivities].sort((a, b) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
 
-        // Calculate height needed for contact header
-        const headerHeight = 15;
-        checkPageBreak(headerHeight);
-
-        // Contact header with background
-        doc.setFillColor(249, 250, 251);
-        doc.rect(margin, currentY - 3, contentWidth, 10, 'F');
+        // Contact header
+        checkPageBreak(20);
 
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(31, 41, 55);
-        doc.text(contactName, margin + 3, currentY + 3);
+        doc.text(contactName, margin, currentY + 4);
 
-        // Activity count badge
-        const countText = `${sorted.length} activit${sorted.length !== 1 ? 'ies' : 'y'}`;
+        // Activity count
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(107, 114, 128);
-        doc.text(countText, pageWidth - margin - doc.getTextWidth(countText) - 3, currentY + 3);
+        const countText = `${sorted.length} activit${sorted.length !== 1 ? 'ies' : 'y'}`;
+        doc.text(countText, pageWidth - margin - doc.getTextWidth(countText), currentY + 4);
 
-        currentY += 12;
+        currentY += 10;
 
-        // Draw each activity
-        sorted.forEach((activity, index) => {
-            // Estimate height needed for this activity
-            const descriptionLines = doc.splitTextToSize(activity.description || '', contentWidth - 10);
-            const activityHeight = 12 + (descriptionLines.length * 5) + 8;
+        // Draw each activity as a card
+        sorted.forEach((activity) => {
+            // Calculate card height based on description
+            doc.setFontSize(9);
+            const descriptionLines = doc.splitTextToSize(activity.description || 'No description', contentWidth - (cardPadding * 2) - 4);
+            const cardHeight = 14 + (descriptionLines.length * 4);
 
-            checkPageBreak(activityHeight);
+            checkPageBreak(cardHeight + 4);
 
-            // Activity header line: Date • Type • Outcome
+            // Draw card border
+            drawCard(margin, currentY, contentWidth, cardHeight);
+
+            // Header row inside card: Date | Type | Outcome
             const activityDate = new Date(activity.created_at);
             const dateStr = activityDate.toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric',
-                year: 'numeric'
             });
             const timeStr = activityDate.toLocaleTimeString('en-US', {
                 hour: 'numeric',
                 minute: '2-digit',
             });
 
-            doc.setFontSize(9);
+            doc.setFontSize(8);
             doc.setFont('helvetica', 'bold');
-            doc.setTextColor(55, 65, 81);
+            doc.setTextColor(107, 114, 128);
+            doc.text(`${dateStr}, ${timeStr}`, margin + cardPadding, currentY + 5);
 
-            const typeIcon = ACTIVITY_TYPE_ICONS[activity.activity_type] || '';
-            const headerText = `${dateStr} at ${timeStr}  ${typeIcon} ${activity.activity_type.charAt(0).toUpperCase() + activity.activity_type.slice(1)}`;
-            doc.text(headerText, margin + 3, currentY);
+            // Type badge
+            const typeLabel = ACTIVITY_TYPE_LABELS[activity.activity_type] || activity.activity_type;
+            const typeX = margin + cardPadding + doc.getTextWidth(`${dateStr}, ${timeStr}`) + 6;
+            doc.setFillColor(229, 231, 235);
+            const typeWidth = doc.getTextWidth(typeLabel) + 4;
+            doc.roundedRect(typeX, currentY + 2, typeWidth, 4.5, 1, 1, 'F');
+            doc.setTextColor(75, 85, 99);
+            doc.setFontSize(7);
+            doc.text(typeLabel, typeX + 2, currentY + 5);
 
             // Outcome badge (right side)
             if (activity.outcome) {
                 const outcomeColor = OUTCOME_COLORS[activity.outcome] || OUTCOME_COLORS.neutral;
                 const outcomeLabel = OUTCOME_LABELS[activity.outcome] || activity.outcome;
-
-                doc.setFillColor(outcomeColor.r, outcomeColor.g, outcomeColor.b);
-                doc.circle(pageWidth - margin - doc.getTextWidth(outcomeLabel) - 8, currentY - 1, 1.5, 'F');
-
-                doc.setFont('helvetica', 'normal');
-                doc.setTextColor(outcomeColor.r, outcomeColor.g, outcomeColor.b);
-                doc.text(outcomeLabel, pageWidth - margin - doc.getTextWidth(outcomeLabel) - 3, currentY);
+                drawBadge(outcomeLabel, pageWidth - margin - doc.getTextWidth(outcomeLabel) - 10, currentY + 5, outcomeColor);
             }
-
-            currentY += 6;
 
             // Description
             doc.setFontSize(9);
             doc.setFont('helvetica', 'normal');
-            doc.setTextColor(75, 85, 99);
+            doc.setTextColor(55, 65, 81);
 
+            let descY = currentY + 11;
             descriptionLines.forEach((line: string) => {
-                doc.text(line, margin + 3, currentY);
-                currentY += 4.5;
+                doc.text(line, margin + cardPadding, descY);
+                descY += 4;
             });
 
-            currentY += 4;
-
-            // Light separator between activities (not after last one)
-            if (index < sorted.length - 1) {
-                doc.setDrawColor(243, 244, 246);
-                doc.setLineWidth(0.2);
-                doc.line(margin + 3, currentY, pageWidth - margin - 3, currentY);
-                currentY += 6;
-            }
+            currentY += cardHeight + 3;
         });
 
-        currentY += 8;
+        currentY += 6;
     };
 
     // Build the document
@@ -705,8 +737,8 @@ export async function generateActivityReportPDF({
         doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(156, 163, 175);
-        doc.text(`Page ${i} of ${totalPages}`, margin, pageHeight - 10);
-        doc.text('Activity Report', pageWidth - margin - doc.getTextWidth('Activity Report'), pageHeight - 10);
+        doc.text(`Page ${i} of ${totalPages}`, margin, pageHeight - 8);
+        doc.text('Activity Report', pageWidth - margin - doc.getTextWidth('Activity Report'), pageHeight - 8);
     }
 
     // Save the PDF

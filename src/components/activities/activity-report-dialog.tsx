@@ -79,7 +79,7 @@ export function ActivityReportDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="py-4">
+                <div className="px-1 py-4">
                     <Label className="text-sm font-medium mb-3 block">
                         Select Month
                     </Label>
