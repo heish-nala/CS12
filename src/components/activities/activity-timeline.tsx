@@ -20,12 +20,15 @@ import {
     Users,
     Copy,
     Check,
+    Download,
 } from 'lucide-react';
 import { PersonDetailPanel, PersonInfo } from '@/components/person-detail-panel';
+import { ActivityReportDialog } from '@/components/activities/activity-report-dialog';
 import { toast } from 'sonner';
 
 interface ActivityTimelineProps {
     clientId: string;
+    clientName?: string;
 }
 
 type ViewMode = 'cards' | 'table' | 'grid';
@@ -41,7 +44,7 @@ interface ContactWithActivity {
     activityCount: number;
 }
 
-export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
+export function ActivityTimeline({ clientId, clientName }: ActivityTimelineProps) {
     const { user } = useAuth();
     const [contacts, setContacts] = useState<ContactWithActivity[]>([]);
     const [activities, setActivities] = useState<Activity[]>([]);
@@ -52,6 +55,9 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
     // Panel state
     const [selectedPerson, setSelectedPerson] = useState<PersonInfo | null>(null);
     const [panelOpen, setPanelOpen] = useState(false);
+
+    // Report dialog state
+    const [reportDialogOpen, setReportDialogOpen] = useState(false);
 
     // Copy state
     const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -292,6 +298,17 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
                         />
                     </div>
 
+                    {/* Download Report Button */}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setReportDialogOpen(true)}
+                        disabled={activities.length === 0}
+                    >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                    </Button>
+
                     {/* View Toggle */}
                     <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as ViewMode)}>
                         <ToggleGroupItem value="cards" aria-label="Cards view">
@@ -483,6 +500,14 @@ export function ActivityTimeline({ clientId }: ActivityTimelineProps) {
                 onOpenChange={setPanelOpen}
                 person={selectedPerson}
                 clientId={clientId}
+            />
+
+            {/* Activity Report Dialog */}
+            <ActivityReportDialog
+                open={reportDialogOpen}
+                onOpenChange={setReportDialogOpen}
+                clientName={clientName || 'Client'}
+                activities={activities}
             />
         </div>
     );

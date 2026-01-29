@@ -220,11 +220,11 @@ function ClientDetailContent({
                         </TabsContent>
 
                         <TabsContent value="activity" className="space-y-6 mt-0">
-                            <ActivityTimeline clientId={clientId} />
+                            <ActivityTimeline clientId={clientId} clientName={client.name} />
                         </TabsContent>
 
                         <TabsContent value="progress" className="space-y-6 mt-0">
-                            <ProgressTab clientId={clientId} />
+                            <ProgressTab clientId={clientId} clientName={client.name} />
                         </TabsContent>
                     </Tabs>
                 </div>

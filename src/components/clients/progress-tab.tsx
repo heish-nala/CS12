@@ -59,8 +59,10 @@ import {
     Clock,
     Mail,
     Phone,
+    Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ProgressReportDialog } from '@/components/clients/progress-report-dialog';
 
 interface DataTableWithMeta extends DataTable {
     columns: DataColumn[];
@@ -88,9 +90,10 @@ type ViewMode = 'cards' | 'table' | 'grid';
 
 interface ProgressTabProps {
     clientId: string;
+    clientName?: string;
 }
 
-export function ProgressTab({ clientId }: ProgressTabProps) {
+export function ProgressTab({ clientId, clientName }: ProgressTabProps) {
     const { user } = useAuth();
     const [tables, setTables] = useState<DataTableWithMeta[]>([]);
     const [contacts, setContacts] = useState<ContactWithProgress[]>([]);
@@ -106,6 +109,9 @@ export function ProgressTab({ clientId }: ProgressTabProps) {
     const [saving, setSaving] = useState(false);
     const [pendingChanges, setPendingChanges] = useState<Record<string, Record<string, number>>>({});
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+
+    // Report dialog state
+    const [reportDialogOpen, setReportDialogOpen] = useState(false);
 
     // Track in-flight requests
     const pendingRequestsRef = useRef<Set<string>>(new Set());
@@ -415,6 +421,18 @@ export function ProgressTab({ clientId }: ProgressTabProps) {
                             className="pl-9 w-64"
                         />
                     </div>
+
+                    {/* Download Report Button */}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setReportDialogOpen(true)}
+                        disabled={contacts.length === 0}
+                    >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                    </Button>
+
                     <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as ViewMode)}>
                         <ToggleGroupItem value="cards" aria-label="Cards view">
                             <LayoutGrid className="h-4 w-4" />
@@ -702,6 +720,15 @@ export function ProgressTab({ clientId }: ProgressTabProps) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Progress Report Dialog */}
+            <ProgressReportDialog
+                open={reportDialogOpen}
+                onOpenChange={setReportDialogOpen}
+                clientName={clientName || 'Client'}
+                tables={tables}
+                contacts={contacts}
+            />
         </div>
     );
 }
