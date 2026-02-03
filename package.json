@@ -12,7 +12,14 @@
     "test:e2e": "playwright test tests/example.spec.ts",
     "test:ux": "playwright test tests/ux.spec.ts",
     "qa": "npx tsx scripts/qa-agent.ts",
-    "precheck": "npm run build && npm run test:api"
+    "precheck": "npm run build && npm run test:api",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:reset": "supabase db reset",
+    "supabase:studio": "open http://127.0.0.1:54323",
+    "supabase:status": "supabase status",
+    "supabase:push": "supabase db push",
+    "supabase:pull": "supabase db pull"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.73",
