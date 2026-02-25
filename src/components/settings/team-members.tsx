@@ -144,13 +144,13 @@ export function TeamMembers() {
         return 'Expiring soon';
     };
 
-    const fetchMembers = useCallback(async () => {
+    const fetchMembers = useCallback(async (showLoading = true) => {
         if (!user?.id) {
             setLoading(false);
             return;
         }
 
-        setLoading(true);
+        if (showLoading) setLoading(true);
         try {
             const response = await fetch(`/api/team?user_id=${user.id}`);
             if (response.ok) {
@@ -284,9 +284,9 @@ export function TeamMembers() {
 
     const handleDialogClose = useCallback((open: boolean) => {
         setAddDialogOpen(open);
-        // Refresh members and pending invites when dialog closes
+        // Refresh members and pending invites when dialog closes (no skeleton flash)
         if (!open) {
-            fetchMembers();
+            fetchMembers(false);
             if (currentDsoId) {
                 fetchPendingInvites();
             }
