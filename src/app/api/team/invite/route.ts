@@ -5,15 +5,25 @@ import { requireAuth, checkDsoAccess } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
     try {
-        // Require authentication
-        const authResult = await requireAuth(request);
-        if (authResult.response) {
-            return authResult.response;
-        }
-        const currentUser = authResult.user;
-
         const body = await request.json();
-        const { email, role, dso_id, inviter_name } = body;
+        const { email, role, dso_id, inviter_name, invited_by } = body;
+
+        // Try session auth first, fall back to invited_by from body
+        const authResult = await requireAuth(request);
+        let currentUser: { id: string; email: string };
+        if (authResult.response) {
+            // Session auth failed - use invited_by as fallback
+            if (!invited_by) {
+                return authResult.response;
+            }
+            const { data: userData } = await supabaseAdmin.auth.admin.getUserById(invited_by);
+            if (!userData?.user) {
+                return authResult.response;
+            }
+            currentUser = { id: userData.user.id, email: userData.user.email || '' };
+        } else {
+            currentUser = authResult.user;
+        }
 
         // Validate input
         if (!email) {
