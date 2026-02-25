@@ -62,29 +62,40 @@ export async function POST(request: NextRequest) {
         let acceptedCount = 0;
         const acceptedWorkspaces: string[] = [];
 
-        // Process each pending invite
+        // Process each pending invite — also add user to ALL of the inviter's DSOs
         for (const invite of pendingInvites) {
             try {
-                // Check if user already has access to this DSO
+                // Get all DSOs the inviter has access to
+                const { data: inviterAccess } = await supabaseAdmin
+                    .from('user_dso_access')
+                    .select('dso_id')
+                    .eq('user_id', invite.invited_by);
+
+                const allDsoIds = inviterAccess?.map(a => a.dso_id) || [invite.dso_id];
+
+                // Get DSOs the new user already has access to
                 const { data: existingAccess } = await supabaseAdmin
                     .from('user_dso_access')
-                    .select('id')
+                    .select('dso_id')
                     .eq('user_id', actualUserId)
-                    .eq('dso_id', invite.dso_id)
-                    .single();
+                    .in('dso_id', allDsoIds);
 
-                if (!existingAccess) {
-                    // Add user to the DSO with the invited role
+                const existingDsoIds = new Set(existingAccess?.map(a => a.dso_id) || []);
+                const missingDsoIds = allDsoIds.filter(id => !existingDsoIds.has(id));
+
+                if (missingDsoIds.length > 0) {
+                    const insertRows = missingDsoIds.map(id => ({
+                        user_id: actualUserId,
+                        dso_id: id,
+                        role: invite.role,
+                    }));
+
                     const { error: accessError } = await supabaseAdmin
                         .from('user_dso_access')
-                        .insert({
-                            user_id: actualUserId,
-                            dso_id: invite.dso_id,
-                            role: invite.role,
-                        });
+                        .insert(insertRows);
 
                     if (accessError) {
-                        console.error('Error adding user to DSO:', accessError);
+                        console.error('Error adding user to DSOs:', accessError);
                         continue;
                     }
                 }
@@ -105,15 +116,14 @@ export async function POST(request: NextRequest) {
 
                 acceptedCount++;
 
-                // Get DSO name for the response
-                const { data: dso } = await supabaseAdmin
+                // Get DSO names for the response
+                const { data: dsos } = await supabaseAdmin
                     .from('dsos')
                     .select('name')
-                    .eq('id', invite.dso_id)
-                    .single();
+                    .in('id', missingDsoIds.length > 0 ? missingDsoIds : [invite.dso_id]);
 
-                if (dso) {
-                    acceptedWorkspaces.push(dso.name);
+                if (dsos) {
+                    acceptedWorkspaces.push(...dsos.map(d => d.name));
                 }
             } catch (error) {
                 console.error('Error processing invite:', error);

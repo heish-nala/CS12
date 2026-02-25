@@ -85,57 +85,67 @@ export async function POST(request: NextRequest) {
         );
 
         if (existingUser) {
-            // Check if they already have access to this DSO
+            // Get all DSOs the inviter has access to
+            const { data: inviterAccess } = await supabaseAdmin
+                .from('user_dso_access')
+                .select('dso_id')
+                .eq('user_id', currentUser.id);
+
+            const inviterDsoIds = inviterAccess?.map(a => a.dso_id) || [dso_id];
+
+            // Get DSOs the invited user already has access to
             const { data: existingAccess } = await supabaseAdmin
                 .from('user_dso_access')
-                .select('id')
+                .select('dso_id')
                 .eq('user_id', existingUser.id)
-                .eq('dso_id', dso_id)
-                .single();
+                .in('dso_id', inviterDsoIds);
 
-            if (existingAccess) {
-                // Also clean up any stale pending invites for this user/dso
+            const existingDsoIds = new Set(existingAccess?.map(a => a.dso_id) || []);
+            const missingDsoIds = inviterDsoIds.filter(id => !existingDsoIds.has(id));
+
+            if (missingDsoIds.length === 0) {
+                // Clean up stale pending invites
                 await supabaseAdmin
                     .from('team_invites')
                     .update({ status: 'accepted', accepted_at: new Date().toISOString() })
                     .eq('email', normalizedEmail)
-                    .eq('dso_id', dso_id)
                     .eq('status', 'pending');
 
                 return NextResponse.json(
-                    { error: 'This user is already a member of this workspace' },
+                    { error: 'This user already has access to all your workspaces' },
                     { status: 400 }
                 );
             }
 
-            // User exists but doesn't have access - add them directly
+            // Add user to all missing DSOs
+            const insertRows = missingDsoIds.map(id => ({
+                user_id: existingUser.id,
+                dso_id: id,
+                role: role,
+            }));
+
             const { error: accessError } = await supabaseAdmin
                 .from('user_dso_access')
-                .insert({
-                    user_id: existingUser.id,
-                    dso_id: dso_id,
-                    role: role,
-                });
+                .insert(insertRows);
 
             if (accessError) {
                 console.error('Error adding user access:', accessError);
                 return NextResponse.json(
-                    { error: 'Failed to add user to workspace' },
+                    { error: 'Failed to add user to workspaces' },
                     { status: 500 }
                 );
             }
 
-            // Mark any pending invites as accepted since user was added directly
+            // Mark any pending invites as accepted
             await supabaseAdmin
                 .from('team_invites')
                 .update({ status: 'accepted', accepted_at: new Date().toISOString() })
                 .eq('email', normalizedEmail)
-                .eq('dso_id', dso_id)
                 .eq('status', 'pending');
 
             return NextResponse.json({
                 success: true,
-                message: `${normalizedEmail} has been added to the workspace`,
+                message: `${normalizedEmail} has been added to ${missingDsoIds.length} workspace(s)`,
                 added_directly: true,
             });
         }
