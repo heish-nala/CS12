@@ -34,6 +34,7 @@ import {
     ArrowRight,
     Loader2,
 } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
 
 type Step = 'upload' | 'mapping' | 'preview';
 
@@ -76,6 +77,7 @@ export function ImportCSVDialog({
     clientId,
     isNewTable = false,
 }: ImportCSVDialogProps) {
+    const { user } = useAuth();
     const [step, setStep] = useState<Step>('upload');
     const [parsedData, setParsedData] = useState<ParsedCSV | null>(null);
     const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([]);
@@ -209,6 +211,7 @@ export function ImportCSVDialog({
                     body: JSON.stringify({
                         client_id: clientId,
                         name: 'Attendee List',
+                        user_id: user?.id,
                     }),
                 });
 
@@ -239,12 +242,14 @@ export function ImportCSVDialog({
                         name: col.name,
                         type: col.type,
                         config,
+                        user_id: user?.id,
                     }),
                 });
             }
 
             // Fetch the created columns to get their IDs
-            const tableResponse = await fetch(`/api/data-tables/${targetTableId}`);
+            const userIdParam = user?.id ? `?user_id=${user.id}` : '';
+            const tableResponse = await fetch(`/api/data-tables/${targetTableId}${userIdParam}`);
             const tableData = await tableResponse.json();
             const createdColumns = tableData.table?.columns || [];
 
@@ -278,7 +283,7 @@ export function ImportCSVDialog({
                 await fetch(`/api/data-tables/${targetTableId}/rows`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data: rowData }),
+                    body: JSON.stringify({ data: rowData, user_id: user?.id }),
                 });
             }
 

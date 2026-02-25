@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { PeriodProgress } from '@/lib/db/types';
 import { format } from 'date-fns';
 import { FileText, GraduationCap, TrendingUp } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
 
 interface PeriodProgressDialogProps {
     open: boolean;
@@ -28,6 +29,7 @@ export function PeriodProgressDialog({
     doctorId,
     doctorName,
 }: PeriodProgressDialogProps) {
+    const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [periods, setPeriods] = useState<PeriodProgress[]>([]);
 
@@ -42,7 +44,8 @@ export function PeriodProgressDialog({
 
         setLoading(true);
         try {
-            const response = await fetch(`/api/doctors/${doctorId}/periods`);
+            const userIdParam = user?.id ? `?user_id=${user.id}` : '';
+            const response = await fetch(`/api/doctors/${doctorId}/periods${userIdParam}`);
             const data = await response.json();
             setPeriods(data || []);
         } catch (error) {

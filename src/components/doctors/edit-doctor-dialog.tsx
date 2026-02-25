@@ -102,7 +102,7 @@ export function EditDoctorDialog({
             const response = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData),
+                body: JSON.stringify({ ...formData, user_id: user?.id }),
             });
 
             if (!response.ok) {

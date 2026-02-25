@@ -14,6 +14,7 @@ import {
     FileSpreadsheet,
     Loader2,
 } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
 
 const STORAGE_KEY_PREFIX = 'activity-contact-source-';
 
@@ -72,6 +73,7 @@ export function CreateTableDialog({
     onTableCreated,
     onUploadCSV,
 }: CreateTableDialogProps) {
+    const { user } = useAuth();
     const [creating, setCreating] = useState(false);
 
     const saveContactSourceConfig = (tableId: string, tableName: string, columns: DataColumn[]) => {
@@ -99,6 +101,7 @@ export function CreateTableDialog({
                 body: JSON.stringify({
                     client_id: clientId,
                     type: 'attendee_list',
+                    user_id: user?.id,
                 }),
             });
 
