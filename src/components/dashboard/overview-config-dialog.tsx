@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, GripVertical, BarChart3, Hash } from 'lucide-react';
 import { toast } from 'sonner';
 import { OverviewWidget, AggregationType, ChartType, DataColumn } from '@/lib/db/types';
+import { useAuth } from '@/contexts/auth-context';
 
 interface TableWithColumns {
     table_id: string;
@@ -67,6 +68,7 @@ export function OverviewConfigDialog({
     widgets,
     onWidgetsChange,
 }: OverviewConfigDialogProps) {
+    const { user } = useAuth();
     const [availableTables, setAvailableTables] = useState<TableWithColumns[]>([]);
     const [chartableTables, setChartableTables] = useState<TableWithColumns[]>([]);
     const [loading, setLoading] = useState(false);
@@ -88,13 +90,14 @@ export function OverviewConfigDialog({
     const fetchColumns = async () => {
         setLoading(true);
         try {
+            const userIdParam = user?.id ? `&user_id=${user.id}` : '';
             // Fetch aggregatable columns
-            const aggResponse = await fetch(`/api/overview-widgets/columns?client_id=${clientId}&type=aggregatable`);
+            const aggResponse = await fetch(`/api/overview-widgets/columns?client_id=${clientId}&type=aggregatable${userIdParam}`);
             const aggData = await aggResponse.json();
             setAvailableTables(aggData.tables || []);
 
             // Fetch chartable columns
-            const chartResponse = await fetch(`/api/overview-widgets/columns?client_id=${clientId}&type=chartable`);
+            const chartResponse = await fetch(`/api/overview-widgets/columns?client_id=${clientId}&type=chartable${userIdParam}`);
             const chartData = await chartResponse.json();
             setChartableTables(chartData.tables || []);
         } catch (error) {
@@ -141,6 +144,7 @@ export function OverviewConfigDialog({
                     type: addMode === 'metric' ? 'metric_card' : 'chart',
                     label: newLabel,
                     config,
+                    user_id: user?.id,
                 }),
             });
 
@@ -159,7 +163,8 @@ export function OverviewConfigDialog({
 
     const handleDeleteWidget = async (widgetId: string) => {
         try {
-            const response = await fetch(`/api/overview-widgets/${widgetId}`, {
+            const userIdParam = user?.id ? `?user_id=${user.id}` : '';
+            const response = await fetch(`/api/overview-widgets/${widgetId}${userIdParam}`, {
                 method: 'DELETE',
             });
 

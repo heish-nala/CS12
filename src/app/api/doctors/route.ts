@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db/client';
 import { calculateRiskLevel, getDaysSinceActivity } from '@/lib/calculations/risk-level';
-import { requireAuth, requireDsoAccess, requireAuthWithFallback, requireDsoAccessWithFallback } from '@/lib/auth';
+import { requireAuthWithFallback, requireDsoAccessWithFallback } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
@@ -102,8 +102,8 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Require write access to the DSO
-        const accessResult = await requireDsoAccess(request, dso_id, true);
+        // Require write access to the DSO (with user_id fallback from body)
+        const accessResult = await requireDsoAccessWithFallback(request, dso_id, true, body);
         if ('response' in accessResult) {
             return accessResult.response;
         }

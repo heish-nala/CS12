@@ -12,6 +12,7 @@ import {
     CommandSeparator,
 } from '@/components/ui/command';
 import { Home, Users, Settings, Building2, User, Table2, Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
 
 interface SearchResult {
     id: string;
@@ -28,6 +29,7 @@ interface SearchCommandProps {
 
 export function SearchCommand({ open, onOpenChange }: SearchCommandProps) {
     const router = useRouter();
+    const { user } = useAuth();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<SearchResult[]>([]);
     const [loading, setLoading] = useState(false);
@@ -43,7 +45,8 @@ export function SearchCommand({ open, onOpenChange }: SearchCommandProps) {
         const timeoutId = setTimeout(async () => {
             setLoading(true);
             try {
-                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+                const userIdParam = user?.id ? `&user_id=${user.id}` : '';
+                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}${userIdParam}`, {
                     signal: controller.signal,
                 });
                 const data = await response.json();

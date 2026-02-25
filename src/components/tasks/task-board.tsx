@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar, User, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { useAuth } from '@/contexts/auth-context';
 
 interface TaskWithDoctor extends Task {
     task_group: TaskGroup;
@@ -21,6 +22,7 @@ interface TaskBoardResponse {
 }
 
 export function TaskBoard() {
+    const { user } = useAuth();
     const searchParams = useSearchParams();
     const dsoId = searchParams.get('dso_id');
 
@@ -40,6 +42,7 @@ export function TaskBoard() {
             if (selectedDoctor && selectedDoctor !== 'all') {
                 params.append('doctor_id', selectedDoctor);
             }
+            if (user?.id) params.append('user_id', user.id);
 
             const response = await fetch(`/api/tasks?${params}`);
             const result = await response.json();

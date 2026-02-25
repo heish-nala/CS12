@@ -8,6 +8,7 @@ import { DashboardMetrics, OverviewWidget, OverviewWidgetWithValue, OverviewChar
 import { Activity, TrendingUp, Users, AlertTriangle, Clock, Target, MessageSquare, CheckCircle2, Zap, FileText, GraduationCap, Settings2, Plus, ArrowRight, Hash, BarChart3 } from 'lucide-react';
 import { OverviewConfigDialog } from './overview-config-dialog';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/auth-context';
 
 interface ExecutiveDashboardProps {
     dsoId?: string;
@@ -16,6 +17,7 @@ interface ExecutiveDashboardProps {
 type WidgetWithValue = OverviewWidgetWithValue | OverviewChartWidgetWithData;
 
 export function ExecutiveDashboard({ dsoId }: ExecutiveDashboardProps = {}) {
+    const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [configDialogOpen, setConfigDialogOpen] = useState(false);
     const [widgets, setWidgets] = useState<WidgetWithValue[]>([]);
@@ -27,7 +29,8 @@ export function ExecutiveDashboard({ dsoId }: ExecutiveDashboardProps = {}) {
         }
 
         try {
-            const response = await fetch(`/api/overview-widgets?client_id=${dsoId}`);
+            const userIdParam = user?.id ? `&user_id=${user.id}` : '';
+            const response = await fetch(`/api/overview-widgets?client_id=${dsoId}${userIdParam}`);
             const data = await response.json();
             setWidgets(data.widgets || []);
         } catch (error) {
@@ -35,7 +38,7 @@ export function ExecutiveDashboard({ dsoId }: ExecutiveDashboardProps = {}) {
         } finally {
             setLoading(false);
         }
-    }, [dsoId]);
+    }, [dsoId, user?.id]);
 
     useEffect(() => {
         fetchWidgets();

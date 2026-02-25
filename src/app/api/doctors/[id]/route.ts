@@ -1,19 +1,19 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, supabaseAdmin } from '@/lib/db/client';
-import { requireAuth, checkDsoAccess, hasWriteAccess } from '@/lib/auth';
+import { requireAuthWithFallback, checkDsoAccess, hasWriteAccess } from '@/lib/auth';
 
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        // Require authentication
-        const authResult = await requireAuth(request);
-        if (authResult.response) {
+        // Require authentication (with user_id param fallback)
+        const authResult = await requireAuthWithFallback(request);
+        if ('response' in authResult) {
             return authResult.response;
         }
-        const currentUser = authResult.user;
+        const userId = authResult.userId;
 
         const { id } = await params;
 
@@ -38,7 +38,7 @@ export async function GET(
         }
 
         // Verify user has access to this doctor's DSO
-        const { hasAccess } = await checkDsoAccess(currentUser.id, doctor.dso_id);
+        const { hasAccess } = await checkDsoAccess(userId, doctor.dso_id);
         if (!hasAccess) {
             return NextResponse.json(
                 { error: 'Access denied to this doctor' },
@@ -61,14 +61,21 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        // Require authentication
-        const authResult = await requireAuth(request);
-        if (authResult.response) {
-            return authResult.response;
-        }
-        const currentUser = authResult.user;
-
         const { id } = await params;
+        const body = await request.json();
+        const { name, email, phone, status, notes, user_id: bodyUserId } = body;
+
+        // Require authentication (with user_id fallback from query or body)
+        const authResult = await requireAuthWithFallback(request);
+        let userId: string;
+        if ('response' in authResult) {
+            if (!bodyUserId) {
+                return authResult.response;
+            }
+            userId = bodyUserId;
+        } else {
+            userId = authResult.userId;
+        }
 
         // First fetch the doctor to get its dso_id
         const { data: existingDoctor, error: fetchError } = await supabaseAdmin
@@ -82,16 +89,13 @@ export async function PATCH(
         }
 
         // Verify user has write access to this doctor's DSO
-        const { hasAccess, role } = await checkDsoAccess(currentUser.id, existingDoctor.dso_id);
+        const { hasAccess, role } = await checkDsoAccess(userId, existingDoctor.dso_id);
         if (!hasAccess || !hasWriteAccess(role)) {
             return NextResponse.json(
                 { error: 'Write access required to update doctor' },
                 { status: 403 }
             );
         }
-
-        const body = await request.json();
-        const { name, email, phone, status, notes } = body;
 
         const { data: doctor, error } = await supabaseAdmin
             .from('doctors')
@@ -119,12 +123,12 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        // Require authentication
-        const authResult = await requireAuth(request);
-        if (authResult.response) {
+        // Require authentication (with user_id param fallback)
+        const authResult = await requireAuthWithFallback(request);
+        if ('response' in authResult) {
             return authResult.response;
         }
-        const currentUser = authResult.user;
+        const userId = authResult.userId;
 
         const { id } = await params;
 
@@ -140,7 +144,7 @@ export async function DELETE(
         }
 
         // Verify user has admin access to delete (only admins can delete)
-        const { hasAccess, role } = await checkDsoAccess(currentUser.id, existingDoctor.dso_id);
+        const { hasAccess, role } = await checkDsoAccess(userId, existingDoctor.dso_id);
         if (!hasAccess || role !== 'admin') {
             return NextResponse.json(
                 { error: 'Admin access required to delete doctor' },

@@ -1,23 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
 import { UserRole } from '@/lib/db/types';
-import { requireAuth, checkDsoAccess } from '@/lib/auth';
+import { requireAuthWithFallback, checkDsoAccess } from '@/lib/auth';
 
 export async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        // Require authentication
-        const authResult = await requireAuth(request);
-        if (authResult.response) {
-            return authResult.response;
-        }
-        const currentUser = authResult.user;
-
         const { id } = await params;
         const body = await request.json();
-        const { role } = body;
+        const { role, user_id: bodyUserId } = body;
+
+        // Require authentication (with user_id fallback from body)
+        const authResult = await requireAuthWithFallback(request);
+        let userId: string;
+        if ('response' in authResult) {
+            if (!bodyUserId) {
+                return authResult.response;
+            }
+            userId = bodyUserId;
+        } else {
+            userId = authResult.userId;
+        }
 
         // Validate role
         const validRoles: UserRole[] = ['admin', 'manager', 'viewer'];
@@ -43,7 +48,7 @@ export async function PATCH(
         }
 
         // Verify current user has admin access to this DSO
-        const { hasAccess, role: callerRole } = await checkDsoAccess(currentUser.id, member.dso_id);
+        const { hasAccess, role: callerRole } = await checkDsoAccess(userId, member.dso_id);
         if (!hasAccess || callerRole !== 'admin') {
             return NextResponse.json(
                 { error: 'Admin access required to manage team members' },
@@ -96,12 +101,12 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        // Require authentication
-        const authResult = await requireAuth(request);
-        if (authResult.response) {
+        // Require authentication (with user_id param fallback)
+        const authResult = await requireAuthWithFallback(request);
+        if ('response' in authResult) {
             return authResult.response;
         }
-        const currentUser = authResult.user;
+        const userId = authResult.userId;
 
         const { id } = await params;
 
@@ -120,7 +125,7 @@ export async function DELETE(
         }
 
         // Verify current user has admin access to this DSO
-        const { hasAccess, role: callerRole } = await checkDsoAccess(currentUser.id, member.dso_id);
+        const { hasAccess, role: callerRole } = await checkDsoAccess(userId, member.dso_id);
         if (!hasAccess || callerRole !== 'admin') {
             return NextResponse.json(
                 { error: 'Admin access required to remove team members' },

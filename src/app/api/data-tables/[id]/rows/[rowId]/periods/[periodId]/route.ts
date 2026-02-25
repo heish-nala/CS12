@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
-import { requireDsoAccess, checkDsoAccess } from '@/lib/auth';
+import { requireDsoAccessWithFallback } from '@/lib/auth';
 
 // GET /api/data-tables/[id]/rows/[rowId]/periods/[periodId] - Get a specific period
 export async function GET(
@@ -20,8 +20,8 @@ export async function GET(
         return NextResponse.json({ error: 'Table not found' }, { status: 404 });
     }
 
-    // Require access to the client/DSO
-    const accessResult = await requireDsoAccess(request, table.client_id);
+    // Require access to the client/DSO (with user_id param fallback)
+    const accessResult = await requireDsoAccessWithFallback(request, table.client_id);
     if ('response' in accessResult) {
         return accessResult.response;
     }
@@ -59,18 +59,10 @@ export async function PUT(
         return NextResponse.json({ error: 'Table not found' }, { status: 404 });
     }
 
-    // Try session auth first, then user_id fallback
-    const accessResult = await requireDsoAccess(request, table.client_id, true);
+    // Require write access to the client/DSO (with user_id fallback from body)
+    const accessResult = await requireDsoAccessWithFallback(request, table.client_id, true, body);
     if ('response' in accessResult) {
-        // Session auth failed, try user_id from body
-        if (!user_id) {
-            return accessResult.response;
-        }
-        // Verify user has write access via user_id
-        const { hasAccess, role } = await checkDsoAccess(user_id, table.client_id);
-        if (!hasAccess || (role !== 'admin' && role !== 'manager')) {
-            return NextResponse.json({ error: 'Write access required' }, { status: 403 });
-        }
+        return accessResult.response;
     }
 
     const { metrics } = body;
@@ -128,8 +120,8 @@ export async function DELETE(
         return NextResponse.json({ error: 'Table not found' }, { status: 404 });
     }
 
-    // Require write access to the client/DSO
-    const accessResult = await requireDsoAccess(request, table.client_id, true);
+    // Require write access to the client/DSO (with user_id param fallback)
+    const accessResult = await requireDsoAccessWithFallback(request, table.client_id, true);
     if ('response' in accessResult) {
         return accessResult.response;
     }

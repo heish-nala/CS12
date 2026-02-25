@@ -10,16 +10,16 @@ import {
     getChartableColumns,
 } from '@/lib/mock-data';
 import { OverviewMetricCard, OverviewChartWidget } from '@/lib/db/types';
-import { requireAuth, checkDsoAccess } from '@/lib/auth';
+import { requireAuthWithFallback, checkDsoAccess } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
-        // Require authentication
-        const authResult = await requireAuth(request);
-        if (authResult.response) {
+        // Require authentication (with user_id param fallback)
+        const authResult = await requireAuthWithFallback(request);
+        if ('response' in authResult) {
             return authResult.response;
         }
-        const currentUser = authResult.user;
+        const userId = authResult.userId;
 
         const { searchParams } = new URL(request.url);
         const clientId = searchParams.get('client_id');
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Verify user has access to this client/DSO
-        const { hasAccess } = await checkDsoAccess(currentUser.id, clientId);
+        const { hasAccess } = await checkDsoAccess(userId, clientId);
         if (!hasAccess) {
             return NextResponse.json(
                 { error: 'Access denied to this workspace' },
@@ -75,15 +75,20 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
-        // Require authentication
-        const authResult = await requireAuth(request);
-        if (authResult.response) {
-            return authResult.response;
-        }
-        const currentUser = authResult.user;
-
         const body = await request.json();
-        const { client_id, type, label, config } = body;
+        const { client_id, type, label, config, user_id: bodyUserId } = body;
+
+        // Require authentication (with user_id fallback from body)
+        const authResult = await requireAuthWithFallback(request);
+        let userId: string;
+        if ('response' in authResult) {
+            if (!bodyUserId) {
+                return authResult.response;
+            }
+            userId = bodyUserId;
+        } else {
+            userId = authResult.userId;
+        }
 
         if (!client_id) {
             return NextResponse.json(
@@ -93,7 +98,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Verify user has write access to this client/DSO
-        const { hasAccess, role } = await checkDsoAccess(currentUser.id, client_id);
+        const { hasAccess, role } = await checkDsoAccess(userId, client_id);
         if (!hasAccess || (role !== 'admin' && role !== 'manager')) {
             return NextResponse.json(
                 { error: 'Write access required to create widgets' },

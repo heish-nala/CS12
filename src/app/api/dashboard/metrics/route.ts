@@ -2,23 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase, supabaseAdmin } from '@/lib/db/client';
 import { DashboardMetrics } from '@/lib/db/types';
 import { calculateRiskLevel, getDaysSinceActivity } from '@/lib/calculations/risk-level';
-import { requireAuth, checkDsoAccess } from '@/lib/auth';
+import { requireAuthWithFallback, checkDsoAccess } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
-        // Require authentication
-        const authResult = await requireAuth(request);
-        if (authResult.response) {
+        // Require authentication (with user_id param fallback)
+        const authResult = await requireAuthWithFallback(request);
+        if ('response' in authResult) {
             return authResult.response;
         }
-        const currentUser = authResult.user;
+        const userId = authResult.userId;
 
         const searchParams = request.nextUrl.searchParams;
         const dsoId = searchParams.get('dso_id');
 
         // If dso_id is provided, verify user has access
         if (dsoId) {
-            const { hasAccess } = await checkDsoAccess(currentUser.id, dsoId);
+            const { hasAccess } = await checkDsoAccess(userId, dsoId);
             if (!hasAccess) {
                 return NextResponse.json(
                     { error: 'Access denied to this workspace' },
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
         const { data: userAccess } = await supabaseAdmin
             .from('user_dso_access')
             .select('dso_id')
-            .eq('user_id', currentUser.id);
+            .eq('user_id', userId);
 
         const accessibleDsoIds = userAccess?.map(a => a.dso_id) || [];
 

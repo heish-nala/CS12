@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
-import { requireAuth } from '@/lib/auth';
+import { requireAuthWithFallback } from '@/lib/auth';
 
 export interface SearchResult {
     id: string;
@@ -13,12 +13,12 @@ export interface SearchResult {
 
 export async function GET(request: NextRequest) {
     try {
-        // Require authentication
-        const authResult = await requireAuth(request);
-        if (authResult.response) {
+        // Require authentication (with user_id param fallback)
+        const authResult = await requireAuthWithFallback(request);
+        if ('response' in authResult) {
             return authResult.response;
         }
-        const currentUser = authResult.user;
+        const userId = authResult.userId;
 
         const { searchParams } = new URL(request.url);
         const query = searchParams.get('q')?.toLowerCase() || '';
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
         const { data: userAccess } = await supabaseAdmin
             .from('user_dso_access')
             .select('dso_id')
-            .eq('user_id', currentUser.id);
+            .eq('user_id', userId);
 
         const accessibleDsoIds = userAccess?.map(a => a.dso_id) || [];
 

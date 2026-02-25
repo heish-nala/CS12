@@ -31,6 +31,7 @@ import { TableColumnHeader } from './table-column-header';
 import { CustomFieldCell } from './custom-field-cell';
 import { toast } from 'sonner';
 import { useMetricConfigOrDefault } from '@/contexts/metric-config-context';
+import { useAuth } from '@/contexts/auth-context';
 
 interface DoctorTrackerProps {
     dsoId?: string;
@@ -165,6 +166,7 @@ const DoctorRow = memo(function DoctorRow({
 });
 
 export function DoctorTracker({ dsoId }: DoctorTrackerProps) {
+    const { user } = useAuth();
     const metricConfig = useMetricConfigOrDefault();
     const [doctors, setDoctors] = useState<DoctorWithDSO[]>([]);
     const [loading, setLoading] = useState(true);
@@ -259,6 +261,7 @@ export function DoctorTracker({ dsoId }: DoctorTrackerProps) {
         try {
             const params = new URLSearchParams();
             if (dsoId) params.append('dso_id', dsoId);
+            if (user?.id) params.append('user_id', user.id);
 
             const response = await fetch(`/api/doctors?${params}`);
             const data = await response.json();
@@ -275,6 +278,7 @@ export function DoctorTracker({ dsoId }: DoctorTrackerProps) {
             const params = new URLSearchParams();
             if (dsoId) params.append('dso_id', dsoId);
             if (searchQuery) params.append('search', searchQuery);
+            if (user?.id) params.append('user_id', user.id);
 
             const response = await fetch(`/api/doctors?${params}`);
             const data = await response.json();
@@ -293,10 +297,10 @@ export function DoctorTracker({ dsoId }: DoctorTrackerProps) {
             );
 
             // Make API call (fire and forget with error handling)
-            fetch(`/api/doctors/${doctorId}`, {
+            fetch(`/api/doctors/${doctorId}?user_id=${user?.id || ''}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ [field]: value }),
+                body: JSON.stringify({ [field]: value, user_id: user?.id }),
             })
                 .then(response => {
                     if (!response.ok) throw new Error('Failed to update doctor');

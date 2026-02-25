@@ -102,7 +102,8 @@ export function TeamMembers() {
         if (!currentDsoId) return;
 
         try {
-            const response = await fetch(`/api/team/invite?dso_id=${currentDsoId}`);
+            const userIdParam = user?.id ? `&user_id=${user.id}` : '';
+            const response = await fetch(`/api/team/invite?dso_id=${currentDsoId}${userIdParam}`);
             if (response.ok) {
                 const data = await response.json();
                 setPendingInvites(data.invites || []);
@@ -115,7 +116,8 @@ export function TeamMembers() {
     const handleCancelInvite = async (inviteId: string) => {
         setCancellingInvite(inviteId);
         try {
-            const response = await fetch(`/api/team/invite?id=${inviteId}`, {
+            const userIdParam = user?.id ? `&user_id=${user.id}` : '';
+            const response = await fetch(`/api/team/invite?id=${inviteId}${userIdParam}`, {
                 method: 'DELETE',
             });
 
@@ -159,7 +161,7 @@ export function TeamMembers() {
                 if (data.dso_id) {
                     setCurrentDsoId(data.dso_id);
                     // Fetch invites immediately in parallel
-                    fetch(`/api/team/invite?dso_id=${data.dso_id}`)
+                    fetch(`/api/team/invite?dso_id=${data.dso_id}&user_id=${user.id}`)
                         .then(res => res.ok ? res.json() : { invites: [] })
                         .then(inviteData => setPendingInvites(inviteData.invites || []))
                         .catch(() => setPendingInvites([]));
@@ -229,10 +231,11 @@ export function TeamMembers() {
 
         setUpdatingRole(memberId);
         try {
-            const response = await fetch(`/api/team/${memberId}`, {
+            const userIdParam = user?.id ? `?user_id=${user.id}` : '';
+            const response = await fetch(`/api/team/${memberId}${userIdParam}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ role: newRole }),
+                body: JSON.stringify({ role: newRole, user_id: user?.id }),
             });
 
             if (response.ok) {
@@ -267,7 +270,8 @@ export function TeamMembers() {
         }
 
         try {
-            const response = await fetch(`/api/team/${memberId}`, {
+            const userIdParam = user?.id ? `?user_id=${user.id}` : '';
+            const response = await fetch(`/api/team/${memberId}${userIdParam}`, {
                 method: 'DELETE',
             });
 

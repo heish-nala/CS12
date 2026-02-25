@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
-import { requireAuth, checkDsoAccess } from '@/lib/auth';
+import { requireAuthWithFallback, checkDsoAccess } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
-        // Require authentication
-        const authResult = await requireAuth(request);
-        if (authResult.response) {
+        // Require authentication (with user_id param fallback)
+        const authResult = await requireAuthWithFallback(request);
+        if ('response' in authResult) {
             return authResult.response;
         }
-        const currentUser = authResult.user;
+        const userId = authResult.userId;
 
         const searchParams = request.nextUrl.searchParams;
         const doctorId = searchParams.get('doctor_id');
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
         // If dso_id is provided, verify user has access
         if (dsoId) {
-            const { hasAccess } = await checkDsoAccess(currentUser.id, dsoId);
+            const { hasAccess } = await checkDsoAccess(userId, dsoId);
             if (!hasAccess) {
                 return NextResponse.json(
                     { error: 'Access denied to this workspace' },
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
                 .single();
 
             if (doctor) {
-                const { hasAccess } = await checkDsoAccess(currentUser.id, doctor.dso_id);
+                const { hasAccess } = await checkDsoAccess(userId, doctor.dso_id);
                 if (!hasAccess) {
                     return NextResponse.json(
                         { error: 'Access denied to this doctor' },
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
         const { data: userAccess } = await supabaseAdmin
             .from('user_dso_access')
             .select('dso_id')
-            .eq('user_id', currentUser.id);
+            .eq('user_id', userId);
 
         const accessibleDsoIds = userAccess?.map(a => a.dso_id) || [];
 
@@ -135,14 +135,19 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
-        // Require authentication
-        const authResult = await requireAuth(request);
-        if (authResult.response) {
-            return authResult.response;
-        }
-        const currentUser = authResult.user;
-
         const body = await request.json();
+
+        // Require authentication (with user_id fallback from body)
+        const authResult = await requireAuthWithFallback(request);
+        let currentUserId: string;
+        if ('response' in authResult) {
+            if (!body.user_id) {
+                return authResult.response;
+            }
+            currentUserId = body.user_id;
+        } else {
+            currentUserId = authResult.userId;
+        }
 
         // If doctor_id is provided, verify user has write access to the doctor's DSO
         if (body.doctor_id) {
@@ -153,7 +158,7 @@ export async function POST(request: NextRequest) {
                 .single();
 
             if (doctor) {
-                const { hasAccess, role } = await checkDsoAccess(currentUser.id, doctor.dso_id);
+                const { hasAccess, role } = await checkDsoAccess(currentUserId, doctor.dso_id);
                 if (!hasAccess || (role !== 'admin' && role !== 'manager')) {
                     return NextResponse.json(
                         { error: 'Write access required to create tasks' },

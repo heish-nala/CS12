@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
 import { UserRole } from '@/lib/db/types';
-import { requireAuth, checkDsoAccess } from '@/lib/auth';
+import { requireAuth, requireAuthWithFallback, checkDsoAccess } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
     try {
@@ -239,12 +239,12 @@ export async function POST(request: NextRequest) {
 // GET endpoint to list pending invites for a DSO
 export async function GET(request: NextRequest) {
     try {
-        // Require authentication
-        const authResult = await requireAuth(request);
-        if (authResult.response) {
+        // Require authentication (with user_id param fallback)
+        const authResult = await requireAuthWithFallback(request);
+        if ('response' in authResult) {
             return authResult.response;
         }
-        const currentUser = authResult.user;
+        const userId = authResult.userId;
 
         const { searchParams } = new URL(request.url);
         const dsoId = searchParams.get('dso_id');
@@ -257,7 +257,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Verify current user has admin access to view invites
-        const { hasAccess, role: callerRole } = await checkDsoAccess(currentUser.id, dsoId);
+        const { hasAccess, role: callerRole } = await checkDsoAccess(userId, dsoId);
         if (!hasAccess || callerRole !== 'admin') {
             return NextResponse.json(
                 { error: 'Admin access required to view pending invites' },
@@ -337,12 +337,12 @@ export async function GET(request: NextRequest) {
 // DELETE endpoint to cancel an invite
 export async function DELETE(request: NextRequest) {
     try {
-        // Require authentication
-        const authResult = await requireAuth(request);
-        if (authResult.response) {
+        // Require authentication (with user_id param fallback)
+        const authResult = await requireAuthWithFallback(request);
+        if ('response' in authResult) {
             return authResult.response;
         }
-        const currentUser = authResult.user;
+        const userId = authResult.userId;
 
         const { searchParams } = new URL(request.url);
         const inviteId = searchParams.get('id');
@@ -369,7 +369,7 @@ export async function DELETE(request: NextRequest) {
         }
 
         // Verify current user has admin access to cancel invites
-        const { hasAccess, role: callerRole } = await checkDsoAccess(currentUser.id, invite.dso_id);
+        const { hasAccess, role: callerRole } = await checkDsoAccess(userId, invite.dso_id);
         if (!hasAccess || callerRole !== 'admin') {
             return NextResponse.json(
                 { error: 'Admin access required to cancel invites' },

@@ -6,27 +6,34 @@ import { requireAuth } from '@/lib/auth';
 // Called when a user logs in to check and accept any pending invites
 export async function POST(request: NextRequest) {
     try {
-        // Require authentication
-        const authResult = await requireAuth(request);
-        if (authResult.response) {
-            return authResult.response;
-        }
-        const currentUser = authResult.user;
-
         const body = await request.json();
         const { user_id, email } = body;
 
-        // Validate that the request is for the authenticated user
-        if (user_id && user_id !== currentUser.id) {
-            return NextResponse.json(
-                { error: 'Cannot accept invites for another user' },
-                { status: 403 }
-            );
+        // Try session auth first, fall back to user_id from body
+        const authResult = await requireAuth(request);
+        let actualUserId: string;
+        let userEmail: string;
+
+        if ('response' in authResult) {
+            // Session auth failed - use user_id from body as fallback
+            if (!user_id) {
+                return authResult.response;
+            }
+            actualUserId = user_id;
+            userEmail = email || '';
+        } else {
+            actualUserId = authResult.user.id;
+            userEmail = email || authResult.user.email;
+            // Validate that the request is for the authenticated user
+            if (user_id && user_id !== actualUserId) {
+                return NextResponse.json(
+                    { error: 'Cannot accept invites for another user' },
+                    { status: 403 }
+                );
+            }
         }
 
-        // Use authenticated user's info (more secure than trusting body params)
-        const actualUserId = currentUser.id;
-        const normalizedEmail = (email || currentUser.email).toLowerCase().trim();
+        const normalizedEmail = userEmail.toLowerCase().trim();
 
         // Find all pending, non-expired invites for this email
         const { data: pendingInvites, error: fetchError } = await supabaseAdmin
