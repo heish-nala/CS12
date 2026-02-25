@@ -282,17 +282,16 @@ export function TeamMembers() {
         }
     }, [members, adminCount]);
 
-    const handleAddMember = useCallback((newMember: TeamMember) => {
-        setMembers(prev => [...prev, newMember]);
-    }, []);
-
     const handleDialogClose = useCallback((open: boolean) => {
         setAddDialogOpen(open);
-        // Refresh pending invites when dialog closes
-        if (!open && currentDsoId) {
-            fetchPendingInvites();
+        // Refresh members and pending invites when dialog closes
+        if (!open) {
+            fetchMembers();
+            if (currentDsoId) {
+                fetchPendingInvites();
+            }
         }
-    }, [currentDsoId, fetchPendingInvites]);
+    }, [currentDsoId, fetchPendingInvites, fetchMembers]);
 
     const getInitials = useCallback((name: string) => {
         return name
@@ -512,7 +511,6 @@ export function TeamMembers() {
             <AddMemberDialog
                 open={addDialogOpen}
                 onOpenChange={handleDialogClose}
-                onMemberAdded={handleAddMember}
                 existingEmails={members.map(m => m.email)}
                 dsoId={currentDsoId}
                 currentUserId={user?.id}
