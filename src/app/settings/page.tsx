@@ -5,7 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TeamMembers } from '@/components/settings/team-members';
 import { Button } from '@/components/ui/button';
 import { useOnboarding } from '@/contexts/onboarding-context';
-import { Users, Settings as SettingsIcon, Bell, PlayCircle, Cog } from 'lucide-react';
+import { OrgSettings } from '@/components/settings/org-settings';
+import { Users, Settings as SettingsIcon, Bell, PlayCircle, Cog, Building2 } from 'lucide-react';
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState('team');
@@ -25,7 +26,7 @@ export default function SettingsPage() {
                             Settings
                         </h1>
                         <p className="text-sm text-muted-foreground mt-1">
-                            Manage your workspace settings and team members
+                            Manage your organization, workspace settings, and team members
                         </p>
                     </div>
                 </div>
@@ -41,6 +42,10 @@ export default function SettingsPage() {
                                 <Users className="h-4 w-4" />
                                 Team
                             </TabsTrigger>
+                            <TabsTrigger value="organization" className="gap-2">
+                                <Building2 className="h-4 w-4" />
+                                Organization
+                            </TabsTrigger>
                             <TabsTrigger value="workspace" className="gap-2">
                                 <SettingsIcon className="h-4 w-4" />
                                 Workspace
@@ -53,6 +58,10 @@ export default function SettingsPage() {
 
                         <TabsContent value="team" className="mt-0">
                             <TeamMembers />
+                        </TabsContent>
+
+                        <TabsContent value="organization" className="mt-0">
+                            <OrgSettings />
                         </TabsContent>
 
                         <TabsContent value="workspace" className="mt-0">
