@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** A team of customer success agents can manage a portfolio of DSOs within one organization, with admins controlling who has access to which DSOs
-**Current focus:** Phase 4 in progress — Plan 02 complete (OrgContext provider + sidebar org name)
+**Current focus:** Phase 4 in progress — Plans 01 and 02 complete (backend DSO routes + OrgContext provider)
 
 ## Current Position
 
 Phase: 4 of 5 in progress (Org Context and Settings UI)
-Plan: 2 of 4 complete in Phase 4
-Status: 04-02 complete — OrgContext provider, useOrg hook, OrgProvider in layout, sidebar shows dynamic org name
-Last activity: 2026-02-27 — Completed 04-02: OrgContext + sidebar wiring
+Plan: 2 of 3 complete in Phase 4
+Status: 04-01 complete — GET /api/orgs/[id]/dsos, GET/POST/DELETE /api/orgs/[id]/dso-access; 04-02 complete — OrgContext provider, useOrg hook, OrgProvider in layout, sidebar dynamic org name
+Last activity: 2026-02-27 — Completed 04-01: org DSO listing + user_dso_access CRUD routes
 
 Progress: [████████░░] 75%
 
@@ -30,7 +30,7 @@ Progress: [████████░░] 75%
 | 01-database-foundation | 2 | ~9 min | ~4.5 min |
 | 02-auth-helpers-and-org-api | 3 | ~18 min | ~6 min |
 | 03-invite-system | 2 (in progress) | ~5 min | ~2.5 min |
-| 04-org-context-and-settings-ui | 2 (in progress) | ~2 min | ~1 min |
+| 04-org-context-and-settings-ui | 2 (in progress) | ~4 min | ~2 min |
 
 **Recent Trend:**
 - Last 7 plans: 4 min, ~5 min, 8 min, ~2 min, ~8 min, ~2 min, ~3 min
@@ -79,6 +79,10 @@ Recent decisions affecting current work:
 - [Phase 04-02]: v1 uses orgs[0] with console.warn for multi-org users — explicit v2 placeholder via MORG-02 comment
 - [Phase 04-02]: OrgProvider placed inside ClientsProvider but wrapping OnboardingProvider — mirrors existing nesting convention
 - [Phase 04-02]: Sidebar falls back to 'CS12' when org is null — handles loading state and edge case gracefully
+- [Phase 04-01]: GET /api/orgs/[id]/dso-access requires owner/admin; GET /api/orgs/[id]/dsos requires only org membership
+- [Phase 04-01]: Empty dsoIds guard returns { access: [] } before .in() query to avoid Supabase error
+- [Phase 04-01]: POST /api/orgs/[id]/dso-access validates DSO belongs to org AND user is org member before insert (cross-org security)
+- [Phase 04-01]: DELETE /api/orgs/[id]/dso-access uses URL search params for user_id and dso_id (Phase 2 REST convention)
 
 ### Pending Todos
 
@@ -95,5 +99,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 04-02-PLAN.md — OrgContext provider + sidebar org name
+Stopped at: Completed 04-01-PLAN.md — org DSO listing and user_dso_access CRUD routes
 Resume file: None — continue Phase 4 with 04-03
