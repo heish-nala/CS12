@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 ## Current Position
 
 Phase: 1 of 5 (Database Foundation)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-02-26 — Roadmap created, requirements mapped, ready for Phase 1 planning
+Plan: 1 of 2 complete in current phase
+Status: Executing Phase 1
+Last activity: 2026-02-26 — Completed 01-01: org tables migration + seed.sql update
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 10%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: -
+- Total plans completed: 1
+- Average duration: 4 min
+- Total execution time: 4 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 01-database-foundation | 1 | 4 min | 4 min |
 
 **Recent Trend:**
-- Last 5 plans: -
-- Trend: -
+- Last 5 plans: 4 min
+- Trend: (baseline)
 
 *Updated after each plan completion*
 
@@ -47,6 +47,10 @@ Recent decisions affecting current work:
 - [Constraint]: Zero-downtime required — user_dso_access must stay in place until ALL 31 routes are verified on the new org model (Phase 5).
 - [Risk]: Existing invite bug (inviter's ALL DSOs granted on invite) must be fixed in Phase 3 BEFORE building org-scoped invites, or it becomes a cross-org data leak.
 - [Risk]: ADD COLUMN NOT NULL on live dsos table requires three-step pattern: add nullable → backfill → constrain separately.
+- [Phase 01-database-foundation]: No RLS on organizations/org_members/user_profiles — supabaseAdmin bypasses RLS, dead code
+- [Phase 01-database-foundation]: Three-step NOT NULL pattern on dsos.org_id to avoid ACCESS EXCLUSIVE lock on production
+- [Phase 01-database-foundation]: Slug-based subquery for org references within migration — avoids hardcoded UUID
+- [Phase 01-database-foundation]: Valentina cleanup in Phase 1 — removes erroneous access before Phase 3 builds org-scoped invites
 
 ### Pending Todos
 
@@ -56,11 +60,11 @@ None yet.
 
 - **Phase 5 pre-work**: 31 routes need individual audit before Phase 5 planning — complexity varies. Research flags this as needing a route inventory pass. Flag for plan-phase to address.
 - **Open product decision**: Does org membership grant access to all DSOs in the org, or does per-DSO access control (user_dso_access) remain permanent? If permanent, Phase 5 is more nuanced. Resolve before Phase 5 planning begins.
-- **Local Supabase**: Confirm local Supabase is running and migrations apply cleanly before Phase 1 execution begins (per CLAUDE.md requirements).
-- **Valentina cleanup**: Valentina has erroneous access to all 5 DSOs. Address during data migration in Phase 1.
+- **Local Supabase / Docker**: Docker Desktop is not running on this machine. supabase db reset could not be run. Validation was performed against local PostgreSQL 17 instead. When Docker is available, run supabase db reset to confirm with full Supabase CLI stack.
+- **Valentina cleanup**: RESOLVED — Valentina's erroneous user_dso_access rows deleted in 20260226000000_add_org_tables.sql migration.
 
 ## Session Continuity
 
-Last session: 2026-02-26
-Stopped at: Roadmap created — Phase 1 ready to plan
-Resume file: None
+Last session: 2026-02-27
+Stopped at: Completed 01-01-PLAN.md — org tables migration + seed.sql
+Resume file: None — proceed with 01-02-PLAN.md
