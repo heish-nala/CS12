@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** A team of customer success agents can manage a portfolio of DSOs within one organization, with admins controlling who has access to which DSOs
-**Current focus:** Phase 4 in progress — Plans 01 and 02 complete (backend DSO routes + OrgContext provider)
+**Current focus:** Phase 4 complete — All 3 plans done (backend DSO routes, OrgContext provider, and Organization settings UI)
 
 ## Current Position
 
-Phase: 4 of 5 in progress (Org Context and Settings UI)
-Plan: 2 of 3 complete in Phase 4
-Status: 04-01 complete — GET /api/orgs/[id]/dsos, GET/POST/DELETE /api/orgs/[id]/dso-access; 04-02 complete — OrgContext provider, useOrg hook, OrgProvider in layout, sidebar dynamic org name
-Last activity: 2026-02-27 — Completed 04-01: org DSO listing + user_dso_access CRUD routes
+Phase: 4 of 5 complete (Org Context and Settings UI)
+Plan: 3 of 3 complete in Phase 4
+Status: 04-01 complete — GET /api/orgs/[id]/dsos, GET/POST/DELETE /api/orgs/[id]/dso-access; 04-02 complete — OrgContext provider, useOrg hook, OrgProvider in layout, sidebar dynamic org name; 04-03 complete — OrgSettings component, DsoAssignmentDialog, Organization tab in settings
+Last activity: 2026-02-27 — Completed 04-03: Organization settings UI with DSO assignment management
 
-Progress: [████████░░] 75%
+Progress: [██████████] 100% (Phase 4 complete)
 
 ## Performance Metrics
 
@@ -30,7 +30,7 @@ Progress: [████████░░] 75%
 | 01-database-foundation | 2 | ~9 min | ~4.5 min |
 | 02-auth-helpers-and-org-api | 3 | ~18 min | ~6 min |
 | 03-invite-system | 2 (in progress) | ~5 min | ~2.5 min |
-| 04-org-context-and-settings-ui | 2 (in progress) | ~4 min | ~2 min |
+| 04-org-context-and-settings-ui | 3 (complete) | ~6 min | ~2 min |
 
 **Recent Trend:**
 - Last 7 plans: 4 min, ~5 min, 8 min, ~2 min, ~8 min, ~2 min, ~3 min
@@ -83,6 +83,10 @@ Recent decisions affecting current work:
 - [Phase 04-01]: Empty dsoIds guard returns { access: [] } before .in() query to avoid Supabase error
 - [Phase 04-01]: POST /api/orgs/[id]/dso-access validates DSO belongs to org AND user is org member before insert (cross-org security)
 - [Phase 04-01]: DELETE /api/orgs/[id]/dso-access uses URL search params for user_id and dso_id (Phase 2 REST convention)
+- [Phase 04-03]: canManage derives from org.role via useOrg() — NOT hardcoded — satisfies UI-03 role gating requirement
+- [Phase 04-03]: Admin/owner fetches all 3 endpoints in parallel; member fetches only members list (least-privilege fetch pattern)
+- [Phase 04-03]: DsoAssignmentDialog computes toAdd/toRemove diff before saving — only touches changed assignments via Promise.all
+- [Phase 04-03]: 409 on duplicate add is possible if UI gets out of sync; handled by onSave refetch
 
 ### Pending Todos
 
@@ -99,5 +103,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 04-01-PLAN.md — org DSO listing and user_dso_access CRUD routes
-Resume file: None — continue Phase 4 with 04-03
+Stopped at: Completed 04-03-PLAN.md — Organization settings UI with DSO assignment management
+Resume file: None — Phase 4 complete, ready for Phase 5 planning
