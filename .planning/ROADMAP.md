@@ -73,7 +73,11 @@ Plans:
   1. Org settings page shows: org name, list of all members with their roles, and which DSOs each member is assigned to
   2. A member viewing the app can see exactly which DSOs they have access to — no DSOs from other orgs appear
   3. An admin can add or remove a member's access to a specific DSO from the settings page and the change takes effect immediately on next page load
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 04-01-PLAN.md — Backend API routes for org DSO listing and DSO access CRUD
+- [ ] 04-02-PLAN.md — OrgContext provider + sidebar org name display
+- [ ] 04-03-PLAN.md — Organization settings tab with member list, DSO assignments, and assignment dialog
 
 ### Phase 5: Scope All Routes and Full Isolation
 **Goal**: Every data operation in the app — all 31 existing API routes — verifies org membership before returning any data, and DSO lists are filtered by the active org so no cross-org data is reachable
@@ -98,7 +102,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Database Foundation | 0/2 | Planned | - |
 | 2. Auth Helpers and Org API | 0/3 | Planned | - |
 | 3. Invite System | 0/2 | Planned | - |
-| 4. Org Context and Settings UI | 0/TBD | Not started | - |
+| 4. Org Context and Settings UI | 0/3 | Planned | - |
 | 5. Scope All Routes and Full Isolation | 0/TBD | Not started | - |
 
 ---
