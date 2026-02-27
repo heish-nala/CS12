@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** A team of customer success agents can manage a portfolio of DSOs within one organization, with admins controlling who has access to which DSOs
-**Current focus:** Phase 3 in progress — Plan 01 complete (invite bug fixed + org_invites table)
+**Current focus:** Phase 3 in progress — Plan 02 complete (org invite endpoints + auth confirm + accept-invite + auth-context)
 
 ## Current Position
 
 Phase: 3 of 5 in progress (Invite System)
-Plan: 1 of 3 complete in Phase 3
-Status: 03-01 complete — ISO-04 bug closed, org_invites migration created
-Last activity: 2026-02-27 — Completed 03-01: invite bug fix + org_invites table
+Plan: 2 of 3 complete in Phase 3
+Status: 03-02 complete — org invite send/list, auth confirm route, accept-invite endpoint, auth-context integration
+Last activity: 2026-02-27 — Completed 03-02: full org invite flow
 
-Progress: [██████░░░░] 57%
+Progress: [███████░░░] 64%
 
 ## Performance Metrics
 
@@ -29,10 +29,10 @@ Progress: [██████░░░░] 57%
 |-------|-------|-------|----------|
 | 01-database-foundation | 2 | ~9 min | ~4.5 min |
 | 02-auth-helpers-and-org-api | 3 | ~18 min | ~6 min |
-| 03-invite-system | 1 (in progress) | ~2 min | ~2 min |
+| 03-invite-system | 2 (in progress) | ~5 min | ~2.5 min |
 
 **Recent Trend:**
-- Last 6 plans: 4 min, ~5 min, 8 min, ~2 min, ~8 min, ~2 min
+- Last 7 plans: 4 min, ~5 min, 8 min, ~2 min, ~8 min, ~2 min, ~3 min
 - Trend: consistent ~5 min average
 
 *Updated after each plan completion*
@@ -70,6 +70,10 @@ Recent decisions affecting current work:
 - [Phase 03-01]: org_invites uses org_id FK (not dso_id) with org roles (owner/admin/member) — separate from team_invites
 - [Phase 03-01]: No RLS on org_invites — consistent with Phase 1 supabaseAdmin bypass decision
 - [Phase 03-01]: team_invites table and routes preserved — Phase 5 will deprecate old DSO-scoped model
+- [Phase 03-02]: verifyOtp (not exchangeCodeForSession) for invite links — Supabase does not support PKCE for type=invite
+- [Phase 03-02]: Existing users added directly to org_members, no inviteUserByEmail — avoids Supabase error for registered users
+- [Phase 03-02]: inviteUserByEmail rollback on failure — delete org_invites row to prevent orphaned pending invites
+- [Phase 03-02]: Both checkAndAcceptInvites (team/DSO) and checkAndAcceptOrgInvites (org) share inviteCheckDone ref guard
 
 ### Pending Todos
 
@@ -86,5 +90,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 03-01-PLAN.md — invite bug fix (ISO-04) + org_invites migration
-Resume file: None — continue Phase 3 with 03-02 (org invite send/accept endpoints)
+Stopped at: Completed 03-02-PLAN.md — full org invite flow (send/confirm/accept + auth-context)
+Resume file: None — continue Phase 3 with 03-03 (if exists) or move to Phase 4
