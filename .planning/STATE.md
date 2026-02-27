@@ -5,34 +5,34 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** A team of customer success agents can manage a portfolio of DSOs within one organization, with admins controlling who has access to which DSOs
-**Current focus:** Phase 2 — Auth Helpers and Org API
+**Current focus:** Phase 2 complete — begin Phase 3 (Team Invites)
 
 ## Current Position
 
-Phase: 2 of 5 (Auth Helpers and Org API)
-Plan: 2 of 3 complete in current phase
-Status: In progress — 02-02 complete, proceed with 02-03 (org member management routes)
-Last activity: 2026-02-27 — Completed 02-02: org CRUD API routes + dsos POST org_id fix
+Phase: 2 of 5 complete (Auth Helpers and Org API)
+Plan: 3 of 3 complete in Phase 2 — Phase 2 DONE
+Status: Phase 2 complete — all org API routes, auth helpers, and auto-signup trigger delivered
+Last activity: 2026-02-27 — Completed 02-03: member management routes + auto-org signup trigger
 
-Progress: [████░░░░░░] 40%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 5.7 min
-- Total execution time: ~17 min
+- Total plans completed: 5
+- Average duration: ~6 min
+- Total execution time: ~25 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-database-foundation | 2 | ~9 min | ~4.5 min |
-| 02-auth-helpers-and-org-api | 2 | ~10 min | ~5 min |
+| 02-auth-helpers-and-org-api | 3 | ~18 min | ~6 min |
 
 **Recent Trend:**
-- Last 5 plans: 4 min, ~5 min, 8 min
-- Trend: (baseline)
+- Last 5 plans: 4 min, ~5 min, 8 min, ~2 min, ~8 min
+- Trend: consistent ~6 min average
 
 *Updated after each plan completion*
 
@@ -60,6 +60,10 @@ Recent decisions affecting current work:
 - [Phase 02-02]: Slug is a stable identifier — PATCH /api/orgs/[id] only updates name, never regenerates slug on rename
 - [Phase 02-02]: DSO create uses .limit(1).single() on org_members — v1 single-org-per-user assumption, explicit not accidental
 - [Phase 02-02]: 409 on duplicate slug (code 23505) — user-facing message says 'choose a different name' not expose constraint
+- [Phase 02-03]: DELETE reads user_id from URL search params (?user_id=<uuid>) — REST convention, avoids body parsing on DELETE
+- [Phase 02-03]: POST defaults role to 'member' when not provided — least-privilege default
+- [Phase 02-03]: Signup trigger inserts user_profiles with ON CONFLICT DO NOTHING; seed.sql uses DO UPDATE to win
+- [Phase 02-03]: Demo user gets two orgs in local dev (trigger-created "demo" slug + manual "demo-org") — slugs differ, no conflict, acceptable for testing
 
 ### Pending Todos
 
@@ -71,9 +75,10 @@ None yet.
 - **Open product decision**: Does org membership grant access to all DSOs in the org, or does per-DSO access control (user_dso_access) remain permanent? If permanent, Phase 5 is more nuanced. Resolve before Phase 5 planning begins.
 - **Local Supabase / Docker**: Docker Desktop is not running on this machine. supabase db reset could not be run. Validation was performed against local PostgreSQL 17 instead. When Docker is available, run supabase db reset to confirm with full Supabase CLI stack.
 - **Valentina cleanup**: RESOLVED — Valentina's erroneous user_dso_access rows deleted in 20260226000000_add_org_tables.sql migration.
+- **Phase 3 pre-condition**: Fix existing invite bug (inviter's ALL DSOs granted on invite) BEFORE building org-scoped invites — or it becomes a cross-org data leak.
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 02-02-PLAN.md — org CRUD API routes and dsos POST org_id fix
-Resume file: None — proceed with 02-03 (org member management)
+Stopped at: Completed 02-03-PLAN.md — member management routes + auto-org signup trigger (Phase 2 COMPLETE)
+Resume file: None — begin Phase 3 (Team Invites) with `/gsd:plan-phase 3`
