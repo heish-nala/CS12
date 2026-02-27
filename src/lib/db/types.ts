@@ -6,6 +6,7 @@ export type DoctorStatus = 'active' | 'inactive' | 'completed';
 export type ActivityType = 'phone' | 'email' | 'text';
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'blocked';
 export type UserRole = 'admin' | 'manager' | 'viewer';
+export type OrgRole = 'owner' | 'admin' | 'member';
 export type CustomColumnType = 'text' | 'number' | 'percentage' | 'select' | 'date' | 'checkbox' | 'email' | 'phone' | 'url';
 
 export interface CustomColumn {
@@ -492,4 +493,37 @@ export interface OverviewChartWidgetWithData extends OverviewChartWidget {
         value: number;
         color?: string;
     }>;
+}
+
+// ============================================================================
+// ORGANIZATION TYPES (Phase 2)
+// ============================================================================
+
+export interface Organization {
+    id: string;
+    name: string;
+    slug: string;
+    created_by: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface OrgMember {
+    id: string;
+    org_id: string;
+    user_id: string;
+    role: OrgRole;
+    joined_at: string;
+}
+
+export interface UserProfile {
+    id: string;
+    email: string;
+    name: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface OrgMemberWithProfile extends OrgMember {
+    user_profiles: UserProfile | null;
 }
