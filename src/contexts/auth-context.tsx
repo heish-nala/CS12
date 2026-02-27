@@ -16,7 +16,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper function to check and accept pending invites
+// Helper function to check and accept pending team (DSO-scoped) invites
 async function checkAndAcceptInvites(userId: string, email: string) {
     try {
         const response = await fetch('/api/team/accept-invite', {
@@ -33,6 +33,25 @@ async function checkAndAcceptInvites(userId: string, email: string) {
         }
     } catch (error) {
         console.error('Error checking for pending invites:', error);
+    }
+}
+
+// Helper function to check and accept pending org-scoped invites
+async function checkAndAcceptOrgInvites(userId: string, email: string) {
+    try {
+        const response = await fetch('/api/orgs/accept-invite', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId, email }),
+        });
+        if (response.ok) {
+            const data = await response.json();
+            if (data.accepted_count > 0) {
+                console.log(`Joined ${data.accepted_count} org(s):`, data.orgs);
+            }
+        }
+    } catch (error) {
+        console.error('Error checking for pending org invites:', error);
     }
 }
 
@@ -54,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 if (!inviteCheckDone.current.has(session.user.id)) {
                     inviteCheckDone.current.add(session.user.id);
                     checkAndAcceptInvites(session.user.id, session.user.email);
+                    checkAndAcceptOrgInvites(session.user.id, session.user.email);
                 }
             }
         });
@@ -70,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     if (!inviteCheckDone.current.has(session.user.id)) {
                         inviteCheckDone.current.add(session.user.id);
                         checkAndAcceptInvites(session.user.id, session.user.email);
+                        checkAndAcceptOrgInvites(session.user.id, session.user.email);
                     }
                 }
 
