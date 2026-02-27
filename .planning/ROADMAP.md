@@ -30,7 +30,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Alan and Claudia appear in `org_members` for the default org with correct roles
   4. `user_dso_access` table still exists and all existing routes continue to work (zero downtime verified)
   5. Local migration runs cleanly via `supabase db reset` before production push
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 01-01-PLAN.md — Write migration + update seed.sql + local verification
+- [ ] 01-02-PLAN.md — Push to production + human verification (zero downtime)
 
 ### Phase 2: Auth Helpers and Org API
 **Goal**: Every org operation has a secure, testable API endpoint, and every API route has access to org membership helpers that work the same way as the existing DSO access helpers
@@ -85,7 +88,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Database Foundation | 0/TBD | Not started | - |
+| 1. Database Foundation | 0/2 | Planned | - |
 | 2. Auth Helpers and Org API | 0/TBD | Not started | - |
 | 3. Invite System | 0/TBD | Not started | - |
 | 4. Org Context and Settings UI | 0/TBD | Not started | - |
