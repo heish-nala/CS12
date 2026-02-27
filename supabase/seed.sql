@@ -63,6 +63,12 @@ INSERT INTO auth.identities (
 -- ============================================================
 -- 2. DEMO ORGANIZATION (must come before DSOs — org_id is NOT NULL)
 -- ============================================================
+-- Note: The auth.users INSERT above will also trigger handle_new_user_signup(),
+-- which auto-creates an org for the demo user (slug: "demo", name: "Demo User's Organization").
+-- This manual org is separate and intentional — the demo DSOs reference its UUID
+-- (00000000-0000-0000-0000-000000000100). The demo user will belong to both orgs
+-- in local dev, which is fine for testing. The slugs differ ("demo" vs "demo-org"),
+-- so there is no conflict on the organizations.slug unique constraint.
 INSERT INTO organizations (id, name, slug, created_by)
 VALUES (
     '00000000-0000-0000-0000-000000000100',
@@ -232,17 +238,25 @@ INSERT INTO user_dso_access (user_id, dso_id, role) VALUES
 -- ============================================================
 
 -- Demo user is owner of demo org
+-- ON CONFLICT DO NOTHING makes this idempotent for repeated seed runs
 INSERT INTO org_members (org_id, user_id, role)
 VALUES (
     '00000000-0000-0000-0000-000000000100',
     '00000000-0000-0000-0000-000000000001',
     'owner'
-);
+)
+ON CONFLICT DO NOTHING;
 
 -- Demo user profile
+-- Use DO UPDATE so seed values win over the trigger-generated row (trigger fires
+-- on auth.users INSERT above and may insert a user_profiles row first via
+-- handle_new_user_signup). This ensures the demo profile is always predictable.
 INSERT INTO user_profiles (id, email, name)
 VALUES (
     '00000000-0000-0000-0000-000000000001',
     'demo@cs12.com',
     'Demo User'
-);
+)
+ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    name = EXCLUDED.name;
