@@ -77,13 +77,16 @@ CREATE INDEX idx_dsos_org_id ON dsos(org_id);
 -- ============================================================
 
 -- 5a. Insert default organization for Alan
+-- Uses CASE to set created_by only when user exists (production yes, local dev no)
 -- ON CONFLICT DO NOTHING ensures idempotency on re-runs
 INSERT INTO organizations (name, slug, created_by)
-VALUES (
+SELECT
     'All Solutions Consulting',
     'all-solutions-consulting',
-    '8a84898d-0266-4dc1-b97c-744d70d7a4ec'
-)
+    CASE WHEN EXISTS (SELECT 1 FROM auth.users WHERE id = '8a84898d-0266-4dc1-b97c-744d70d7a4ec')
+         THEN '8a84898d-0266-4dc1-b97c-744d70d7a4ec'::uuid
+         ELSE NULL
+    END
 ON CONFLICT (slug) DO NOTHING;
 
 -- 5b. Backfill dsos.org_id for all existing DSOs (Step 2 of 3: backfill before constraining)
@@ -93,14 +96,14 @@ SET org_id = (SELECT id FROM organizations WHERE slug = 'all-solutions-consultin
 WHERE org_id IS NULL;
 
 -- 5c. Insert org_members for Alan (owner) and Claudia (admin)
--- ON CONFLICT DO NOTHING is safe if migration runs twice
--- Note: These INSERTs will silently no-op on local dev (user IDs don't exist locally);
+-- WHERE EXISTS guards against FK violations on local dev (user IDs don't exist locally);
 -- seed.sql handles local dev org membership separately.
 INSERT INTO org_members (org_id, user_id, role)
 SELECT
     (SELECT id FROM organizations WHERE slug = 'all-solutions-consulting'),
     '8a84898d-0266-4dc1-b97c-744d70d7a4ec',
     'owner'
+WHERE EXISTS (SELECT 1 FROM auth.users WHERE id = '8a84898d-0266-4dc1-b97c-744d70d7a4ec')
 ON CONFLICT (org_id, user_id) DO NOTHING;
 
 INSERT INTO org_members (org_id, user_id, role)
@@ -108,14 +111,20 @@ SELECT
     (SELECT id FROM organizations WHERE slug = 'all-solutions-consulting'),
     '6559957c-2ce6-4cea-aa15-f79fb401a685',
     'admin'
+WHERE EXISTS (SELECT 1 FROM auth.users WHERE id = '6559957c-2ce6-4cea-aa15-f79fb401a685')
 ON CONFLICT (org_id, user_id) DO NOTHING;
 
 -- 5d. Seed user_profiles for Alan and Claudia
+-- WHERE EXISTS guards against FK violations on local dev
 -- Claudia is on the allsolutions.consulting Google Workspace domain
 INSERT INTO user_profiles (id, email, name)
-VALUES
-    ('8a84898d-0266-4dc1-b97c-744d70d7a4ec', 'alan@allsolutions.consulting', 'Alan Hsieh'),
-    ('6559957c-2ce6-4cea-aa15-f79fb401a685', 'claudia@allsolutions.consulting', 'Claudia')
+SELECT '8a84898d-0266-4dc1-b97c-744d70d7a4ec', 'alan@allsolutions.consulting', 'Alan Hsieh'
+WHERE EXISTS (SELECT 1 FROM auth.users WHERE id = '8a84898d-0266-4dc1-b97c-744d70d7a4ec')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO user_profiles (id, email, name)
+SELECT '6559957c-2ce6-4cea-aa15-f79fb401a685', 'claudia@allsolutions.consulting', 'Claudia'
+WHERE EXISTS (SELECT 1 FROM auth.users WHERE id = '6559957c-2ce6-4cea-aa15-f79fb401a685')
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================
