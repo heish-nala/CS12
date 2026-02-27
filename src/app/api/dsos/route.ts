@@ -119,10 +119,25 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Look up user's org (for v1, user has one org)
+        const { data: membership, error: memberError } = await supabaseAdmin
+            .from('org_members')
+            .select('org_id')
+            .eq('user_id', user_id)
+            .limit(1)
+            .single();
+
+        if (memberError || !membership) {
+            return NextResponse.json(
+                { error: 'You must belong to an organization to create a client' },
+                { status: 400 }
+            );
+        }
+
         // Create the DSO
         const { data, error } = await supabaseAdmin
             .from('dsos')
-            .insert({ name })
+            .insert({ name, org_id: membership.org_id })
             .select()
             .single();
 
