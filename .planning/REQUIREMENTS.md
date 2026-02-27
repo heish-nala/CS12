@@ -76,37 +76,37 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ORG-01 | — | Pending |
-| ORG-02 | — | Pending |
-| ORG-03 | — | Pending |
-| ORG-04 | — | Pending |
-| MBR-01 | — | Pending |
-| MBR-02 | — | Pending |
-| MBR-03 | — | Pending |
-| MBR-04 | — | Pending |
-| MBR-05 | — | Pending |
-| MBR-06 | — | Pending |
-| MBR-07 | — | Pending |
-| MBR-08 | — | Pending |
-| UI-01 | — | Pending |
-| UI-02 | — | Pending |
-| UI-03 | — | Pending |
-| ISO-01 | — | Pending |
-| ISO-02 | — | Pending |
-| ISO-03 | — | Pending |
-| ISO-04 | — | Pending |
-| DB-01 | — | Pending |
-| DB-02 | — | Pending |
-| DB-03 | — | Pending |
-| DB-04 | — | Pending |
-| DB-05 | — | Pending |
-| DB-06 | — | Pending |
+| DB-01 | Phase 1 | Pending |
+| DB-02 | Phase 1 | Pending |
+| DB-03 | Phase 1 | Pending |
+| DB-04 | Phase 1 | Pending |
+| DB-05 | Phase 1 | Pending |
+| ORG-04 | Phase 1 | Pending |
+| ISO-01 | Phase 1 | Pending |
+| DB-06 | Phase 2 | Pending |
+| ISO-03 | Phase 2 | Pending |
+| MBR-07 | Phase 2 | Pending |
+| MBR-08 | Phase 2 | Pending |
+| ORG-01 | Phase 2 | Pending |
+| ORG-02 | Phase 2 | Pending |
+| ORG-03 | Phase 2 | Pending |
+| MBR-01 | Phase 3 | Pending |
+| MBR-02 | Phase 3 | Pending |
+| ISO-04 | Phase 3 | Pending |
+| UI-01 | Phase 4 | Pending |
+| UI-02 | Phase 4 | Pending |
+| UI-03 | Phase 4 | Pending |
+| MBR-03 | Phase 5 | Pending |
+| MBR-04 | Phase 5 | Pending |
+| MBR-05 | Phase 5 | Pending |
+| MBR-06 | Phase 5 | Pending |
+| ISO-02 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 25 total
-- Mapped to phases: 0
-- Unmapped: 25
+- Mapped to phases: 25
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-26 after initial definition*
+*Last updated: 2026-02-26 — traceability complete, all 25 requirements mapped*
