@@ -9,6 +9,7 @@ import { CreateClientDialog } from '@/components/clients/create-client-dialog';
 import { SearchCommand } from '@/components/layout/search-command';
 import { useAuth } from '@/contexts/auth-context';
 import { useClients } from '@/contexts/clients-context';
+import { useOrg } from '@/contexts/org-context';
 import { useOnboarding } from '@/contexts/onboarding-context';
 import {
     Home,
@@ -55,6 +56,7 @@ export function NotionSidebar() {
     const pathname = usePathname();
     const { user, signOut } = useAuth();
     const { clients, archivedClients } = useClients();
+    const { org } = useOrg();
     const { isOnboardingActive, currentStep } = useOnboarding();
     const [createClientOpen, setCreateClientOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
@@ -74,7 +76,9 @@ export function NotionSidebar() {
                     <div className="w-5 h-5 rounded-lg bg-primary flex items-center justify-center text-primary-foreground text-[11px] font-semibold">
                         C
                     </div>
-                    <span className="font-medium text-[14px] text-foreground">CS12</span>
+                    <span className="font-medium text-[14px] text-foreground truncate">
+                        {org?.name ?? 'CS12'}
+                    </span>
                 </div>
             </div>
 

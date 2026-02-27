@@ -3,6 +3,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/contexts/auth-context";
 import { ClientsProvider } from "@/contexts/clients-context";
+import { OrgProvider } from "@/contexts/org-context";
 import { OnboardingProvider } from "@/contexts/onboarding-context";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { AppShell } from "@/components/layout/app-shell";
@@ -23,14 +24,16 @@ export default function RootLayout({
             <body className="antialiased">
                 <AuthProvider>
                     <ClientsProvider>
-                        <OnboardingProvider>
-                            <AuthGuard>
-                                <AppShell>{children}</AppShell>
-                                <OnboardingTrigger />
-                                <OnboardingTour />
-                                <OnboardingChecklist />
-                            </AuthGuard>
-                        </OnboardingProvider>
+                        <OrgProvider>
+                            <OnboardingProvider>
+                                <AuthGuard>
+                                    <AppShell>{children}</AppShell>
+                                    <OnboardingTrigger />
+                                    <OnboardingTour />
+                                    <OnboardingChecklist />
+                                </AuthGuard>
+                            </OnboardingProvider>
+                        </OrgProvider>
                     </ClientsProvider>
                 </AuthProvider>
                 <Toaster />
