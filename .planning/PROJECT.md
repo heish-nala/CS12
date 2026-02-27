@@ -2,11 +2,11 @@
 
 ## What This Is
 
-CS12 is a customer success tracking platform for dental service organizations (DSOs). It tracks doctor onboarding progress, cases, courses, activities, and risk levels across multiple DSO workspaces. Currently live at cs12.allsolutions.consulting with real users (Alan, Claudia). This milestone adds proper multi-tenant workspace isolation so each user can have their own workspace, invite others selectively, and switch between workspaces they belong to — following the Linear model.
+CS12 is a customer success tracking platform for dental service organizations (DSOs). It tracks doctor onboarding progress, cases, courses, activities, and risk levels across multiple DSO workspaces. Currently live at cs12.allsolutions.consulting with real users (Alan, Claudia). This milestone adds organization-level multi-tenancy (Option 1: single org, assign DSOs to members). One organization owns DSOs, admin invites team members and assigns them to specific DSOs. CS agents manage DSO portfolios within their org and can collaborate/cover for each other. Follows MakerKit pattern.
 
 ## Core Value
 
-Users can manage their own workspace independently while selectively sharing access with others — without seeing workspaces they weren't invited to.
+A team of customer success agents can manage a portfolio of DSOs within one organization, with admins controlling who has access to which DSOs.
 
 ## Requirements
 
