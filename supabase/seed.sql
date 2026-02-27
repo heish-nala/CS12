@@ -1,13 +1,87 @@
 -- Sample seed data for CS12 Platform
 -- Run this in Supabase SQL Editor after running schema.sql
+--
+-- Insertion order matters — foreign key dependencies:
+--   auth.users → organizations → dsos → doctors/activities
+--   auth.users → user_dso_access, org_members, user_profiles
 
--- Insert sample DSOs
-INSERT INTO dsos (id, name) VALUES
-  ('550e8400-e29b-41d4-a716-446655440001', 'Smile Dental Group'),
-  ('550e8400-e29b-41d4-a716-446655440002', 'Bright Teeth Partners'),
-  ('550e8400-e29b-41d4-a716-446655440003', 'Dental Care Associates');
+-- ============================================================
+-- 1. DEMO USER (must come first — everything else references it)
+-- ============================================================
+-- Creates a demo user with email: demo@cs12.com and password: demo123456
+INSERT INTO auth.users (
+  id,
+  instance_id,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  created_at,
+  updated_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  is_super_admin,
+  role,
+  aud,
+  confirmation_token
+) VALUES (
+  '00000000-0000-0000-0000-000000000001',
+  '00000000-0000-0000-0000-000000000000',
+  'demo@cs12.com',
+  crypt('demo123456', gen_salt('bf')),
+  NOW(),
+  NOW(),
+  NOW(),
+  '{"provider": "email", "providers": ["email"]}',
+  '{"name": "Demo User"}',
+  false,
+  'authenticated',
+  'authenticated',
+  ''
+);
 
--- Insert sample doctors
+-- Create identity for the demo user
+INSERT INTO auth.identities (
+  id,
+  user_id,
+  provider_id,
+  identity_data,
+  provider,
+  last_sign_in_at,
+  created_at,
+  updated_at
+) VALUES (
+  '00000000-0000-0000-0000-000000000001',
+  '00000000-0000-0000-0000-000000000001',
+  'demo@cs12.com',
+  '{"sub": "00000000-0000-0000-0000-000000000001", "email": "demo@cs12.com"}',
+  'email',
+  NOW(),
+  NOW(),
+  NOW()
+);
+
+-- ============================================================
+-- 2. DEMO ORGANIZATION (must come before DSOs — org_id is NOT NULL)
+-- ============================================================
+INSERT INTO organizations (id, name, slug, created_by)
+VALUES (
+    '00000000-0000-0000-0000-000000000100',
+    'Demo Organization',
+    'demo-org',
+    '00000000-0000-0000-0000-000000000001'
+);
+
+-- ============================================================
+-- 3. SAMPLE DSOs (with org_id — required after Phase 1 migration)
+-- ============================================================
+INSERT INTO dsos (id, name, org_id) VALUES
+  ('550e8400-e29b-41d4-a716-446655440001', 'Smile Dental Group', '00000000-0000-0000-0000-000000000100'),
+  ('550e8400-e29b-41d4-a716-446655440002', 'Bright Teeth Partners', '00000000-0000-0000-0000-000000000100'),
+  ('550e8400-e29b-41d4-a716-446655440003', 'Dental Care Associates', '00000000-0000-0000-0000-000000000100');
+
+-- ============================================================
+-- 4. SAMPLE DOCTORS
+-- ============================================================
 INSERT INTO doctors (id, dso_id, name, email, phone, start_date, status, notes) VALUES
   (
     '650e8400-e29b-41d4-a716-446655440001',
@@ -60,6 +134,10 @@ INSERT INTO doctors (id, dso_id, name, email, phone, start_date, status, notes) 
     'Quick learner, proactive'
   );
 
+-- ============================================================
+-- 5. SAMPLE PERIOD PROGRESS
+-- ============================================================
+
 -- Insert sample period progress for Dr. Sarah Johnson
 INSERT INTO period_progress (doctor_id, period_number, start_date, end_date, cases_submitted, courses_completed) VALUES
   ('650e8400-e29b-41d4-a716-446655440001', 1, '2024-01-15', '2024-02-14', 5, 2),
@@ -90,7 +168,9 @@ INSERT INTO period_progress (doctor_id, period_number, start_date, end_date, cas
   ('650e8400-e29b-41d4-a716-446655440002', 11, '2024-12-02', '2025-01-01', 0, 0),
   ('650e8400-e29b-41d4-a716-446655440002', 12, '2025-01-02', '2025-02-01', 0, 0);
 
--- Insert sample activities (using new activity types: phone, email, text)
+-- ============================================================
+-- 6. SAMPLE ACTIVITIES
+-- ============================================================
 INSERT INTO activities (doctor_id, activity_type, description, created_by, created_at) VALUES
   ('650e8400-e29b-41d4-a716-446655440001', 'phone', 'Initial onboarding call - discussed program expectations', 'admin@cs12.com', NOW() - INTERVAL '30 days'),
   ('650e8400-e29b-41d4-a716-446655440001', 'email', 'Sent welcome package and course materials', 'admin@cs12.com', NOW() - INTERVAL '28 days'),
@@ -111,6 +191,10 @@ INSERT INTO activities (doctor_id, activity_type, description, created_by, creat
   ('650e8400-e29b-41d4-a716-446655440005', 'phone', 'Onboarding call scheduled', 'admin@cs12.com', NOW() - INTERVAL '1 day'),
   ('650e8400-e29b-41d4-a716-446655440005', 'email', 'Welcome email sent', 'admin@cs12.com', NOW() - INTERVAL '1 day');
 
+-- ============================================================
+-- 7. TASK GROUPS AND TASKS
+-- ============================================================
+
 -- Insert task groups
 INSERT INTO task_groups (id, name, description, order_index) VALUES
   ('750e8400-e29b-41d4-a716-446655440001', 'Week 1: Onboarding', 'Initial setup and orientation', 1),
@@ -123,72 +207,42 @@ INSERT INTO tasks (task_group_id, title, description, status, order_index) VALUE
   ('750e8400-e29b-41d4-a716-446655440001', 'Complete welcome call', 'Initial orientation call with CS team', 'completed', 1),
   ('750e8400-e29b-41d4-a716-446655440001', 'Review program materials', 'Read through onboarding guide', 'completed', 2),
   ('750e8400-e29b-41d4-a716-446655440001', 'Set up digital tools', 'Configure practice management software', 'in_progress', 3),
-  
+
   ('750e8400-e29b-41d4-a716-446655440002', 'Submit first 5 cases', 'Complete and submit initial cases', 'in_progress', 1),
   ('750e8400-e29b-41d4-a716-446655440002', 'Complete Course 101', 'Fundamentals of digital dentistry', 'completed', 2),
   ('750e8400-e29b-41d4-a716-446655440002', 'Monthly check-in meeting', 'Progress review with CS manager', 'pending', 3),
-  
+
   ('750e8400-e29b-41d4-a716-446655440003', 'Advanced case training', 'Complex case management', 'pending', 1),
   ('750e8400-e29b-41d4-a716-446655440003', 'Peer collaboration session', 'Join monthly peer group', 'pending', 2),
-  
+
   ('750e8400-e29b-41d4-a716-446655440004', 'Independent practice review', 'Self-assessment and reflection', 'pending', 1),
   ('750e8400-e29b-41d4-a716-446655440004', 'Graduation evaluation', 'Final program assessment', 'pending', 2);
 
--- Demo user for local testing
--- This creates a demo user with email: demo@cs12.com and password: demo123456
-INSERT INTO auth.users (
-  id,
-  instance_id,
-  email,
-  encrypted_password,
-  email_confirmed_at,
-  created_at,
-  updated_at,
-  raw_app_meta_data,
-  raw_user_meta_data,
-  is_super_admin,
-  role,
-  aud,
-  confirmation_token
-) VALUES (
-  '00000000-0000-0000-0000-000000000001',
-  '00000000-0000-0000-0000-000000000000',
-  'demo@cs12.com',
-  crypt('demo123456', gen_salt('bf')),
-  NOW(),
-  NOW(),
-  NOW(),
-  '{"provider": "email", "providers": ["email"]}',
-  '{"name": "Demo User"}',
-  false,
-  'authenticated',
-  'authenticated',
-  ''
-);
-
--- Create identity for the demo user
-INSERT INTO auth.identities (
-  id,
-  user_id,
-  provider_id,
-  identity_data,
-  provider,
-  last_sign_in_at,
-  created_at,
-  updated_at
-) VALUES (
-  '00000000-0000-0000-0000-000000000001',
-  '00000000-0000-0000-0000-000000000001',
-  'demo@cs12.com',
-  '{"sub": "00000000-0000-0000-0000-000000000001", "email": "demo@cs12.com"}',
-  'email',
-  NOW(),
-  NOW(),
-  NOW()
-);
-
+-- ============================================================
+-- 8. USER DSO ACCESS
+-- ============================================================
 -- Grant admin access to all DSOs for the demo user
 INSERT INTO user_dso_access (user_id, dso_id, role) VALUES
   ('00000000-0000-0000-0000-000000000001', '550e8400-e29b-41d4-a716-446655440001', 'admin'),
   ('00000000-0000-0000-0000-000000000001', '550e8400-e29b-41d4-a716-446655440002', 'admin'),
   ('00000000-0000-0000-0000-000000000001', '550e8400-e29b-41d4-a716-446655440003', 'admin');
+
+-- ============================================================
+-- 9. ORG MEMBERS AND USER PROFILES (Phase 1 additions)
+-- ============================================================
+
+-- Demo user is owner of demo org
+INSERT INTO org_members (org_id, user_id, role)
+VALUES (
+    '00000000-0000-0000-0000-000000000100',
+    '00000000-0000-0000-0000-000000000001',
+    'owner'
+);
+
+-- Demo user profile
+INSERT INTO user_profiles (id, email, name)
+VALUES (
+    '00000000-0000-0000-0000-000000000001',
+    'demo@cs12.com',
+    'Demo User'
+);
