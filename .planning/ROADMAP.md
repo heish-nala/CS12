@@ -60,7 +60,10 @@ Plans:
   1. Inviting a new user creates an `org_invites` row scoped to the org — the invitee is NOT automatically granted access to all of the inviter's DSOs (existing bug is fixed)
   2. Invited user receives an email, clicks the link, logs in or signs up, and lands with correct org membership in `org_members`
   3. A user invited to Org A cannot see DSOs belonging to Org B
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 03-01-PLAN.md — Fix existing invite bug (ISO-04) + create org_invites table migration
+- [ ] 03-02-PLAN.md — Org invite send/accept endpoints + auth confirm route + auth-context integration
 
 ### Phase 4: Org Context and Settings UI
 **Goal**: Users can see which organization they are in, admins can manage members and DSO assignments from a settings page, and the sidebar reflects the current org
@@ -94,7 +97,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Database Foundation | 0/2 | Planned | - |
 | 2. Auth Helpers and Org API | 0/3 | Planned | - |
-| 3. Invite System | 0/TBD | Not started | - |
+| 3. Invite System | 0/2 | Planned | - |
 | 4. Org Context and Settings UI | 0/TBD | Not started | - |
 | 5. Scope All Routes and Full Isolation | 0/TBD | Not started | - |
 
