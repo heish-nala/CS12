@@ -5,32 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** A team of customer success agents can manage a portfolio of DSOs within one organization, with admins controlling who has access to which DSOs
-**Current focus:** Phase 1 — Database Foundation
+**Current focus:** Phase 2 — Auth Helpers and Org API
 
 ## Current Position
 
-Phase: 1 of 5 (Database Foundation)
-Plan: 2 of 2 complete in current phase — Phase 1 DONE
-Status: Phase 1 complete — ready to begin Phase 2
-Last activity: 2026-02-27 — Completed 01-02: production migration push + zero-downtime verification
+Phase: 2 of 5 (Auth Helpers and Org API)
+Plan: 1 of 3 complete in current phase
+Status: In progress — 02-01 complete, proceed with 02-02 (org CRUD routes)
+Last activity: 2026-02-27 — Completed 02-01: org auth helpers, types, and slug utility
 
-Progress: [██░░░░░░░░] 20%
+Progress: [███░░░░░░░] 30%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 4 min
-- Total execution time: 4 min
+- Total plans completed: 3
+- Average duration: 5.7 min
+- Total execution time: ~17 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-database-foundation | 2 | ~9 min | ~4.5 min |
+| 02-auth-helpers-and-org-api | 1 | 8 min | 8 min |
 
 **Recent Trend:**
-- Last 5 plans: 4 min, ~5 min
+- Last 5 plans: 4 min, ~5 min, 8 min
 - Trend: (baseline)
 
 *Updated after each plan completion*
@@ -52,6 +53,10 @@ Recent decisions affecting current work:
 - [Phase 01-database-foundation]: Slug-based subquery for org references within migration — avoids hardcoded UUID
 - [Phase 01-database-foundation]: Valentina cleanup in Phase 1 — removes erroneous access before Phase 3 builds org-scoped invites
 - [Phase 01-02]: Zero downtime confirmed — new tables + org_id column addition did not affect any existing routes or queries
+- [Phase 02-01]: OrgRole defined in both types.ts (DB contract) and org-utils.ts (runtime const for validation) — identical values, different purposes
+- [Phase 02-01]: checkOrgMembership fails closed — returns { isMember: false, role: null } on any error rather than throwing
+- [Phase 02-01]: requireOrgAccess uses requireOwnerOrAdmin boolean flag (not a separate function) — avoids function sprawl
+- [Phase 02-01]: OrgMemberWithProfile uses user_profiles key — matches Supabase join key for .select('*, user_profiles(*)')
 
 ### Pending Todos
 
@@ -67,5 +72,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 01-02-PLAN.md — production migration push + zero-downtime human verification
-Resume file: None — Phase 1 complete, proceed with Phase 2 planning (/gsd:plan-phase 2)
+Stopped at: Completed 02-01-PLAN.md — org auth helpers, TypeScript types, slug utility
+Resume file: None — proceed with 02-02 (org CRUD routes)
