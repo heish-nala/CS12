@@ -46,7 +46,11 @@ Plans:
   4. Org owner can rename the organization via PATCH /api/orgs/[id] and the change persists on refresh
   5. Last owner cannot be removed — removing the sole owner returns a 403 with a clear error message
   6. Three org roles (owner, admin, member) are enforced — assigning an invalid role is rejected
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 02-01-PLAN.md — Auth helpers (checkOrgMembership, requireOrgAccess) + TypeScript types + slug utility
+- [ ] 02-02-PLAN.md — Org CRUD API (POST/GET /api/orgs, GET/PATCH /api/orgs/[id]) + fix POST /api/dsos org_id gap
+- [ ] 02-03-PLAN.md — Member management API (GET/POST/DELETE /api/orgs/[id]/members) + auto-org signup trigger migration
 
 ### Phase 3: Invite System
 **Goal**: An admin can invite a user to the organization by email, the invite is scoped only to that org (not all the inviter's DSOs), and the invited user can accept and join
@@ -89,7 +93,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Database Foundation | 0/2 | Planned | - |
-| 2. Auth Helpers and Org API | 0/TBD | Not started | - |
+| 2. Auth Helpers and Org API | 0/3 | Planned | - |
 | 3. Invite System | 0/TBD | Not started | - |
 | 4. Org Context and Settings UI | 0/TBD | Not started | - |
 | 5. Scope All Routes and Full Isolation | 0/TBD | Not started | - |
