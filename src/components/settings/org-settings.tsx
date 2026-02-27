@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Shield, Crown, User, Building2, Pencil } from 'lucide-react';
 import { useOrg } from '@/contexts/org-context';
 import { useAuth } from '@/contexts/auth-context';
+import { useClients } from '@/contexts/clients-context';
 import { OrgMemberWithProfile } from '@/lib/db/types';
 import { DsoAssignmentDialog } from './dso-assignment-dialog';
 import { toast } from 'sonner';
@@ -42,6 +43,7 @@ const ORG_ROLE_CONFIG: Record<string, { label: string; icon: React.ReactNode; co
 export function OrgSettings() {
     const { org } = useOrg();
     const { user } = useAuth();
+    const { clients } = useClients();
     const [members, setMembers] = useState<OrgMemberWithProfile[]>([]);
     const [dsoAccess, setDsoAccess] = useState<DsoAccessRow[]>([]);
     const [allDsos, setAllDsos] = useState<DsoInfo[]>([]);
@@ -84,7 +86,7 @@ export function OrgSettings() {
                     setAllDsos(data.dsos || []);
                 }
             } else {
-                // Member: only fetch member list (DSO info comes from ClientsContext)
+                // Member: only fetch member list
                 const membersRes = await fetch(`/api/orgs/${org.id}/members`);
                 if (membersRes.ok) {
                     const data = await membersRes.json();
@@ -171,6 +173,38 @@ export function OrgSettings() {
                 <h3 className="font-semibold text-foreground mb-1">Organization</h3>
                 <p className="text-lg text-foreground">{org?.name ?? '—'}</p>
             </div>
+
+            {/* Non-admin: show your own DSO access */}
+            {!canManage && (
+                <div className="rounded-xl border border-border/50 bg-card shadow-sm">
+                    <div className="p-4 border-b border-border/50">
+                        <h3 className="font-semibold text-foreground">Your Workspaces</h3>
+                        <p className="text-sm text-muted-foreground">
+                            DSOs you have access to in this organization
+                        </p>
+                    </div>
+                    <div className="p-4">
+                        {clients.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                                {clients.map((client) => (
+                                    <Badge
+                                        key={client.id}
+                                        variant="outline"
+                                        className="gap-1 text-sm px-2.5 py-1 text-foreground"
+                                    >
+                                        <Building2 className="h-3.5 w-3.5" />
+                                        {client.name}
+                                    </Badge>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-muted-foreground">
+                                No DSO access assigned yet. Contact an admin to get access.
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Members section */}
             <div className="rounded-xl border border-border/50 bg-card shadow-sm">
