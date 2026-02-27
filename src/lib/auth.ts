@@ -245,3 +245,74 @@ export async function requireDsoAccessWithFallback(
 
     return { userId, role: role! };
 }
+
+/**
+ * Check if user is a member of a specific organization
+ */
+export async function checkOrgMembership(
+    userId: string,
+    orgId: string
+): Promise<{ isMember: boolean; role: string | null }> {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('org_members')
+            .select('role')
+            .eq('user_id', userId)
+            .eq('org_id', orgId)
+            .single();
+
+        if (error || !data) {
+            return { isMember: false, role: null };
+        }
+        return { isMember: true, role: data.role };
+    } catch (error) {
+        console.error('Org membership check error:', error);
+        return { isMember: false, role: null };
+    }
+}
+
+/**
+ * Middleware helper to require organization membership
+ * Returns an error response if not a member, or the user + role if authorized
+ */
+export async function requireOrgAccess(
+    request: NextRequest,
+    orgId: string,
+    requireOwnerOrAdmin = false
+): Promise<
+    { user: AuthUser; role: string; response?: never } |
+    { user?: never; role?: never; response: NextResponse }
+> {
+    const { user, error } = await getAuthUser(request);
+
+    if (!user) {
+        return {
+            response: NextResponse.json(
+                { error: error || 'Unauthorized' },
+                { status: 401 }
+            ),
+        };
+    }
+
+    const { isMember, role } = await checkOrgMembership(user.id, orgId);
+
+    if (!isMember) {
+        return {
+            response: NextResponse.json(
+                { error: 'Not a member of this organization' },
+                { status: 403 }
+            ),
+        };
+    }
+
+    if (requireOwnerOrAdmin && role !== 'owner' && role !== 'admin') {
+        return {
+            response: NextResponse.json(
+                { error: 'Owner or admin access required' },
+                { status: 403 }
+            ),
+        };
+    }
+
+    return { user, role: role! };
+}
