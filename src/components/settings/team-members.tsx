@@ -84,8 +84,8 @@ export function TeamMembers() {
     const [currentDsoId, setCurrentDsoId] = useState<string | null>(null);
     const [cancellingInvite, setCancellingInvite] = useState<string | null>(null);
 
-    // Current user is admin (for demo purposes)
-    const currentUserRole: UserRole = 'admin';
+    // Derive current user's role from the member list returned by the API
+    const currentUserRole = members.find(m => m.is_current_user)?.role;
     const canManageTeam = currentUserRole === 'admin';
 
     // Get display name from email
