@@ -90,7 +90,11 @@ Plans:
   4. An admin can change a member's org-level role (e.g., member to admin) and the new role is enforced on the next API call
   5. A user cannot reach any DSO data by crafting a direct API request to a DSO they are not assigned to within the org
   6. `user_dso_access` is deprecated (flag set) and a cleanup migration is documented for the follow-on milestone
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 05-01-PLAN.md — Auth helpers (requireOrgDsoAccess, getUserOrg) + PATCH /api/orgs/[id]/members for role changes (MBR-06)
+- [ ] 05-02-PLAN.md — Migrate all Category A DSO-scoped routes (core + data-tables) to requireOrgDsoAccess
+- [ ] 05-03-PLAN.md — Migrate Category B enumeration routes + team routes to org-filtered queries + deprecation docs
 
 ## Progress
 
@@ -103,7 +107,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Auth Helpers and Org API | 0/3 | Planned | - |
 | 3. Invite System | 0/2 | Planned | - |
 | 4. Org Context and Settings UI | 0/3 | Planned | - |
-| 5. Scope All Routes and Full Isolation | 0/TBD | Not started | - |
+| 5. Scope All Routes and Full Isolation | 0/3 | Planned | - |
 
 ---
 *Roadmap created: 2026-02-26*
