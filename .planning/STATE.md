@@ -90,6 +90,9 @@ Recent decisions affecting current work:
 - [Phase 04-03]: 409 on duplicate add is possible if UI gets out of sync; handled by onSave refetch
 - [Phase 05-01]: requireOrgDsoAccess preserves user_id body fallback — fallback userId gets same org+DSO checks as session users
 - [Phase 05-01]: getUserOrg uses .limit(1).single() — explicit v1 single-org-per-user assumption
+- [Phase 05-02]: POST double-fallback pattern eliminated — requireOrgDsoAccess handles body fallback internally, manual user_dso_access query removed from data-tables POST and rows POST
+- [Phase 05-02]: GET /api/tasks enumeration uses getUserOrg + dsos!inner(org_id) join — org boundary enforced on task listing without explicit dsoId
+- [Phase 05-02]: activities/route.ts POST split into two paths — client_id present uses requireOrgDsoAccess; no client_id uses requireAuth (preserves legacy doctor-only activities)
 - [Phase 05-03]: GET /api/team migrated to org_members — role field is now org role (owner/admin/member), not DSO role; response shape preserved
 - [Phase 05-03]: primaryDsoId backward-compat lookup retained — invite flow (team_invites) still needs a DSO ID
 - [Phase 05-03]: dashboard/metrics dsoId-specific path uses requireOrgDsoAccess — full two-level check for specific DSO requests
