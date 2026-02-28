@@ -187,3 +187,96 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
 }
+
+/**
+ * PATCH /api/orgs/[id]/members
+ * Change a member's org-level role (owner/admin/member).
+ * Only owners and admins can change roles.
+ * Rejects demoting the last owner (zero-owner guard).
+ *
+ * Body: { user_id: string, role: 'owner' | 'admin' | 'member' }
+ */
+export async function PATCH(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const { id } = await params;
+
+    const authResult = await requireOrgAccess(request, id, true);
+    if (authResult.response) {
+        return authResult.response;
+    }
+
+    let body: { user_id?: string; role?: string };
+    try {
+        body = await request.json();
+    } catch {
+        return NextResponse.json(
+            { error: 'Invalid request body' },
+            { status: 400 }
+        );
+    }
+
+    const { user_id, role } = body;
+
+    if (!user_id || !role) {
+        return NextResponse.json(
+            { error: 'user_id and role are required' },
+            { status: 400 }
+        );
+    }
+
+    if (!isValidOrgRole(role)) {
+        return NextResponse.json(
+            { error: `Invalid role. Must be one of: owner, admin, member` },
+            { status: 400 }
+        );
+    }
+
+    // Look up target member's current role
+    const { data: targetMember } = await supabaseAdmin
+        .from('org_members')
+        .select('role')
+        .eq('org_id', id)
+        .eq('user_id', user_id)
+        .single();
+
+    if (!targetMember) {
+        return NextResponse.json(
+            { error: 'User is not a member of this organization' },
+            { status: 404 }
+        );
+    }
+
+    // Zero-owner guard (MBR-06): prevent demoting the last owner
+    if (targetMember.role === 'owner' && role !== 'owner') {
+        const { count } = await supabaseAdmin
+            .from('org_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('org_id', id)
+            .eq('role', 'owner');
+
+        if (count !== null && count <= 1) {
+            return NextResponse.json(
+                { error: 'Cannot demote the last owner. Transfer ownership first.' },
+                { status: 403 }
+            );
+        }
+    }
+
+    const { error: updateError } = await supabaseAdmin
+        .from('org_members')
+        .update({ role })
+        .eq('org_id', id)
+        .eq('user_id', user_id);
+
+    if (updateError) {
+        console.error('Failed to update member role:', updateError);
+        return NextResponse.json(
+            { error: 'Failed to update member role' },
+            { status: 500 }
+        );
+    }
+
+    return NextResponse.json({ success: true, role });
+}
