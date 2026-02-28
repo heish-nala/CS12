@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db/client';
 import { calculateRiskLevel, getDaysSinceActivity } from '@/lib/calculations/risk-level';
-import { requireAuthWithFallback, requireOrgDsoAccess } from '@/lib/auth';
+import { supabaseAdmin } from '@/lib/db/client';
+import { requireAuthWithFallback, requireOrgDsoAccess, getUserOrg } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
@@ -24,6 +25,24 @@ export async function GET(request: NextRequest) {
             }
         }
 
+        // When no dsoId, filter to user's org-accessible DSOs
+        let accessibleDsoIds: string[] | null = null;
+        if (!dsoId) {
+            const orgInfo = await getUserOrg(authResult.userId);
+            if (!orgInfo) {
+                return NextResponse.json({ doctors: [], total: 0 });
+            }
+            const { data: userAccess } = await supabaseAdmin
+                .from('user_dso_access')
+                .select('dso_id, dsos!inner(org_id)')
+                .eq('user_id', authResult.userId)
+                .eq('dsos.org_id', orgInfo.orgId);
+            accessibleDsoIds = userAccess?.map(a => a.dso_id) || [];
+            if (accessibleDsoIds.length === 0) {
+                return NextResponse.json({ doctors: [], total: 0 });
+            }
+        }
+
         // Build query
         let query = supabase
             .from('doctors')
@@ -37,6 +56,8 @@ export async function GET(request: NextRequest) {
 
         if (dsoId) {
             query = query.eq('dso_id', dsoId);
+        } else if (accessibleDsoIds) {
+            query = query.in('dso_id', accessibleDsoIds);
         }
 
         if (status) {
