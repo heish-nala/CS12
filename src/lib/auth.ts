@@ -247,6 +247,117 @@ export async function requireDsoAccessWithFallback(
 }
 
 /**
+ * Get the user's org membership (org_id and role) from org_members.
+ * Used by Category B enumeration routes to filter data to the user's org.
+ */
+export async function getUserOrg(
+    userId: string
+): Promise<{ orgId: string; role: string } | null> {
+    const { data } = await supabaseAdmin
+        .from('org_members')
+        .select('org_id, role')
+        .eq('user_id', userId)
+        .limit(1)
+        .single();
+    return data ? { orgId: data.org_id, role: data.role } : null;
+}
+
+/**
+ * Middleware helper combining org membership check + per-DSO access check.
+ * Replaces requireDsoAccessWithFallback as the standard auth check for all DSO-scoped routes.
+ *
+ * Steps:
+ * 1. Identify user (session → query param → parsedBody fallback)
+ * 2. Look up DSO to get its org_id
+ * 3. Verify user is an org member (org boundary check)
+ * 4. Verify user has per-DSO access (ISO-02 per-DSO assignment)
+ * 5. Enforce write access if required
+ */
+export async function requireOrgDsoAccess(
+    request: NextRequest,
+    dsoId: string,
+    requireWrite = false,
+    parsedBody?: { user_id?: string }
+): Promise<
+    { userId: string; orgId: string; role: string; response?: never } |
+    { userId?: never; orgId?: never; role?: never; response: NextResponse }
+> {
+    // Step 1: identify user (session or fallback)
+    const { user } = await getAuthUser(request);
+    let userId: string;
+
+    if (user) {
+        userId = user.id;
+    } else {
+        const { searchParams } = new URL(request.url);
+        const userIdParam = searchParams.get('user_id');
+
+        if (userIdParam) {
+            userId = userIdParam;
+        } else if (parsedBody?.user_id) {
+            userId = parsedBody.user_id;
+        } else {
+            return {
+                response: NextResponse.json(
+                    { error: 'Unauthorized' },
+                    { status: 401 }
+                ),
+            };
+        }
+    }
+
+    // Step 2: look up DSO to get org_id
+    const { data: dso } = await supabaseAdmin
+        .from('dsos')
+        .select('org_id')
+        .eq('id', dsoId)
+        .single();
+
+    if (!dso) {
+        return {
+            response: NextResponse.json(
+                { error: 'DSO not found' },
+                { status: 404 }
+            ),
+        };
+    }
+
+    // Step 3: verify user is a member of the DSO's org
+    const { isMember } = await checkOrgMembership(userId, dso.org_id);
+    if (!isMember) {
+        return {
+            response: NextResponse.json(
+                { error: 'Not a member of this organization' },
+                { status: 403 }
+            ),
+        };
+    }
+
+    // Step 4: verify user has per-DSO access (ISO-02)
+    const { hasAccess, role } = await checkDsoAccess(userId, dsoId);
+    if (!hasAccess) {
+        return {
+            response: NextResponse.json(
+                { error: 'Access denied to this workspace' },
+                { status: 403 }
+            ),
+        };
+    }
+
+    // Step 5: enforce write access if required
+    if (requireWrite && !hasWriteAccess(role)) {
+        return {
+            response: NextResponse.json(
+                { error: 'Write access required' },
+                { status: 403 }
+            ),
+        };
+    }
+
+    return { userId, orgId: dso.org_id, role: role! };
+}
+
+/**
  * Check if user is a member of a specific organization
  */
 export async function checkOrgMembership(
