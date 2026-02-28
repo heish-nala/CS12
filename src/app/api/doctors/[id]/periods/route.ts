@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
-import { requireDsoAccessWithFallback, checkDsoAccess } from '@/lib/auth';
+import { requireOrgDsoAccess } from '@/lib/auth';
 
 export async function GET(
     request: NextRequest,
@@ -20,8 +20,8 @@ export async function GET(
             return NextResponse.json({ error: 'Doctor not found' }, { status: 404 });
         }
 
-        // Require access to the DSO
-        const accessResult = await requireDsoAccessWithFallback(request, doctor.dso_id);
+        // Require org + DSO access
+        const accessResult = await requireOrgDsoAccess(request, doctor.dso_id);
         if ('response' in accessResult) {
             return accessResult.response;
         }
@@ -72,19 +72,12 @@ export async function PATCH(
         } catch {
             return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
         }
-        const { periodNumber, updates, user_id } = body;
+        const { periodNumber, updates } = body;
 
-        // Require write access to the DSO
-        const accessResult = await requireDsoAccessWithFallback(request, doctor.dso_id);
+        // Require write access to the DSO (with user_id fallback from body)
+        const accessResult = await requireOrgDsoAccess(request, doctor.dso_id, true, body);
         if ('response' in accessResult) {
-            // Try user_id fallback
-            if (!user_id) {
-                return accessResult.response;
-            }
-            const { hasAccess, role } = await checkDsoAccess(user_id, doctor.dso_id);
-            if (!hasAccess || (role !== 'admin' && role !== 'manager')) {
-                return NextResponse.json({ error: 'Write access required' }, { status: 403 });
-            }
+            return accessResult.response;
         }
 
         const { data, error } = await supabaseAdmin

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
-import { requireAuthWithFallback, checkDsoAccess } from '@/lib/auth';
+import { requireAuthWithFallback, requireOrgDsoAccess, getUserOrg } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
@@ -15,18 +15,15 @@ export async function GET(request: NextRequest) {
         const doctorId = searchParams.get('doctor_id');
         const dsoId = searchParams.get('dso_id');
 
-        // If dso_id is provided, verify user has access
+        // If dso_id is provided, verify user has org + DSO access
         if (dsoId) {
-            const { hasAccess } = await checkDsoAccess(userId, dsoId);
-            if (!hasAccess) {
-                return NextResponse.json(
-                    { error: 'Access denied to this workspace' },
-                    { status: 403 }
-                );
+            const accessResult = await requireOrgDsoAccess(request, dsoId);
+            if ('response' in accessResult) {
+                return accessResult.response;
             }
         }
 
-        // If doctor_id is provided, verify user has access to the doctor's DSO
+        // If doctor_id is provided (no dso_id), verify user has access to the doctor's DSO
         if (doctorId && !dsoId) {
             const { data: doctor } = await supabaseAdmin
                 .from('doctors')
@@ -35,21 +32,29 @@ export async function GET(request: NextRequest) {
                 .single();
 
             if (doctor) {
-                const { hasAccess } = await checkDsoAccess(userId, doctor.dso_id);
-                if (!hasAccess) {
-                    return NextResponse.json(
-                        { error: 'Access denied to this doctor' },
-                        { status: 403 }
-                    );
+                const accessResult = await requireOrgDsoAccess(request, doctor.dso_id);
+                if ('response' in accessResult) {
+                    return accessResult.response;
                 }
             }
         }
 
-        // Get user's accessible DSOs to filter results
+        // Get user's org to filter accessible DSOs
+        const orgInfo = await getUserOrg(userId);
+        if (!orgInfo) {
+            return NextResponse.json({
+                tasks: [],
+                task_groups: [],
+                total: 0,
+            });
+        }
+
+        // Get user's accessible DSOs filtered by org (prevents cross-org enumeration)
         const { data: userAccess } = await supabaseAdmin
             .from('user_dso_access')
-            .select('dso_id')
-            .eq('user_id', userId);
+            .select('dso_id, dsos!inner(org_id)')
+            .eq('user_id', userId)
+            .eq('dsos.org_id', orgInfo.orgId);
 
         const accessibleDsoIds = userAccess?.map(a => a.dso_id) || [];
 
@@ -137,18 +142,6 @@ export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
 
-        // Require authentication (with user_id fallback from body)
-        const authResult = await requireAuthWithFallback(request);
-        let currentUserId: string;
-        if ('response' in authResult) {
-            if (!body.user_id) {
-                return authResult.response;
-            }
-            currentUserId = body.user_id;
-        } else {
-            currentUserId = authResult.userId;
-        }
-
         // If doctor_id is provided, verify user has write access to the doctor's DSO
         if (body.doctor_id) {
             const { data: doctor } = await supabaseAdmin
@@ -158,12 +151,17 @@ export async function POST(request: NextRequest) {
                 .single();
 
             if (doctor) {
-                const { hasAccess, role } = await checkDsoAccess(currentUserId, doctor.dso_id);
-                if (!hasAccess || (role !== 'admin' && role !== 'manager')) {
-                    return NextResponse.json(
-                        { error: 'Write access required to create tasks' },
-                        { status: 403 }
-                    );
+                const accessResult = await requireOrgDsoAccess(request, doctor.dso_id, true, body);
+                if ('response' in accessResult) {
+                    return accessResult.response;
+                }
+            }
+        } else {
+            // No doctor_id — require basic auth with fallback
+            const authResult = await requireAuthWithFallback(request);
+            if ('response' in authResult) {
+                if (!body.user_id) {
+                    return authResult.response;
                 }
             }
         }

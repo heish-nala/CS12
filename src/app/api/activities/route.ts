@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
-import { requireAuth, requireAuthWithFallback, checkDsoAccess } from '@/lib/auth';
+import { requireAuth, requireAuthWithFallback, requireOrgDsoAccess } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
@@ -27,13 +27,10 @@ export async function GET(request: NextRequest) {
         let clientDoctorIds: string[] = [];
 
         if (clientId) {
-            // Verify user has access to this client
-            const { hasAccess } = await checkDsoAccess(authResult.userId, clientId);
-            if (!hasAccess) {
-                return NextResponse.json(
-                    { error: 'Access denied to this workspace' },
-                    { status: 403 }
-                );
+            // Verify user has org + DSO access to this client
+            const accessResult = await requireOrgDsoAccess(request, clientId);
+            if ('response' in accessResult) {
+                return accessResult.response;
             }
 
             // Get doctors that belong to this client (for legacy activity lookup)
@@ -123,25 +120,7 @@ export async function POST(request: NextRequest) {
             contact_phone,
             client_id,
             doctor_id,
-            user_id, // Fallback auth from body
         } = body;
-
-        // Try session auth first, fallback to user_id from body
-        const authResult = await requireAuth(request);
-        let createdBy: string;
-        let userId: string;
-
-        if ('response' in authResult) {
-            // Session auth failed, try user_id from body
-            if (!user_id) {
-                return authResult.response;
-            }
-            createdBy = user_id;
-            userId = user_id;
-        } else {
-            createdBy = authResult.user.email;
-            userId = authResult.user.id;
-        }
 
         if (!activity_type || !description) {
             return NextResponse.json(
@@ -150,15 +129,73 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Verify user has access to the client if provided
+        // Verify user has org + DSO access to the client if provided (with user_id fallback from body)
         if (client_id) {
-            const { hasAccess, role } = await checkDsoAccess(userId, client_id);
-            if (!hasAccess || (role !== 'admin' && role !== 'manager')) {
-                return NextResponse.json(
-                    { error: 'Write access required to create activities' },
-                    { status: 403 }
-                );
+            const accessResult = await requireOrgDsoAccess(request, client_id, true, body);
+            if ('response' in accessResult) {
+                return accessResult.response;
             }
+
+            // Get the user info for created_by
+            const authResult = await requireAuth(request);
+            let createdBy: string;
+            if ('response' in authResult) {
+                // Fallback: use user_id from body
+                createdBy = body.user_id || 'unknown';
+            } else {
+                createdBy = authResult.user.email;
+            }
+
+            // Build insert object, only including fields that have values
+            const insertData: Record<string, any> = {
+                activity_type,
+                description,
+                created_by: createdBy,
+            };
+
+            // Only include optional fields if they have values
+            if (outcome) insertData.outcome = outcome;
+            if (contact_name) insertData.contact_name = contact_name;
+            if (contact_email) insertData.contact_email = contact_email;
+            if (contact_phone) insertData.contact_phone = contact_phone;
+            if (doctor_id) insertData.doctor_id = doctor_id;
+            if (client_id) insertData.client_id = client_id;
+
+            const { data, error } = await supabaseAdmin
+                .from('activities')
+                .insert(insertData)
+                .select()
+                .single();
+
+            // If client_id column doesn't exist yet, retry without it
+            if (error?.message?.includes('client_id')) {
+                delete insertData.client_id;
+                const { data: retryData, error: retryError } = await supabaseAdmin
+                    .from('activities')
+                    .insert(insertData)
+                    .select()
+                    .single();
+                if (retryError) throw retryError;
+                return NextResponse.json(retryData, { status: 201 });
+            }
+
+            if (error) throw error;
+
+            return NextResponse.json(data, { status: 201 });
+        }
+
+        // No client_id — require basic auth
+        const authResult = await requireAuth(request);
+        let createdBy: string;
+
+        if ('response' in authResult) {
+            // Session auth failed, try user_id from body
+            if (!body.user_id) {
+                return authResult.response;
+            }
+            createdBy = body.user_id;
+        } else {
+            createdBy = authResult.user.email;
         }
 
         // Build insert object, only including fields that have values
@@ -174,7 +211,6 @@ export async function POST(request: NextRequest) {
         if (contact_email) insertData.contact_email = contact_email;
         if (contact_phone) insertData.contact_phone = contact_phone;
         if (doctor_id) insertData.doctor_id = doctor_id;
-        if (client_id) insertData.client_id = client_id;
 
         const { data, error } = await supabaseAdmin
             .from('activities')

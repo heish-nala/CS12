@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
-import { requireDsoAccessWithFallback } from '@/lib/auth';
+import { requireOrgDsoAccess } from '@/lib/auth';
 
 // GET /api/progress?client_id=xxx - Get all progress data in ONE request
 export async function GET(request: NextRequest) {
@@ -15,8 +15,8 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // Require access to the client/DSO
-        const accessResult = await requireDsoAccessWithFallback(request, clientId);
+        // Require org + DSO access to the client
+        const accessResult = await requireOrgDsoAccess(request, clientId);
         if ('response' in accessResult) {
             return accessResult.response;
         }

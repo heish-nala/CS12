@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth, requireOrgDsoAccess, getUserOrg } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
@@ -21,11 +21,18 @@ export async function GET(request: NextRequest) {
             userId = authResult.user.id;
         }
 
-        // Get DSOs that the user has access to
+        // Get user's org to filter DSOs to the correct org (prevents cross-org enumeration)
+        const orgInfo = await getUserOrg(userId);
+        if (!orgInfo) {
+            return NextResponse.json({ dsos: [], archivedDsos: [] });
+        }
+
+        // Get DSOs that the user has access to, filtered to their org
         const { data: accessRecords, error: accessError } = await supabaseAdmin
             .from('user_dso_access')
-            .select('dso_id')
-            .eq('user_id', userId);
+            .select('dso_id, dsos!inner(org_id)')
+            .eq('user_id', userId)
+            .eq('dsos.org_id', orgInfo.orgId);
 
         if (accessError) throw accessError;
 
@@ -180,19 +187,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
     try {
         const body = await request.json();
-        const { id, archived, name, user_id: bodyUserId } = body;
-
-        // Try to get user from session, fall back to user_id from body
-        const authResult = await requireAuth(request);
-        let user_id: string;
-        if ('response' in authResult) {
-            if (!bodyUserId) {
-                return authResult.response;
-            }
-            user_id = bodyUserId;
-        } else {
-            user_id = authResult.user.id;
-        }
+        const { id, archived, name } = body;
 
         if (!id) {
             return NextResponse.json(
@@ -201,19 +196,10 @@ export async function PATCH(request: NextRequest) {
             );
         }
 
-        // Verify user has access to this DSO
-        const { data: access, error: accessError } = await supabaseAdmin
-            .from('user_dso_access')
-            .select('role')
-            .eq('user_id', user_id)
-            .eq('dso_id', id)
-            .single();
-
-        if (accessError || !access) {
-            return NextResponse.json(
-                { error: 'Access denied' },
-                { status: 403 }
-            );
+        // Verify user has org + DSO access (with user_id fallback from body)
+        const accessResult = await requireOrgDsoAccess(request, id, true, body);
+        if ('response' in accessResult) {
+            return accessResult.response;
         }
 
         // Build update object with only provided fields

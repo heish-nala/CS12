@@ -1,20 +1,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, supabaseAdmin } from '@/lib/db/client';
-import { requireAuthWithFallback, checkDsoAccess, hasWriteAccess } from '@/lib/auth';
+import { requireOrgDsoAccess } from '@/lib/auth';
 
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        // Require authentication (with user_id param fallback)
-        const authResult = await requireAuthWithFallback(request);
-        if ('response' in authResult) {
-            return authResult.response;
-        }
-        const userId = authResult.userId;
-
         const { id } = await params;
 
         // First fetch the doctor to get its dso_id
@@ -37,13 +30,10 @@ export async function GET(
             return NextResponse.json({ error: 'Doctor not found' }, { status: 404 });
         }
 
-        // Verify user has access to this doctor's DSO
-        const { hasAccess } = await checkDsoAccess(userId, doctor.dso_id);
-        if (!hasAccess) {
-            return NextResponse.json(
-                { error: 'Access denied to this doctor' },
-                { status: 403 }
-            );
+        // Verify user has org + DSO access
+        const accessResult = await requireOrgDsoAccess(request, doctor.dso_id);
+        if ('response' in accessResult) {
+            return accessResult.response;
         }
 
         return NextResponse.json(doctor);
@@ -63,19 +53,7 @@ export async function PATCH(
     try {
         const { id } = await params;
         const body = await request.json();
-        const { name, email, phone, status, notes, user_id: bodyUserId } = body;
-
-        // Require authentication (with user_id fallback from query or body)
-        const authResult = await requireAuthWithFallback(request);
-        let userId: string;
-        if ('response' in authResult) {
-            if (!bodyUserId) {
-                return authResult.response;
-            }
-            userId = bodyUserId;
-        } else {
-            userId = authResult.userId;
-        }
+        const { name, email, phone, status, notes } = body;
 
         // First fetch the doctor to get its dso_id
         const { data: existingDoctor, error: fetchError } = await supabaseAdmin
@@ -88,13 +66,10 @@ export async function PATCH(
             return NextResponse.json({ error: 'Doctor not found' }, { status: 404 });
         }
 
-        // Verify user has write access to this doctor's DSO
-        const { hasAccess, role } = await checkDsoAccess(userId, existingDoctor.dso_id);
-        if (!hasAccess || !hasWriteAccess(role)) {
-            return NextResponse.json(
-                { error: 'Write access required to update doctor' },
-                { status: 403 }
-            );
+        // Verify user has write access to this doctor's DSO (with user_id fallback from body)
+        const accessResult = await requireOrgDsoAccess(request, existingDoctor.dso_id, true, body);
+        if ('response' in accessResult) {
+            return accessResult.response;
         }
 
         const { data: doctor, error } = await supabaseAdmin
@@ -123,13 +98,6 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        // Require authentication (with user_id param fallback)
-        const authResult = await requireAuthWithFallback(request);
-        if ('response' in authResult) {
-            return authResult.response;
-        }
-        const userId = authResult.userId;
-
         const { id } = await params;
 
         // First fetch the doctor to get its dso_id
@@ -143,13 +111,10 @@ export async function DELETE(
             return NextResponse.json({ error: 'Doctor not found' }, { status: 404 });
         }
 
-        // Verify user has admin access to delete (only admins can delete)
-        const { hasAccess, role } = await checkDsoAccess(userId, existingDoctor.dso_id);
-        if (!hasAccess || role !== 'admin') {
-            return NextResponse.json(
-                { error: 'Admin access required to delete doctor' },
-                { status: 403 }
-            );
+        // Verify user has write access to this doctor's DSO (admin required for delete)
+        const accessResult = await requireOrgDsoAccess(request, existingDoctor.dso_id, true);
+        if ('response' in accessResult) {
+            return accessResult.response;
         }
 
         const { error } = await supabaseAdmin
