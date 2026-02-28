@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** A team of customer success agents can manage a portfolio of DSOs within one organization, with admins controlling who has access to which DSOs
-**Current focus:** Phase 4 complete — All 3 plans done (backend DSO routes, OrgContext provider, and Organization settings UI)
+**Current focus:** Phase 5 in progress — 05-01 complete (auth helpers + PATCH member role handler)
 
 ## Current Position
 
-Phase: 4 of 5 complete (Org Context and Settings UI)
-Plan: 3 of 3 complete in Phase 4
-Status: 04-01 complete — GET /api/orgs/[id]/dsos, GET/POST/DELETE /api/orgs/[id]/dso-access; 04-02 complete — OrgContext provider, useOrg hook, OrgProvider in layout, sidebar dynamic org name; 04-03 complete — OrgSettings component, DsoAssignmentDialog, Organization tab in settings
-Last activity: 2026-02-27 — Completed 04-03: Organization settings UI with DSO assignment management
+Phase: 5 of 5 in progress (Scope All Routes and Full Isolation)
+Plan: 1 of 3 complete in Phase 5
+Status: 05-01 complete — requireOrgDsoAccess and getUserOrg helpers in lib/auth.ts; PATCH /api/orgs/[id]/members (MBR-06) with zero-owner guard
+Last activity: 2026-02-28 — Completed 05-01: auth foundation helpers and PATCH member role handler
 
-Progress: [██████████] 100% (Phase 4 complete)
+Progress: [██░░░░░░░░] ~33% (Phase 5, Plan 1 of 3 complete)
 
 ## Performance Metrics
 
@@ -31,10 +31,11 @@ Progress: [██████████] 100% (Phase 4 complete)
 | 02-auth-helpers-and-org-api | 3 | ~18 min | ~6 min |
 | 03-invite-system | 2 (in progress) | ~5 min | ~2.5 min |
 | 04-org-context-and-settings-ui | 3 (complete) | ~6 min | ~2 min |
+| 05-scope-all-routes-and-full-isolation | 1 of 3 complete | ~2 min | ~2 min |
 
 **Recent Trend:**
-- Last 7 plans: 4 min, ~5 min, 8 min, ~2 min, ~8 min, ~2 min, ~3 min
-- Trend: consistent ~5 min average
+- Last 8 plans: 4 min, ~5 min, 8 min, ~2 min, ~8 min, ~2 min, ~3 min, ~2 min
+- Trend: consistent ~4 min average
 
 *Updated after each plan completion*
 
@@ -87,6 +88,8 @@ Recent decisions affecting current work:
 - [Phase 04-03]: Admin/owner fetches all 3 endpoints in parallel; member fetches only members list (least-privilege fetch pattern)
 - [Phase 04-03]: DsoAssignmentDialog computes toAdd/toRemove diff before saving — only touches changed assignments via Promise.all
 - [Phase 04-03]: 409 on duplicate add is possible if UI gets out of sync; handled by onSave refetch
+- [Phase 05-01]: requireOrgDsoAccess preserves user_id body fallback — fallback userId gets same org+DSO checks as session users
+- [Phase 05-01]: getUserOrg uses .limit(1).single() — explicit v1 single-org-per-user assumption
 
 ### Pending Todos
 
@@ -102,6 +105,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-27
-Stopped at: Completed 04-03-PLAN.md — Organization settings UI with DSO assignment management
-Resume file: None — Phase 4 complete, ready for Phase 5 planning
+Last session: 2026-02-28
+Stopped at: Completed 05-01-PLAN.md — requireOrgDsoAccess, getUserOrg, PATCH /api/orgs/[id]/members
+Resume file: None — ready for 05-02-PLAN.md (Category A route migrations)
