@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** A team of customer success agents can manage a portfolio of DSOs within one organization, with admins controlling who has access to which DSOs
-**Current focus:** Phase 5 in progress — 05-01 complete (auth helpers + PATCH member role handler)
+**Current focus:** Phase 5 COMPLETE — all 3 plans done (auth helpers, Category A routes, Category B routes + team migration + deprecation)
 
 ## Current Position
 
-Phase: 5 of 5 in progress (Scope All Routes and Full Isolation)
-Plan: 1 of 3 complete in Phase 5
-Status: 05-01 complete — requireOrgDsoAccess and getUserOrg helpers in lib/auth.ts; PATCH /api/orgs/[id]/members (MBR-06) with zero-owner guard
-Last activity: 2026-02-28 — Completed 05-01: auth foundation helpers and PATCH member role handler
+Phase: 5 of 5 complete (Scope All Routes and Full Isolation)
+Plan: 3 of 3 complete in Phase 5
+Status: 05-03 complete — Category B enumeration routes org-filtered; GET /api/team migrated to org_members; team sub-routes gated; user_dso_access deprecation documented
+Last activity: 2026-02-28 — Completed 05-03: Category B route migration + deprecation migration
 
-Progress: [██░░░░░░░░] ~33% (Phase 5, Plan 1 of 3 complete)
+Progress: [██████████] ~100% (Phase 5, Plan 3 of 3 complete — Phase 5 DONE)
 
 ## Performance Metrics
 
@@ -31,10 +31,10 @@ Progress: [██░░░░░░░░] ~33% (Phase 5, Plan 1 of 3 complete)
 | 02-auth-helpers-and-org-api | 3 | ~18 min | ~6 min |
 | 03-invite-system | 2 (in progress) | ~5 min | ~2.5 min |
 | 04-org-context-and-settings-ui | 3 (complete) | ~6 min | ~2 min |
-| 05-scope-all-routes-and-full-isolation | 1 of 3 complete | ~2 min | ~2 min |
+| 05-scope-all-routes-and-full-isolation | 3 (complete) | ~8 min | ~3 min |
 
 **Recent Trend:**
-- Last 8 plans: 4 min, ~5 min, 8 min, ~2 min, ~8 min, ~2 min, ~3 min, ~2 min
+- Last 9 plans: 4 min, ~5 min, 8 min, ~2 min, ~8 min, ~2 min, ~3 min, ~2 min, ~4 min
 - Trend: consistent ~4 min average
 
 *Updated after each plan completion*
@@ -90,6 +90,10 @@ Recent decisions affecting current work:
 - [Phase 04-03]: 409 on duplicate add is possible if UI gets out of sync; handled by onSave refetch
 - [Phase 05-01]: requireOrgDsoAccess preserves user_id body fallback — fallback userId gets same org+DSO checks as session users
 - [Phase 05-01]: getUserOrg uses .limit(1).single() — explicit v1 single-org-per-user assumption
+- [Phase 05-03]: GET /api/team migrated to org_members — role field is now org role (owner/admin/member), not DSO role; response shape preserved
+- [Phase 05-03]: primaryDsoId backward-compat lookup retained — invite flow (team_invites) still needs a DSO ID
+- [Phase 05-03]: dashboard/metrics dsoId-specific path uses requireOrgDsoAccess — full two-level check for specific DSO requests
+- [Phase 05-03]: Deprecation migration (20260227000000) is COMMENT-only — documents 7-step cleanup path for future milestone
 
 ### Pending Todos
 
@@ -106,5 +110,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 05-01-PLAN.md — requireOrgDsoAccess, getUserOrg, PATCH /api/orgs/[id]/members
-Resume file: None — ready for 05-02-PLAN.md (Category A route migrations)
+Stopped at: Completed 05-03-PLAN.md — Category B enumeration route migration, GET /api/team to org_members, team sub-route org gates, deprecation migration
+Resume file: None — Phase 5 complete
