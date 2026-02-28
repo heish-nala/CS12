@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
         // Query org members directly (replaces user_dso_access-based team listing)
         const { data: orgMembers, error: membersError } = await supabaseAdmin
             .from('org_members')
-            .select('id, user_id, role, joined_at, user_profiles(*)')
+            .select('id, user_id, role, joined_at')
             .eq('org_id', orgInfo.orgId)
             .order('joined_at', { ascending: true });
 
@@ -56,21 +56,26 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ members: [] });
         }
 
-        // Try to get user info from Supabase Auth admin API
+        // Batch-fetch user_profiles for all members (no FK join needed)
+        const memberUserIds = orgMembers.map(m => m.user_id);
+        const { data: profiles } = await supabaseAdmin
+            .from('user_profiles')
+            .select('id, email, name')
+            .in('id', memberUserIds);
+
+        const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+
         const members: TeamMember[] = [];
 
         for (const member of orgMembers) {
             const uid = member.user_id;
-            // Use user_profiles if available, otherwise fall back to auth admin API
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const profile = member.user_profiles as any;
+            const profile = profileMap.get(uid);
             if (profile?.email) {
-                const email = profile.email;
-                const name = profile.display_name || email.split('@')[0];
+                const name = profile.name || profile.email.split('@')[0];
                 members.push({
                     id: member.id,
                     user_id: uid,
-                    email: email,
+                    email: profile.email,
                     name: name.charAt(0).toUpperCase() + name.slice(1),
                     role: member.role as UserRole,
                     created_at: member.joined_at,

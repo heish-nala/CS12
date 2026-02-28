@@ -19,9 +19,9 @@ export async function GET(
         return authResult.response;
     }
 
-    const { data: members, error } = await supabaseAdmin
+    const { data: orgMembers, error } = await supabaseAdmin
         .from('org_members')
-        .select('*, user_profiles(*)')
+        .select('*')
         .eq('org_id', id)
         .order('joined_at', { ascending: true });
 
@@ -32,6 +32,18 @@ export async function GET(
             { status: 500 }
         );
     }
+
+    // Batch-fetch user_profiles (no FK join between org_members and user_profiles)
+    const userIds = (orgMembers || []).map(m => m.user_id);
+    const { data: profiles } = userIds.length > 0
+        ? await supabaseAdmin.from('user_profiles').select('id, email, name').in('id', userIds)
+        : { data: [] };
+    const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+
+    const members = (orgMembers || []).map(m => ({
+        ...m,
+        user_profiles: profileMap.get(m.user_id) || null,
+    }));
 
     return NextResponse.json({ members });
 }
