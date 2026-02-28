@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
 import { mockDataTemplates } from '@/lib/mock-data';
-import { requireDsoAccess, requireDsoAccessWithFallback } from '@/lib/auth';
+import { requireOrgDsoAccess } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
@@ -15,8 +15,8 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // Require access to the client/DSO (with user_id param fallback for GET)
-        const accessResult = await requireDsoAccessWithFallback(request, clientId);
+        // Require org + DSO access (with user_id param fallback for GET)
+        const accessResult = await requireOrgDsoAccess(request, clientId);
         if ('response' in accessResult) {
             return accessResult.response;
         }
@@ -105,7 +105,7 @@ const ATTENDEE_LIST_COLUMNS = [
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { client_id, name, template_id, type, user_id: bodyUserId } = body;
+        const { client_id, name, template_id, type } = body;
 
         if (!client_id) {
             return NextResponse.json(
@@ -124,24 +124,10 @@ export async function POST(request: NextRequest) {
         }
 
         // Require write access to the client/DSO (with user_id body fallback)
-        const accessResult = await requireDsoAccessWithFallback(request, client_id, true);
+        // requireOrgDsoAccess handles body fallback internally — no manual double-fallback needed
+        const accessResult = await requireOrgDsoAccess(request, client_id, true, body);
         if ('response' in accessResult) {
-            // If no session and no user_id param, try body user_id
-            if (bodyUserId) {
-                // Verify user has access via body user_id
-                const { data: access } = await supabaseAdmin
-                    .from('user_dso_access')
-                    .select('role')
-                    .eq('user_id', bodyUserId)
-                    .eq('dso_id', client_id)
-                    .single();
-
-                if (!access || (access.role !== 'admin' && access.role !== 'manager')) {
-                    return accessResult.response;
-                }
-            } else {
-                return accessResult.response;
-            }
+            return accessResult.response;
         }
 
         // Get template if provided

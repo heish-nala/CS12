@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
-import { requireDsoAccess, requireDsoAccessWithFallback } from '@/lib/auth';
+import { requireOrgDsoAccess } from '@/lib/auth';
 
 export async function GET(
     request: NextRequest,
@@ -28,8 +28,8 @@ export async function GET(
             );
         }
 
-        // Require access to the client/DSO (with user_id param fallback for GET)
-        const accessResult = await requireDsoAccessWithFallback(request, table.client_id);
+        // Require org + DSO access (with user_id param fallback for GET)
+        const accessResult = await requireOrgDsoAccess(request, table.client_id);
         if ('response' in accessResult) {
             return accessResult.response;
         }
@@ -103,7 +103,7 @@ export async function PUT(
         }
 
         // Require write access to the client/DSO (with user_id fallback)
-        const accessResult = await requireDsoAccessWithFallback(request, currentTable.client_id, true, body);
+        const accessResult = await requireOrgDsoAccess(request, currentTable.client_id, true, body);
         if ('response' in accessResult) {
             return accessResult.response;
         }
@@ -164,7 +164,7 @@ export async function DELETE(
         }
 
         // Require write access to the client/DSO (with user_id fallback from query params)
-        const accessResult = await requireDsoAccessWithFallback(request, table.client_id, true);
+        const accessResult = await requireOrgDsoAccess(request, table.client_id, true);
         if ('response' in accessResult) {
             return accessResult.response;
         }

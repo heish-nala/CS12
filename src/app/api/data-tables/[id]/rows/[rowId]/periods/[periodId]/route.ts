@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
-import { requireDsoAccessWithFallback } from '@/lib/auth';
+import { requireOrgDsoAccess } from '@/lib/auth';
 
 // GET /api/data-tables/[id]/rows/[rowId]/periods/[periodId] - Get a specific period
 export async function GET(
@@ -20,8 +20,8 @@ export async function GET(
         return NextResponse.json({ error: 'Table not found' }, { status: 404 });
     }
 
-    // Require access to the client/DSO (with user_id param fallback)
-    const accessResult = await requireDsoAccessWithFallback(request, table.client_id);
+    // Require org + DSO access (with user_id param fallback)
+    const accessResult = await requireOrgDsoAccess(request, table.client_id);
     if ('response' in accessResult) {
         return accessResult.response;
     }
@@ -46,7 +46,6 @@ export async function PUT(
 ) {
     const { id, periodId } = await params;
     const body = await request.json();
-    const { user_id } = body; // Fallback auth from body
 
     // Get table to check client_id for auth
     const { data: table } = await supabaseAdmin
@@ -60,7 +59,7 @@ export async function PUT(
     }
 
     // Require write access to the client/DSO (with user_id fallback from body)
-    const accessResult = await requireDsoAccessWithFallback(request, table.client_id, true, body);
+    const accessResult = await requireOrgDsoAccess(request, table.client_id, true, body);
     if ('response' in accessResult) {
         return accessResult.response;
     }
@@ -121,7 +120,7 @@ export async function DELETE(
     }
 
     // Require write access to the client/DSO (with user_id param fallback)
-    const accessResult = await requireDsoAccessWithFallback(request, table.client_id, true);
+    const accessResult = await requireOrgDsoAccess(request, table.client_id, true);
     if ('response' in accessResult) {
         return accessResult.response;
     }

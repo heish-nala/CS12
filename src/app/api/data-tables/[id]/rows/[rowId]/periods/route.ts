@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
-import { requireDsoAccess, requireDsoAccessWithFallback } from '@/lib/auth';
+import { requireOrgDsoAccess } from '@/lib/auth';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
                      'July', 'August', 'September', 'October', 'November', 'December'];
@@ -23,8 +23,8 @@ export async function GET(
         return NextResponse.json({ error: 'Table not found' }, { status: 404 });
     }
 
-    // Require access to the client/DSO (with user_id param fallback for GET)
-    const accessResult = await requireDsoAccessWithFallback(request, table.client_id);
+    // Require org + DSO access (with user_id param fallback for GET)
+    const accessResult = await requireOrgDsoAccess(request, table.client_id);
     if ('response' in accessResult) {
         return accessResult.response;
     }
