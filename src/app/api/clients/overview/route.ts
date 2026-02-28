@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
 import { calculateRiskLevel, getDaysSinceActivity } from '@/lib/calculations/risk-level';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth, getUserOrg } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
@@ -21,15 +21,22 @@ export async function GET(request: NextRequest) {
             userId = authResult.user.id;
         }
 
-        // Get DSOs that the user has access to
+        // Get user's org (org boundary check for enumeration routes)
+        const orgInfo = await getUserOrg(userId);
+        if (!orgInfo) {
+            return NextResponse.json({ clients: [] });
+        }
+
+        // Get DSOs that the user has access to, filtered by org
         const { data: accessRecords, error: accessError } = await supabaseAdmin
             .from('user_dso_access')
-            .select('dso_id')
-            .eq('user_id', userId);
+            .select('dso_id, dsos!inner(org_id)')
+            .eq('user_id', userId)
+            .eq('dsos.org_id', orgInfo.orgId);
 
         if (accessError) throw accessError;
 
-        // If user has no access to any DSOs, return empty array
+        // If user has no access to any DSOs within their org, return empty array
         if (!accessRecords || accessRecords.length === 0) {
             return NextResponse.json({ clients: [] });
         }

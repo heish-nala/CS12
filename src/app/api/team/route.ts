@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
 import { UserRole } from '@/lib/db/types';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth, getUserOrg } from '@/lib/auth';
 
 interface TeamMember {
     id: string;
@@ -31,120 +31,91 @@ export async function GET(request: NextRequest) {
             userId = authResult.user.id;
         }
 
-        // Get all DSOs the current user has access to
-        const { data: userAccess, error: accessError } = await supabaseAdmin
-            .from('user_dso_access')
-            .select('dso_id')
-            .eq('user_id', userId);
-
-        if (accessError) {
-            console.error('Error fetching user access:', accessError);
-            return NextResponse.json(
-                { error: 'Failed to fetch user access' },
-                { status: 500 }
-            );
-        }
-
-        if (!userAccess || userAccess.length === 0) {
-            // No workspaces - return just the current user
+        // Get user's org (org membership is now the source of truth for team listing)
+        const orgInfo = await getUserOrg(userId);
+        if (!orgInfo) {
             return NextResponse.json({ members: [] });
         }
 
-        const dsoIds = userAccess.map(a => a.dso_id);
+        // Query org members directly (replaces user_dso_access-based team listing)
+        const { data: orgMembers, error: membersError } = await supabaseAdmin
+            .from('org_members')
+            .select('id, user_id, role, joined_at, user_profiles(*)')
+            .eq('org_id', orgInfo.orgId)
+            .order('joined_at', { ascending: true });
 
-        // Get all team members who have access to any of the user's workspaces
-        const { data: teamAccess, error: teamError } = await supabaseAdmin
-            .from('user_dso_access')
-            .select('id, user_id, role, created_at, dso_id')
-            .in('dso_id', dsoIds);
-
-        if (teamError) {
-            console.error('Error fetching team members:', teamError);
+        if (membersError) {
+            console.error('Error fetching org members:', membersError);
             return NextResponse.json(
                 { error: 'Failed to fetch team members' },
                 { status: 500 }
             );
         }
 
-        if (!teamAccess || teamAccess.length === 0) {
+        if (!orgMembers || orgMembers.length === 0) {
             return NextResponse.json({ members: [] });
-        }
-
-        // Get unique user IDs
-        const uniqueUserIds = [...new Set(teamAccess.map(a => a.user_id))];
-
-        // Try to get user emails from auth.users via admin API
-        // Since we can't directly query auth.users, we'll use the user_id as identifier
-        // In a production app, you'd have a user_profiles table
-
-        // For now, we'll construct members with the user_id
-        // The best role is the highest role across all workspaces
-        const membersByUserId = new Map<string, {
-            id: string;
-            user_id: string;
-            role: UserRole;
-            created_at: string
-        }>();
-
-        const roleOrder: Record<UserRole, number> = { admin: 3, manager: 2, viewer: 1 };
-
-        for (const access of teamAccess) {
-            const existing = membersByUserId.get(access.user_id);
-            if (!existing || roleOrder[access.role as UserRole] > roleOrder[existing.role]) {
-                membersByUserId.set(access.user_id, {
-                    id: access.id,
-                    user_id: access.user_id,
-                    role: access.role as UserRole,
-                    created_at: access.created_at,
-                });
-            }
         }
 
         // Try to get user info from Supabase Auth admin API
         const members: TeamMember[] = [];
 
-        for (const [uid, access] of membersByUserId) {
-            try {
-                const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(uid);
-
-                if (userData?.user) {
-                    const email = userData.user.email || uid;
-                    const name = userData.user.user_metadata?.name ||
-                                 userData.user.user_metadata?.full_name ||
-                                 email.split('@')[0];
-
+        for (const member of orgMembers) {
+            const uid = member.user_id;
+            // Use user_profiles if available, otherwise fall back to auth admin API
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const profile = member.user_profiles as any;
+            if (profile?.email) {
+                const email = profile.email;
+                const name = profile.display_name || email.split('@')[0];
+                members.push({
+                    id: member.id,
+                    user_id: uid,
+                    email: email,
+                    name: name.charAt(0).toUpperCase() + name.slice(1),
+                    role: member.role as UserRole,
+                    created_at: member.joined_at,
+                    is_current_user: uid === userId,
+                });
+            } else {
+                // Fall back to auth admin API
+                try {
+                    const { data: userData } = await supabaseAdmin.auth.admin.getUserById(uid);
+                    if (userData?.user) {
+                        const email = userData.user.email || uid;
+                        const name = userData.user.user_metadata?.name ||
+                                     userData.user.user_metadata?.full_name ||
+                                     email.split('@')[0];
+                        members.push({
+                            id: member.id,
+                            user_id: uid,
+                            email: email,
+                            name: name.charAt(0).toUpperCase() + name.slice(1),
+                            role: member.role as UserRole,
+                            created_at: member.joined_at,
+                            is_current_user: uid === userId,
+                        });
+                    } else {
+                        members.push({
+                            id: member.id,
+                            user_id: uid,
+                            email: uid,
+                            name: 'Unknown User',
+                            role: member.role as UserRole,
+                            created_at: member.joined_at,
+                            is_current_user: uid === userId,
+                        });
+                    }
+                } catch {
                     members.push({
-                        id: access.id,
-                        user_id: uid,
-                        email: email,
-                        name: name.charAt(0).toUpperCase() + name.slice(1),
-                        role: access.role,
-                        created_at: access.created_at,
-                        is_current_user: uid === userId,
-                    });
-                } else {
-                    // Fallback if we can't get user info
-                    members.push({
-                        id: access.id,
+                        id: member.id,
                         user_id: uid,
                         email: uid,
                         name: 'Unknown User',
-                        role: access.role,
-                        created_at: access.created_at,
+                        role: member.role as UserRole,
+                        created_at: member.joined_at,
                         is_current_user: uid === userId,
                     });
                 }
-            } catch (error) {
-                // If admin API fails, use fallback
-                members.push({
-                    id: access.id,
-                    user_id: uid,
-                    email: uid,
-                    name: 'Unknown User',
-                    role: access.role,
-                    created_at: access.created_at,
-                    is_current_user: uid === userId,
-                });
             }
         }
 
@@ -155,8 +126,14 @@ export async function GET(request: NextRequest) {
             return a.name.localeCompare(b.name);
         });
 
-        // Return the first DSO ID for invites (user's primary workspace)
-        const primaryDsoId = dsoIds.length > 0 ? dsoIds[0] : null;
+        // Get primaryDsoId for backward compatibility with invite flow
+        // (still uses user_dso_access for the specific DSO context)
+        const { data: userDsoAccess } = await supabaseAdmin
+            .from('user_dso_access')
+            .select('dso_id')
+            .eq('user_id', userId)
+            .limit(1);
+        const primaryDsoId = userDsoAccess && userDsoAccess.length > 0 ? userDsoAccess[0].dso_id : null;
 
         return NextResponse.json({ members, dso_id: primaryDsoId });
     } catch (error) {

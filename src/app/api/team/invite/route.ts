@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
 import { UserRole } from '@/lib/db/types';
-import { requireAuth, requireAuthWithFallback, checkDsoAccess } from '@/lib/auth';
+import { requireAuth, requireAuthWithFallback, checkDsoAccess, getUserOrg } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
     try {
@@ -23,6 +23,15 @@ export async function POST(request: NextRequest) {
             currentUser = { id: userData.user.id, email: userData.user.email || '' };
         } else {
             currentUser = authResult.user;
+        }
+
+        // Verify caller is an org member (org boundary check)
+        const orgInfo = await getUserOrg(currentUser.id);
+        if (!orgInfo) {
+            return NextResponse.json(
+                { error: 'Not a member of any organization' },
+                { status: 403 }
+            );
         }
 
         // Validate input
@@ -241,6 +250,15 @@ export async function GET(request: NextRequest) {
         }
         const userId = authResult.userId;
 
+        // Verify caller is an org member (org boundary check)
+        const orgInfo = await getUserOrg(userId);
+        if (!orgInfo) {
+            return NextResponse.json(
+                { error: 'Not a member of any organization' },
+                { status: 403 }
+            );
+        }
+
         const { searchParams } = new URL(request.url);
         const dsoId = searchParams.get('dso_id');
 
@@ -338,6 +356,15 @@ export async function DELETE(request: NextRequest) {
             return authResult.response;
         }
         const userId = authResult.userId;
+
+        // Verify caller is an org member (org boundary check)
+        const orgInfo = await getUserOrg(userId);
+        if (!orgInfo) {
+            return NextResponse.json(
+                { error: 'Not a member of any organization' },
+                { status: 403 }
+            );
+        }
 
         const { searchParams } = new URL(request.url);
         const inviteId = searchParams.get('id');

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
 import { UserRole } from '@/lib/db/types';
-import { requireAuthWithFallback, checkDsoAccess } from '@/lib/auth';
+import { requireAuthWithFallback, checkDsoAccess, getUserOrg } from '@/lib/auth';
 
 export async function PATCH(
     request: NextRequest,
@@ -22,6 +22,15 @@ export async function PATCH(
             userId = bodyUserId;
         } else {
             userId = authResult.userId;
+        }
+
+        // Verify caller is an org member (org boundary check)
+        const orgInfo = await getUserOrg(userId);
+        if (!orgInfo) {
+            return NextResponse.json(
+                { error: 'Not a member of any organization' },
+                { status: 403 }
+            );
         }
 
         // Validate role
@@ -109,6 +118,15 @@ export async function DELETE(
         const userId = authResult.userId;
 
         const { id } = await params;
+
+        // Verify caller is an org member (org boundary check)
+        const orgInfo = await getUserOrg(userId);
+        if (!orgInfo) {
+            return NextResponse.json(
+                { error: 'Not a member of any organization' },
+                { status: 403 }
+            );
+        }
 
         // Get the member to check their role
         const { data: member, error: fetchError } = await supabaseAdmin

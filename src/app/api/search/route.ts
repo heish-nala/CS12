@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
-import { requireAuthWithFallback } from '@/lib/auth';
+import { requireAuthWithFallback, getUserOrg } from '@/lib/auth';
 
 export interface SearchResult {
     id: string;
@@ -27,11 +27,18 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ results: [] });
         }
 
-        // Get user's accessible DSOs first
+        // Get user's org (org boundary check for enumeration routes)
+        const orgInfo = await getUserOrg(userId);
+        if (!orgInfo) {
+            return NextResponse.json({ results: [] });
+        }
+
+        // Get user's accessible DSOs, filtered by org
         const { data: userAccess } = await supabaseAdmin
             .from('user_dso_access')
-            .select('dso_id')
-            .eq('user_id', userId);
+            .select('dso_id, dsos!inner(org_id)')
+            .eq('user_id', userId)
+            .eq('dsos.org_id', orgInfo.orgId);
 
         const accessibleDsoIds = userAccess?.map(a => a.dso_id) || [];
 

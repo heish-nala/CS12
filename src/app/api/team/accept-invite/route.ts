@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth, getUserOrg } from '@/lib/auth';
 
 // POST: Accept pending invites for the current user
 // Called when a user logs in to check and accept any pending invites
@@ -31,6 +31,15 @@ export async function POST(request: NextRequest) {
                     { status: 403 }
                 );
             }
+        }
+
+        // Verify caller is an org member (org boundary check)
+        const orgInfo = await getUserOrg(actualUserId);
+        if (!orgInfo) {
+            return NextResponse.json(
+                { error: 'Not a member of any organization' },
+                { status: 403 }
+            );
         }
 
         const normalizedEmail = userEmail.toLowerCase().trim();

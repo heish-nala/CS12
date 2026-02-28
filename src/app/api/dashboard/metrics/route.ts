@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase, supabaseAdmin } from '@/lib/db/client';
 import { DashboardMetrics } from '@/lib/db/types';
 import { calculateRiskLevel, getDaysSinceActivity } from '@/lib/calculations/risk-level';
-import { requireAuthWithFallback, checkDsoAccess } from '@/lib/auth';
+import { requireAuthWithFallback, getUserOrg, requireOrgDsoAccess } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
     try {
@@ -16,22 +16,43 @@ export async function GET(request: NextRequest) {
         const searchParams = request.nextUrl.searchParams;
         const dsoId = searchParams.get('dso_id');
 
-        // If dso_id is provided, verify user has access
+        // If dso_id is provided, verify user has org membership + per-DSO access
         if (dsoId) {
-            const { hasAccess } = await checkDsoAccess(userId, dsoId);
-            if (!hasAccess) {
-                return NextResponse.json(
-                    { error: 'Access denied to this workspace' },
-                    { status: 403 }
-                );
+            const dsoAuthResult = await requireOrgDsoAccess(request, dsoId);
+            if ('response' in dsoAuthResult) {
+                return dsoAuthResult.response;
             }
         }
 
-        // Get user's accessible DSOs
+        // Get user's org (org boundary check for enumeration routes)
+        const orgInfo = await getUserOrg(userId);
+        if (!orgInfo) {
+            const emptyMetrics: DashboardMetrics = {
+                total_doctors: 0,
+                active_doctors: 0,
+                at_risk_count: 0,
+                critical_risk_count: 0,
+                total_cases_this_month: 0,
+                total_courses_this_month: 0,
+                risk_distribution: { low: 0, medium: 0, high: 0, critical: 0 },
+                average_days_in_program: 0,
+                engagement_rate: 0,
+                avg_cases_per_doctor: 0,
+                avg_courses_per_doctor: 0,
+                doctors_needing_attention: 0,
+                recent_activities_count: 0,
+                on_track_count: 0,
+                completion_rate: 0,
+            };
+            return NextResponse.json(emptyMetrics);
+        }
+
+        // Get user's accessible DSOs, filtered by org
         const { data: userAccess } = await supabaseAdmin
             .from('user_dso_access')
-            .select('dso_id')
-            .eq('user_id', userId);
+            .select('dso_id, dsos!inner(org_id)')
+            .eq('user_id', userId)
+            .eq('dsos.org_id', orgInfo.orgId);
 
         const accessibleDsoIds = userAccess?.map(a => a.dso_id) || [];
 
