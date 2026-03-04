@@ -101,7 +101,6 @@ export const mockDataTemplates: DataTemplate[] = [
                 { name: 'Diagnosed', type: 'number' },
                 { name: 'Scans', type: 'number' },
                 { name: 'Accepted', type: 'number' },
-                { name: 'Cases Submitted', type: 'number' },
             ],
         },
         created_at: '2024-01-01T00:00:00Z',

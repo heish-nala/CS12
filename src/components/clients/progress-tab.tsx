@@ -60,6 +60,8 @@ import {
     Mail,
     Phone,
     Download,
+    Copy,
+    Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProgressReportDialog } from '@/components/clients/progress-report-dialog';
@@ -112,6 +114,19 @@ export function ProgressTab({ clientId, clientName }: ProgressTabProps) {
 
     // Report dialog state
     const [reportDialogOpen, setReportDialogOpen] = useState(false);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+
+    const handleCopy = async (e: React.MouseEvent, text: string, id: string, type: 'email' | 'phone') => {
+        e.stopPropagation();
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopiedId(id);
+            toast.success(type === 'email' ? 'Email copied' : 'Phone number copied');
+            setTimeout(() => setCopiedId(null), 1500);
+        } catch (err) {
+            console.error('Failed to copy:', err);
+        }
+    };
 
     // Track in-flight requests
     const pendingRequestsRef = useRef<Set<string>>(new Set());
@@ -622,18 +637,38 @@ export function ProgressTab({ clientId, clientName }: ProgressTabProps) {
                 <SheetContent className="sm:max-w-lg">
                     <SheetHeader className="pb-4">
                         <SheetTitle>{selectedContact?.name}</SheetTitle>
-                        <div className="flex gap-4 text-sm text-muted-foreground">
+                        <div className="space-y-1.5 text-sm text-muted-foreground">
                             {selectedContact?.email && (
-                                <span className="flex items-center gap-1.5">
-                                    <Mail className="h-3.5 w-3.5" />
-                                    {selectedContact.email}
-                                </span>
+                                <div className="flex items-center gap-2 group/email">
+                                    <Mail className="h-3.5 w-3.5 flex-shrink-0" />
+                                    <span className="truncate flex-1">{selectedContact.email}</span>
+                                    <span
+                                        onClick={(e) => handleCopy(e, selectedContact.email!, `email-${selectedContact.id}`, 'email')}
+                                        className="opacity-0 group-hover/email:opacity-100 transition-opacity p-1 hover:bg-muted rounded cursor-pointer"
+                                    >
+                                        {copiedId === `email-${selectedContact.id}` ? (
+                                            <Check className="h-3.5 w-3.5 text-green-500" />
+                                        ) : (
+                                            <Copy className="h-3.5 w-3.5" />
+                                        )}
+                                    </span>
+                                </div>
                             )}
                             {selectedContact?.phone && (
-                                <span className="flex items-center gap-1.5">
-                                    <Phone className="h-3.5 w-3.5" />
-                                    {selectedContact.phone}
-                                </span>
+                                <div className="flex items-center gap-2 group/phone">
+                                    <Phone className="h-3.5 w-3.5 flex-shrink-0" />
+                                    <span className="flex-1">{selectedContact.phone}</span>
+                                    <span
+                                        onClick={(e) => handleCopy(e, selectedContact.phone!, `phone-${selectedContact.id}`, 'phone')}
+                                        className="opacity-0 group-hover/phone:opacity-100 transition-opacity p-1 hover:bg-muted rounded cursor-pointer"
+                                    >
+                                        {copiedId === `phone-${selectedContact.id}` ? (
+                                            <Check className="h-3.5 w-3.5 text-green-500" />
+                                        ) : (
+                                            <Copy className="h-3.5 w-3.5" />
+                                        )}
+                                    </span>
+                                </div>
                             )}
                         </div>
                     </SheetHeader>
