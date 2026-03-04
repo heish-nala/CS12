@@ -1,4 +1,4 @@
-import { Doctor, Client, DSO, Activity, PeriodProgress, TaskGroup, Task, DataTable, DataColumn, DataRow, DataTemplate, ColumnType, PeriodData, TimeTrackingConfig, OverviewWidget, OverviewMetricCard, OverviewChartWidget, AggregationType } from './db/types';
+import { Doctor, Client, DSO, Activity, PeriodProgress, TaskGroup, Task, DataTable, DataColumn, DataRow, DataTemplate, ColumnType, PeriodData, TimeTrackingConfig } from './db/types';
 
 // Empty arrays - no mock data
 export const mockClients: Client[] = [];
@@ -113,7 +113,6 @@ export const mockDataTables: DataTable[] = [];
 export const mockDataColumns: DataColumn[] = [];
 export const mockDataRows: DataRow[] = [];
 export const mockPeriodData: PeriodData[] = [];
-export let mockOverviewWidgets: OverviewWidget[] = [];
 
 // Template helper functions
 export function getTemplates(): DataTemplate[] {
@@ -223,58 +222,3 @@ export function getCurrentPeriodLabel(frequency: 'weekly' | 'monthly' | 'quarter
     }
 }
 
-// Overview widgets - empty
-export function getOverviewWidgetsByClient(clientId: string): OverviewWidget[] {
-    return [];
-}
-
-export function getOverviewWidgetById(widgetId: string): OverviewWidget | undefined {
-    return undefined;
-}
-
-export function createOverviewWidget(
-    clientId: string,
-    type: 'metric_card' | 'chart',
-    label: string,
-    config: OverviewMetricCard['config'] | OverviewChartWidget['config']
-): OverviewWidget {
-    throw new Error('Use Supabase API instead');
-}
-
-export function updateOverviewWidget(
-    widgetId: string,
-    updates: Partial<Pick<OverviewWidget, 'label' | 'order_index' | 'config'>>
-): OverviewWidget | null {
-    throw new Error('Use Supabase API instead');
-}
-
-export function deleteOverviewWidget(widgetId: string): boolean {
-    throw new Error('Use Supabase API instead');
-}
-
-export function reorderOverviewWidgets(clientId: string, widgetIds: string[]): void {
-    // No-op
-}
-
-export function getAggregatableColumns(tableId: string): DataColumn[] {
-    return [];
-}
-
-export function getChartableColumns(tableId: string): DataColumn[] {
-    return [];
-}
-
-export function calculateAggregation(
-    tableId: string,
-    columnId: string,
-    aggregation: AggregationType
-): number | null {
-    return null;
-}
-
-export function calculateChartData(
-    tableId: string,
-    columnId: string
-): Array<{ label: string; value: number; color?: string }> {
-    return [];
-}

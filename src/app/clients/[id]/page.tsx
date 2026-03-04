@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState, useMemo } from 'react';
 import { Client } from '@/lib/db/types';
-import { ExecutiveDashboard } from '@/components/dashboard/executive-dashboard';
+import { OverviewDashboard } from '@/components/dashboard/overview-dashboard';
 import { DataTablesView } from '@/components/data-tables/data-tables-view';
 import { ClientSettingsDialog } from '@/components/clients/client-settings-dialog';
 import { MetricConfigDialog } from '@/components/metrics/metric-config-dialog';
@@ -216,7 +216,7 @@ function ClientDetailContent({
                         </TabsContent>
 
                         <TabsContent value="overview" className="space-y-6 mt-0">
-                            <ExecutiveDashboard dsoId={clientId} />
+                            <OverviewDashboard dsoId={clientId} />
                         </TabsContent>
 
                         <TabsContent value="activity" className="space-y-6 mt-0">

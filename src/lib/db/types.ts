@@ -427,49 +427,28 @@ export interface DataTableWithData extends DataTableWithColumns {
 }
 
 // ============================================================================
-// OVERVIEW WIDGETS SYSTEM
+// OVERVIEW DASHBOARD (Pre-built)
 // ============================================================================
 
-export type AggregationType = 'sum' | 'average' | 'min' | 'max' | 'count';
-
-export type OverviewWidgetType = 'metric_card' | 'chart';
-
-export type ChartType = 'pie' | 'bar' | 'donut';
-
-export interface OverviewWidgetBase {
-    id: string;
-    client_id: string;
-    type: OverviewWidgetType;
-    label: string;
-    order_index: number;
-    created_at: string;
-    updated_at: string;
-}
-
-export interface OverviewMetricCard extends OverviewWidgetBase {
-    type: 'metric_card';
-    config: {
-        table_id: string;
-        column_id: string;
-        aggregation: AggregationType;
-        format?: 'number' | 'currency' | 'percentage';
-        prefix?: string;
-        suffix?: string;
-        icon?: string;
-        color?: string;
+export interface OverviewDashboardResponse {
+    total_attendees: number;
+    attendees_by_status: Array<{ label: string; value: number; color: string }>;
+    attendees_by_role: Array<{ label: string; value: number; color: string }>;
+    blueprint_completion: {
+        average_percent: number;
+        total_with_blueprint: number;
+        distribution: Array<{ label: string; value: number; color: string }>;
+    };
+    clinical_funnel: {
+        period_label: string;
+        stages: Array<{ label: string; value: number }>;
+    };
+    activity_summary: {
+        total_this_month: number;
+        last_contact_date: string | null;
+        by_type: Array<{ label: string; value: number }>;
     };
 }
-
-export interface OverviewChartWidget extends OverviewWidgetBase {
-    type: 'chart';
-    config: {
-        table_id: string;
-        column_id: string;
-        chart_type: ChartType;
-    };
-}
-
-export type OverviewWidget = OverviewMetricCard | OverviewChartWidget;
 
 // Metric config type (for dashboard metric visibility settings)
 export interface MetricConfig {
@@ -480,19 +459,6 @@ export interface MetricConfig {
     order_index: number;
     created_at: string;
     updated_at: string;
-}
-
-// API types for overview widgets
-export interface OverviewWidgetWithValue extends OverviewMetricCard {
-    computed_value: number | null;
-}
-
-export interface OverviewChartWidgetWithData extends OverviewChartWidget {
-    computed_data: Array<{
-        label: string;
-        value: number;
-        color?: string;
-    }>;
 }
 
 // ============================================================================
