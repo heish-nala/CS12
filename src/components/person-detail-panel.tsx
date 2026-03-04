@@ -34,6 +34,8 @@ import {
     AlertCircle,
     MinusCircle,
     Loader2,
+    Copy,
+    Check,
 } from 'lucide-react';
 import { Activity, ActivityType } from '@/lib/db/types';
 import { toast } from 'sonner';
@@ -87,6 +89,7 @@ export function PersonDetailPanel({
     const [outcome, setOutcome] = useState<string>('neutral');
     const [notes, setNotes] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [copiedField, setCopiedField] = useState<string | null>(null);
 
     // Fetch activities for this person
     const fetchActivities = useCallback(async () => {
@@ -203,17 +206,18 @@ export function PersonDetailPanel({
         return groups;
     }, {} as Record<string, Activity[]>);
 
-    // Format relative date
-    const formatRelativeDate = (dateStr: string) => {
+    // Format date as actual date
+    const formatActivityDate = (dateStr: string) => {
         const date = new Date(dateStr);
-        const now = new Date();
-        const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
 
-        if (diffDays === 0) return 'Today';
-        if (diffDays === 1) return 'Yesterday';
-        if (diffDays < 7) return `${diffDays} days ago`;
-        if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-        return date.toLocaleDateString();
+    // Copy to clipboard helper
+    const handleCopy = (value: string, field: string, label: string) => {
+        navigator.clipboard.writeText(value);
+        toast.success(`${label} copied`);
+        setCopiedField(field);
+        setTimeout(() => setCopiedField(null), 1500);
     };
 
     if (!person) return null;
@@ -227,19 +231,39 @@ export function PersonDetailPanel({
                     {/* Contact Info */}
                     <div className="space-y-2 pt-2">
                         {person.email && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground group">
                                 <Mail className="h-4 w-4" />
-                                <a href={`mailto:${person.email}`} className="hover:underline">
+                                <a href={`mailto:${person.email}`} className="hover:underline flex-1 truncate">
                                     {person.email}
                                 </a>
+                                <button
+                                    onClick={() => handleCopy(person.email!, 'email', 'Email')}
+                                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
+                                >
+                                    {copiedField === 'email' ? (
+                                        <Check className="h-3.5 w-3.5 text-green-500" />
+                                    ) : (
+                                        <Copy className="h-3.5 w-3.5" />
+                                    )}
+                                </button>
                             </div>
                         )}
                         {person.phone && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground group">
                                 <Phone className="h-4 w-4" />
-                                <a href={`tel:${person.phone}`} className="hover:underline">
+                                <a href={`tel:${person.phone}`} className="hover:underline flex-1">
                                     {person.phone}
                                 </a>
+                                <button
+                                    onClick={() => handleCopy(person.phone!, 'phone', 'Phone number')}
+                                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
+                                >
+                                    {copiedField === 'phone' ? (
+                                        <Check className="h-3.5 w-3.5 text-green-500" />
+                                    ) : (
+                                        <Copy className="h-3.5 w-3.5" />
+                                    )}
+                                </button>
                             </div>
                         )}
                         {person.startDate && (
@@ -391,7 +415,7 @@ export function PersonDetailPanel({
                                                                     {typeConfig?.label || activity.activity_type}
                                                                 </span>
                                                                 <span className="text-xs text-muted-foreground">
-                                                                    {formatRelativeDate(activity.created_at)}
+                                                                    {formatActivityDate(activity.created_at)}
                                                                 </span>
                                                             </div>
 
