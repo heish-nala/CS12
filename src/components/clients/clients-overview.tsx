@@ -8,27 +8,27 @@ import {
     Users,
     TrendingUp,
     AlertTriangle,
-    ArrowUpRight,
     Plus,
     Settings2,
     Building2,
     Activity,
     ChevronRight,
 } from 'lucide-react';
-import { CardConfigDialog, MetricConfig, DEFAULT_METRICS } from './card-config-dialog';
+import { CardConfigDialog, MetricConfig, DEFAULT_METRICS, migrateMetricsConfig } from './card-config-dialog';
 import { CreateClientDialog } from './create-client-dialog';
 import { useAuth } from '@/contexts/auth-context';
 import { SparkChart, generateTrendData } from '@/components/ui/spark-chart';
 
 interface ClientMetrics {
     client_id: string;
+    total_attendees: number;
     total_doctors: number;
-    active_doctors: number;
-    at_risk_count: number;
-    engagement_rate: number;
-    total_cases: number;
-    total_courses: number;
-    avg_course_progress: number;
+    active_attendees: number;
+    avg_blueprint: number;
+    needs_attention: number;
+    diagnosed: number;
+    scans: number;
+    accepted: number;
 }
 
 interface ClientWithMetrics extends Client {
@@ -90,45 +90,46 @@ function ClientCard({
 
     const getMetricDisplay = (metricId: string) => {
         switch (metricId) {
-            case 'total_doctors':
+            case 'total_attendees':
                 return {
-                    label: 'Doctors',
-                    value: client.metrics.total_doctors,
-                    sub: `${client.metrics.active_doctors} active`,
-                    trendData: generateTrendData(client.metrics.total_doctors, 0.1),
+                    label: 'Attendees',
+                    value: client.metrics.total_attendees,
+                    sub: `${client.metrics.total_doctors} doctors`,
+                    trendData: generateTrendData(client.metrics.total_attendees, 0.1),
                 };
-            case 'active_doctors':
+            case 'active_attendees':
                 return {
                     label: 'Active',
-                    value: client.metrics.active_doctors,
-                    sub: `of ${client.metrics.total_doctors}`,
-                    trendData: generateTrendData(client.metrics.active_doctors, 0.15),
+                    value: client.metrics.active_attendees,
+                    sub: `of ${client.metrics.total_attendees}`,
+                    trendData: generateTrendData(client.metrics.active_attendees, 0.15),
                 };
-            case 'engagement_rate':
+            case 'avg_blueprint':
                 return {
-                    label: 'Engagement',
-                    value: `${client.metrics.engagement_rate}%`,
-                    sub: 'Last 7 days',
-                    trendData: generateTrendData(client.metrics.engagement_rate, 0.12),
+                    label: 'Blueprint',
+                    value: `${client.metrics.avg_blueprint}%`,
+                    sub: 'avg completion',
+                    trendData: generateTrendData(client.metrics.avg_blueprint, 0.12),
                 };
-            case 'at_risk_count':
-                return client.metrics.at_risk_count > 0 ? {
-                    label: 'At Risk',
-                    value: client.metrics.at_risk_count,
-                    sub: 'Need attention',
+            case 'needs_attention':
+                return client.metrics.needs_attention > 0 ? {
+                    label: 'Attention',
+                    value: client.metrics.needs_attention,
+                    sub: 'confidence gap',
                     isWarning: true,
                 } : null;
-            case 'total_cases':
+            case 'accepted':
                 return {
-                    label: 'Cases',
-                    value: client.metrics.total_cases,
-                    trendData: generateTrendData(client.metrics.total_cases, 0.2),
+                    label: 'Accepted',
+                    value: client.metrics.accepted,
+                    sub: 'this period',
+                    trendData: generateTrendData(client.metrics.accepted, 0.2),
                 };
-            case 'avg_course_progress':
+            case 'clinical_summary':
                 return {
-                    label: 'Progress',
-                    value: `${client.metrics.avg_course_progress}%`,
-                    trendData: generateTrendData(client.metrics.avg_course_progress, 0.1),
+                    label: 'Clinical',
+                    value: client.metrics.diagnosed,
+                    sub: `diag / ${client.metrics.scans} scans`,
                 };
             default:
                 return null;
@@ -151,10 +152,10 @@ function ClientCard({
                         <p className="text-sm text-muted-foreground mt-0.5">{client.industry}</p>
                     )}
                 </div>
-                {client.metrics.at_risk_count > 0 && (
+                {client.metrics.needs_attention > 0 && (
                     <div className="flex-shrink-0 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/20">
                         <span className="text-xs font-medium text-amber-600">
-                            {client.metrics.at_risk_count} at risk
+                            {client.metrics.needs_attention} need attention
                         </span>
                     </div>
                 )}
@@ -309,9 +310,9 @@ export function ClientsOverview() {
 
     const loadMetricsConfig = () => {
         try {
-            const stored = localStorage.getItem('client_card_metrics');
-            if (stored) {
-                setMetrics(JSON.parse(stored));
+            const migrated = migrateMetricsConfig();
+            if (migrated) {
+                setMetrics(migrated);
             }
         } catch (error) {
             console.error('Error loading metrics config:', error);
@@ -346,13 +347,12 @@ export function ClientsOverview() {
     // Calculate summary stats
     const summaryStats = useMemo(() => {
         const totalDoctors = clients.reduce((sum, c) => sum + c.metrics.total_doctors, 0);
-        const activeDoctors = clients.reduce((sum, c) => sum + c.metrics.active_doctors, 0);
-        const atRisk = clients.reduce((sum, c) => sum + c.metrics.at_risk_count, 0);
-        const avgEngagement = clients.length > 0
-            ? Math.round(clients.reduce((sum, c) => sum + c.metrics.engagement_rate, 0) / clients.length)
+        const avgBlueprint = clients.length > 0
+            ? Math.round(clients.reduce((sum, c) => sum + c.metrics.avg_blueprint, 0) / clients.length)
             : 0;
+        const needsAttention = clients.reduce((sum, c) => sum + c.metrics.needs_attention, 0);
 
-        return { totalDoctors, activeDoctors, atRisk, avgEngagement, clientCount: clients.length };
+        return { totalDoctors, avgBlueprint, needsAttention, clientCount: clients.length };
     }, [clients]);
 
     if (loading) {
@@ -373,22 +373,20 @@ export function ClientsOverview() {
                     <StatCard
                         label="Total Doctors"
                         value={summaryStats.totalDoctors}
-                        trend={{ value: 12, label: 'this month' }}
                         icon={Users}
                         trendData={generateTrendData(summaryStats.totalDoctors, 0.15)}
                     />
                     <StatCard
-                        label="Avg Engagement"
-                        value={`${summaryStats.avgEngagement}%`}
-                        trend={{ value: 5, label: 'vs last week' }}
+                        label="Avg Blueprint"
+                        value={`${summaryStats.avgBlueprint}%`}
                         icon={TrendingUp}
-                        trendData={generateTrendData(summaryStats.avgEngagement, 0.12)}
+                        trendData={generateTrendData(summaryStats.avgBlueprint, 0.12)}
                     />
                     <StatCard
-                        label="At Risk"
-                        value={summaryStats.atRisk}
+                        label="Needs Attention"
+                        value={summaryStats.needsAttention}
                         icon={AlertTriangle}
-                        trendData={generateTrendData(summaryStats.atRisk, 0.2)}
+                        trendData={generateTrendData(summaryStats.needsAttention, 0.2)}
                     />
                 </div>
             )}

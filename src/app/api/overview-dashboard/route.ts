@@ -2,20 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/client';
 import { requireOrgDsoAccess } from '@/lib/auth';
 import { OverviewDashboardResponse } from '@/lib/db/types';
-
-// Status color → hex for chart rendering
-const STATUS_COLOR_MAP: Record<string, string> = {
-    default: '#9ca3af',
-    gray: '#6b7280',
-    brown: '#92400e',
-    orange: '#f97316',
-    yellow: '#eab308',
-    green: '#22c55e',
-    blue: '#3b82f6',
-    purple: '#a855f7',
-    pink: '#ec4899',
-    red: '#ef4444',
-};
+import { findAttendeeTables, getStatusOptions, getStatusColorHex } from '@/lib/attendee-tracker';
 
 export async function GET(request: NextRequest) {
     try {
@@ -35,74 +22,8 @@ export async function GET(request: NextRequest) {
             return accessResult.response;
         }
 
-        // Fetch all data tables for this client
-        const { data: tables, error: tablesError } = await supabaseAdmin
-            .from('data_tables')
-            .select('*')
-            .eq('client_id', clientId)
-            .order('order_index');
-
-        if (tablesError) throw tablesError;
-
-        if (!tables || tables.length === 0) {
-            return NextResponse.json(emptyDashboard());
-        }
-
-        const tableIds = tables.map(t => t.id);
-
-        // Fetch columns and rows for all tables in parallel
-        const [columnsResult, rowsResult] = await Promise.all([
-            supabaseAdmin
-                .from('data_columns')
-                .select('*')
-                .in('table_id', tableIds)
-                .order('order_index'),
-            supabaseAdmin
-                .from('data_rows')
-                .select('*')
-                .in('table_id', tableIds),
-        ]);
-
-        const allColumns = columnsResult.data || [];
-        const allRows = rowsResult.data || [];
-
-        // Group by table
-        const columnsByTable: Record<string, typeof allColumns> = {};
-        for (const col of allColumns) {
-            if (!columnsByTable[col.table_id]) columnsByTable[col.table_id] = [];
-            columnsByTable[col.table_id].push(col);
-        }
-        const rowsByTable: Record<string, typeof allRows> = {};
-        for (const row of allRows) {
-            if (!rowsByTable[row.table_id]) rowsByTable[row.table_id] = [];
-            rowsByTable[row.table_id].push(row);
-        }
-
-        // Find attendee tracker tables: must have Status + Blueprint columns
-        const attendeeTables: Array<{
-            tableId: string;
-            statusCol: typeof allColumns[0];
-            roleCol: typeof allColumns[0] | undefined;
-            blueprintCol: typeof allColumns[0];
-            rows: typeof allRows;
-        }> = [];
-
-        for (const table of tables) {
-            const cols = columnsByTable[table.id] || [];
-            const statusCol = cols.find(c => c.name === 'Status' && c.type === 'status');
-            const blueprintCol = cols.find(c => c.name === 'Blueprint' && c.type === 'percentage');
-
-            if (statusCol && blueprintCol) {
-                const roleCol = cols.find(c => c.name === 'Role' && c.type === 'status');
-                attendeeTables.push({
-                    tableId: table.id,
-                    statusCol,
-                    roleCol,
-                    blueprintCol,
-                    rows: rowsByTable[table.id] || [],
-                });
-            }
-        }
+        // Use shared attendee tracker detection
+        const { tables: attendeeTables } = await findAttendeeTables(clientId);
 
         if (attendeeTables.length === 0) {
             return NextResponse.json(emptyDashboard());
@@ -130,7 +51,7 @@ export async function GET(request: NextRequest) {
                 if (statusVal) {
                     const opt = statusOptions[statusVal] || { label: statusVal, color: 'gray' };
                     if (!statusCounts[statusVal]) {
-                        statusCounts[statusVal] = { label: opt.label, value: 0, color: STATUS_COLOR_MAP[opt.color] || STATUS_COLOR_MAP.gray };
+                        statusCounts[statusVal] = { label: opt.label, value: 0, color: getStatusColorHex(opt.color) };
                     }
                     statusCounts[statusVal].value++;
                 }
@@ -141,7 +62,7 @@ export async function GET(request: NextRequest) {
                     if (roleVal) {
                         const opt = roleOptions[roleVal] || { label: roleVal, color: 'gray' };
                         if (!roleCounts[roleVal]) {
-                            roleCounts[roleVal] = { label: opt.label, value: 0, color: STATUS_COLOR_MAP[opt.color] || STATUS_COLOR_MAP.gray };
+                            roleCounts[roleVal] = { label: opt.label, value: 0, color: getStatusColorHex(opt.color) };
                         }
                         roleCounts[roleVal].value++;
                     }
@@ -165,10 +86,10 @@ export async function GET(request: NextRequest) {
             : 0;
 
         const bpDistribution = [
-            { label: '0-25%', value: 0, color: STATUS_COLOR_MAP.gray },
-            { label: '26-50%', value: 0, color: STATUS_COLOR_MAP.yellow },
-            { label: '51-75%', value: 0, color: STATUS_COLOR_MAP.blue },
-            { label: '76-100%', value: 0, color: STATUS_COLOR_MAP.green },
+            { label: '0-25%', value: 0, color: getStatusColorHex('gray') },
+            { label: '26-50%', value: 0, color: getStatusColorHex('yellow') },
+            { label: '51-75%', value: 0, color: getStatusColorHex('blue') },
+            { label: '76-100%', value: 0, color: getStatusColorHex('green') },
         ];
         for (const v of blueprintValues) {
             if (v <= 25) bpDistribution[0].value++;
@@ -203,9 +124,9 @@ export async function GET(request: NextRequest) {
 
         // Resolve metric IDs to names using the time_tracking config from tables
         const metricIdToName: Record<string, string> = {};
-        for (const table of tables) {
-            if (table.time_tracking?.metrics) {
-                for (const m of table.time_tracking.metrics) {
+        for (const at of attendeeTables) {
+            if (at.table.time_tracking?.metrics) {
+                for (const m of at.table.time_tracking.metrics) {
                     metricIdToName[m.id] = m.name;
                 }
             }
@@ -270,15 +191,6 @@ export async function GET(request: NextRequest) {
             { status: 500 }
         );
     }
-}
-
-function getStatusOptions(col: { config: any }): Record<string, { label: string; color: string }> {
-    const opts: Record<string, { label: string; color: string }> = {};
-    const options = col.config?.options || col.config?.statusConfig?.options || [];
-    for (const o of options) {
-        opts[o.value] = { label: o.label, color: o.color || 'gray' };
-    }
-    return opts;
 }
 
 function emptyDashboard(): OverviewDashboardResponse {

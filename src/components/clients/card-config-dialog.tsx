@@ -22,50 +22,73 @@ export interface MetricConfig {
 
 const MAX_METRICS = 5;
 
+// Old metric IDs that need migration
+const LEGACY_METRIC_IDS = ['total_doctors', 'active_doctors', 'engagement_rate', 'at_risk_count', 'total_cases', 'avg_course_progress'];
+
 export const DEFAULT_METRICS: MetricConfig[] = [
     {
-        id: 'total_doctors',
-        label: 'Total Doctors',
-        description: 'Total number of doctors',
+        id: 'total_attendees',
+        label: 'Attendees',
+        description: 'Total attendees across all trackers',
         enabled: true,
         order: 0,
     },
     {
-        id: 'active_doctors',
-        label: 'Active Doctors',
-        description: 'Number of active doctors',
+        id: 'active_attendees',
+        label: 'Active',
+        description: 'Number of active attendees',
         enabled: false,
         order: 1,
     },
     {
-        id: 'engagement_rate',
-        label: 'Engagement Rate',
-        description: 'Engagement percentage (last 7 days)',
+        id: 'avg_blueprint',
+        label: 'Blueprint',
+        description: 'Average Blueprint completion percentage',
         enabled: true,
         order: 2,
     },
     {
-        id: 'at_risk_count',
-        label: 'At Risk Count',
-        description: 'Number of doctors at risk',
+        id: 'needs_attention',
+        label: 'Needs Attention',
+        description: 'Attendees with high Blueprint but no recent accepted cases',
         enabled: true,
         order: 3,
     },
     {
-        id: 'total_cases',
-        label: 'Total Cases',
-        description: 'Total number of cases',
+        id: 'accepted',
+        label: 'Accepted',
+        description: 'Accepted cases this period',
         enabled: true,
         order: 4,
     },
     {
-        id: 'avg_course_progress',
-        label: 'Average Course Progress',
-        description: 'Average course completion percentage',
+        id: 'clinical_summary',
+        label: 'Clinical Summary',
+        description: 'Diagnosed and scans this period',
         enabled: true,
         order: 5,
     },
 ];
+
+/**
+ * Migrate legacy metric configs to new IDs.
+ * If stored config has any old IDs, clear and reset to defaults.
+ */
+export function migrateMetricsConfig(): MetricConfig[] | null {
+    try {
+        const stored = localStorage.getItem('client_card_metrics');
+        if (!stored) return null;
+        const parsed: MetricConfig[] = JSON.parse(stored);
+        const hasLegacy = parsed.some(m => LEGACY_METRIC_IDS.includes(m.id));
+        if (hasLegacy) {
+            localStorage.removeItem('client_card_metrics');
+            return DEFAULT_METRICS;
+        }
+        return parsed;
+    } catch {
+        return null;
+    }
+}
 
 interface CardConfigDialogProps {
     open: boolean;
