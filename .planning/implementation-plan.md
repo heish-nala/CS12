@@ -244,24 +244,153 @@ Show formatted date: "Feb 27, 2026"
 
 ---
 
-## Updated Implementation Order
+## Updated Implementation Order (Revised March 5, 2026)
+
+### Current Reality Check
+
+- The legacy main dashboard endpoint (`/api/dashboard/metrics`) still reads from `doctors` + `period_progress`.
+- The app already has data-table metrics in parallel (`/api/clients/overview`, `/api/overview-dashboard`, `computeClientMetrics`).
+- Status options are inconsistent across creation paths (`mock-data.ts` vs data table POST defaults vs CSV import defaults).
+
+### Execution Order
 
 | Order | Item | Depends On | Scope | Status |
 |-------|------|------------|-------|--------|
 | 1 | Add Role column | Nothing | Small | DONE |
-| 2 | Update Status options | Nothing | Small | DONE |
+| 2 | Update Status options | Nothing | Small | DONE (partial propagation risk) |
 | 3 | Reorder time-tracking metrics | Nothing | Small | DONE (Cases Submitted rolled back) |
 | 4 | Copy buttons on detail panel | Nothing | Tiny | DONE |
 | 5 | Actual dates on activities | Nothing | Tiny | DONE |
 | 6 | Replace Overview tab with pre-built dashboard | #1, #2, #3 | Medium | DONE |
 | 6b | Remove Cases Submitted + copy buttons on Progress panel | Nothing | Small | DONE (Mar 3) |
-| **7** | **Rebuild main dashboard from data tables** | #1, #2 | **Large** | **NEXT** |
-| 8 | Confidence gap detection | #7 | Small | Not started |
-| 9 | Case acceptance rate metric | #7 | Small | Not started |
-| 10 | Connect activities to attendee rows | Nothing (can parallel) | Medium | Not started |
-| 11 | Retire doctors table | #7 and #10 | Small | Not started |
+| **6c** | **Normalize Status Options Everywhere** | #2 | **Small** | **NEW — do first** |
+| **7** | **Rebuild main dashboard from data tables (single shared pipeline)** | #1, #2, #6c | **Large** | **NEXT** |
+| 8 | Confidence gap detection (Blueprint >= 80 + Accepted = 0, doctors only) | #7 | Small | Not started |
+| 9 | Case acceptance rate metric (accepted/diagnosed) | #7 | Small | Not started |
+| 10 | Connect activities to attendee rows (`activities.data_row_id`) | Nothing (can parallel after 6c) | Medium | Not started |
+| 11 | Retire doctors table and routes | #7 and #10 | Small | Not started |
 
-Items 1-6b done. **Item 7 is next** — rebuild main dashboard to pull from data tables.
+Items 1-6b are complete. **Item 6c is now the immediate prerequisite**, then item 7.
+
+---
+
+### 6c. Normalize Status Options Everywhere
+
+**What:** Ensure all attendee creation/import paths use the same status set:
+- Not Started
+- Active
+- Completed
+- On Hold
+- Withdrawn
+
+**Why:** If new rows keep getting created with old values (`At Risk`, `Inactive`), dashboard metrics split across old/new status labels and become unreliable.
+
+**Changes needed:**
+- Update status defaults in:
+  - `src/app/api/data-tables/route.ts`
+  - `src/components/data-tables/import-csv-dialog.tsx`
+- Add a data migration/backfill for existing rows:
+  - `at_risk -> on_hold` (or chosen mapping)
+  - `inactive -> withdrawn`
+- Confirm color mapping consistency.
+
+**Acceptance checks:**
+- New attendee list created from UI has no `At Risk`/`Inactive` options.
+- CSV import auto-added Status column uses only new options.
+- Existing rows no longer contain deprecated status values.
+
+---
+
+### 7. Rebuild Main Dashboard from Data Tables (Single Shared Pipeline)
+
+**What:** Move `/api/dashboard/metrics` off legacy doctors tables and onto attendee tracker data tables, Role-filtered to doctors.
+
+**Why:** Current endpoint still queries legacy tables, while other dashboard surfaces already use data-table sources. We need one source of truth and one metric pipeline.
+
+**Changes needed:**
+- Create/expand a shared metrics service in `src/lib/attendee-tracker.ts` used by:
+  - `/api/dashboard/metrics`
+  - `/api/clients/overview`
+  - (optionally) `/api/overview-dashboard`
+- Role filter: include only rows where Role = Doctor for doctor-specific metrics.
+- Resolve dynamic column IDs for Blueprint/Role/Status + period metric IDs.
+- Remove dependency on `doctors` / `period_progress` in dashboard metrics route.
+- Align `DashboardMetrics` type to the new model (remove legacy course-based fields if unused).
+
+**Acceptance checks:**
+- `/api/dashboard/metrics` returns non-zero values from attendee tables for DSOs with attendee data.
+- No query to `doctors` or `period_progress` remains in this route.
+- Metrics match client overview calculations for the same DSO scope.
+
+---
+
+### 8. Confidence Gap Detection
+
+**What:** Add doctor-only confidence gap metric: Blueprint >= 80 and accepted = 0 in current period.
+
+**Why:** This is the highest-risk behavioral segment from the program report.
+
+**Changes needed:**
+- Update existing `needs_attention` logic (currently too broad) to:
+  - Threshold 80 (not 50)
+  - Doctor-only rows
+- Expose count and list in dashboard response.
+
+**Acceptance checks:**
+- Doctors with Blueprint 79 are excluded.
+- Leadership/staff rows are excluded even if Blueprint >= 80.
+- Count matches row-level manual audit.
+
+---
+
+### 9. Case Acceptance Rate Metric
+
+**What:** Add accepted/diagnosed ratio per doctor and overall cohort.
+
+**Why:** Identifies checkout leakage after diagnosis.
+
+**Changes needed:**
+- Compute totals and ratios from period data.
+- Guard divide-by-zero cases.
+- Add cohort metric to dashboard cards and per-doctor value for drill-down (if UI supports).
+
+**Acceptance checks:**
+- Cohort acceptance rate = total accepted / total diagnosed.
+- Doctors with diagnosed > 0 and accepted = 0 are explicitly flagged.
+
+---
+
+### 10. Connect Activities to Attendee Rows
+
+**What:** Link activities directly to attendee data rows.
+
+**Changes needed:**
+- Migration: add nullable `data_row_id` to `activities` (FK -> `data_rows.id`) + index.
+- API: allow create/read filters by `data_row_id`.
+- UI: person detail panel and activity logger should send/store row linkage.
+- Metrics: answer rate, call count, last contact per attendee row.
+
+**Acceptance checks:**
+- New activity logged from attendee panel stores `data_row_id`.
+- Querying by attendee row returns linked activities.
+- Existing activities without linkage still render (backward compatibility).
+
+---
+
+### 11. Retire Doctors Table
+
+**What:** Deprecate doctors-centric routes/components after item 7 + 10 are complete.
+
+**Changes needed:**
+- Remove dashboard dependencies on doctors routes.
+- Hide/remove doctors navigation and old API usage paths.
+- Keep tables in DB for one milestone (no destructive migration yet).
+- Add cleanup migration doc for later hard delete.
+
+**Acceptance checks:**
+- No frontend fetches target doctors-based dashboard metrics.
+- Health check script updated for new canonical dashboard endpoints.
+- Legacy routes are marked deprecated or removed from active UI paths.
 
 ---
 
