@@ -634,8 +634,8 @@ export function ProgressTab({ clientId, clientName }: ProgressTabProps) {
 
             {/* Progress Detail Panel */}
             <Sheet open={panelOpen} onOpenChange={handlePanelClose}>
-                <SheetContent className="sm:max-w-lg">
-                    <SheetHeader className="pb-4">
+                <SheetContent className="sm:max-w-lg p-0 flex flex-col">
+                    <SheetHeader className="px-6 pt-6 pb-4">
                         <SheetTitle>{selectedContact?.name}</SheetTitle>
                         <div className="space-y-1.5 text-sm text-muted-foreground">
                             {selectedContact?.email && (
@@ -673,56 +673,60 @@ export function ProgressTab({ clientId, clientName }: ProgressTabProps) {
                         </div>
                     </SheetHeader>
 
-                    {loadingPeriods ? (
-                        <div className="flex items-center justify-center py-12">
-                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                        </div>
-                    ) : periodData.length === 0 ? (
-                        <div className="text-center py-12 text-muted-foreground">
-                            <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">No period data available</p>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col h-[calc(100vh-120px)]">
-                            {/* Scrollable Timeline */}
-                            <div
-                                className="flex-1 overflow-y-auto space-y-2 pr-2 min-h-0"
-                                ref={(el) => {
-                                    if (el && !loadingPeriods) {
-                                        el.scrollTop = el.scrollHeight;
-                                    }
-                                }}
-                            >
-                                {/* Order: Jan 2025 at top ... Dec 2025 ... Jan 2026 at bottom */}
-                                {periodData.map((period, idx) => {
-                                    const previousPeriod = idx > 0 ? periodData[idx - 1] : null;
-                                    const today = new Date();
-                                    // Parse dates with noon time to avoid timezone issues
-                                    const start = new Date(period.period_start + 'T12:00:00');
-                                    const end = new Date(period.period_end + 'T12:00:00');
-                                    const isCurrent = today >= start && today <= end;
-
-                                    return (
-                                        <MonthCard
-                                            key={period.id}
-                                            period={period}
-                                            previousPeriod={previousPeriod}
-                                            metrics={metrics}
-                                            isEditable={true}
-                                            isCurrent={isCurrent}
-                                            onChange={(metricId, value) => {
-                                                handleMetricChange(period.id, metricId, value);
-                                            }}
-                                        />
-                                    );
-                                })}
+                    <div className="flex-1 min-h-0 flex flex-col px-6">
+                        {loadingPeriods ? (
+                            <div className="flex-1 flex items-center justify-center py-12">
+                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                             </div>
+                        ) : periodData.length === 0 ? (
+                            <div className="flex-1 text-center py-12 text-muted-foreground">
+                                <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                <p className="text-sm">No period data available</p>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Scrollable Timeline */}
+                                <div
+                                    className="flex-1 overflow-y-auto space-y-2 pr-2 min-h-0"
+                                    ref={(el) => {
+                                        if (el && !loadingPeriods) {
+                                            el.scrollTop = el.scrollHeight;
+                                        }
+                                    }}
+                                >
+                                    {/* Order: Jan 2025 at top ... Dec 2025 ... Jan 2026 at bottom */}
+                                    {periodData.map((period, idx) => {
+                                        const previousPeriod = idx > 0 ? periodData[idx - 1] : null;
+                                        const today = new Date();
+                                        // Parse dates with noon time to avoid timezone issues
+                                        const start = new Date(period.period_start + 'T12:00:00');
+                                        const end = new Date(period.period_end + 'T12:00:00');
+                                        const isCurrent = today >= start && today <= end;
 
-                            {/* Save Button */}
+                                        return (
+                                            <MonthCard
+                                                key={period.id}
+                                                period={period}
+                                                previousPeriod={previousPeriod}
+                                                metrics={metrics}
+                                                isEditable={true}
+                                                isCurrent={isCurrent}
+                                                onChange={(metricId, value) => {
+                                                    handleMetricChange(period.id, metricId, value);
+                                                }}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        )}
+
+                        {/* Save Button */}
+                        <div className="shrink-0 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-background">
                             <Button
                                 onClick={handleSave}
                                 disabled={!hasPendingChanges || saving}
-                                className="w-full gap-2 mt-4 shrink-0"
+                                className="w-full gap-2"
                             >
                                 {saving ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -732,7 +736,7 @@ export function ProgressTab({ clientId, clientName }: ProgressTabProps) {
                                 {hasPendingChanges ? 'Save Changes' : 'No Changes'}
                             </Button>
                         </div>
-                    )}
+                    </div>
                 </SheetContent>
             </Sheet>
 
