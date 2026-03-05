@@ -246,21 +246,22 @@ Show formatted date: "Feb 27, 2026"
 
 ## Updated Implementation Order
 
-| Order | Item | Depends On | Scope |
-|-------|------|------------|-------|
-| 1 | Add Role column | Nothing | Small |
-| 2 | Update Status options | Nothing | Small |
-| 3 | Reorder time-tracking metrics + add Cases Submitted | Nothing | Small |
-| 4 | Copy buttons on detail panel | Nothing | Tiny |
-| 5 | Actual dates on activities | Nothing | Tiny |
-| 6 | Replace Overview tab with pre-built dashboard | #1, #2, #3 | Medium |
-| 7 | Rebuild main dashboard from data tables | #1, #2 | Large |
-| 8 | Confidence gap detection | #7 | Small |
-| 9 | Case acceptance rate metric | #7 | Small |
-| 10 | Connect activities to attendee rows | Nothing (can parallel) | Medium |
-| 11 | Retire doctors table | #7 and #10 | Small |
+| Order | Item | Depends On | Scope | Status |
+|-------|------|------------|-------|--------|
+| 1 | Add Role column | Nothing | Small | DONE |
+| 2 | Update Status options | Nothing | Small | DONE |
+| 3 | Reorder time-tracking metrics | Nothing | Small | DONE (Cases Submitted rolled back) |
+| 4 | Copy buttons on detail panel | Nothing | Tiny | DONE |
+| 5 | Actual dates on activities | Nothing | Tiny | DONE |
+| 6 | Replace Overview tab with pre-built dashboard | #1, #2, #3 | Medium | DONE |
+| 6b | Remove Cases Submitted + copy buttons on Progress panel | Nothing | Small | DONE (Mar 3) |
+| **7** | **Rebuild main dashboard from data tables** | #1, #2 | **Large** | **NEXT** |
+| 8 | Confidence gap detection | #7 | Small | Not started |
+| 9 | Case acceptance rate metric | #7 | Small | Not started |
+| 10 | Connect activities to attendee rows | Nothing (can parallel) | Medium | Not started |
+| 11 | Retire doctors table | #7 and #10 | Small | Not started |
 
-Items 1-5 have zero dependencies and can all be done first as quick wins.
+Items 1-6b done. **Item 7 is next** — rebuild main dashboard to pull from data tables.
 
 ---
 

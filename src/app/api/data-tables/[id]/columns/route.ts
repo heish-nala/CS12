@@ -90,14 +90,36 @@ export async function POST(
             .select('*', { count: 'exact', head: true })
             .eq('table_id', id);
 
+        // Auto-populate default config for configurable column types
+        let finalConfig = config || {};
+        const colType = type || 'text';
+
+        if (colType === 'status' && !finalConfig.statusConfig?.options?.length) {
+            finalConfig = {
+                ...finalConfig,
+                statusConfig: {
+                    options: [
+                        { id: crypto.randomUUID().slice(0, 7), value: 'not_started', label: 'Not Started', color: 'gray', group: 'todo' },
+                        { id: crypto.randomUUID().slice(0, 7), value: 'in_progress', label: 'In Progress', color: 'blue', group: 'in_progress' },
+                        { id: crypto.randomUUID().slice(0, 7), value: 'done', label: 'Done', color: 'green', group: 'complete' },
+                    ],
+                },
+            };
+        } else if ((colType === 'select' || colType === 'multi_select') && !finalConfig.selectConfig) {
+            finalConfig = {
+                ...finalConfig,
+                selectConfig: { options: [] },
+            };
+        }
+
         // Create column
         const { data: column, error: insertError } = await supabaseAdmin
             .from('data_columns')
             .insert({
                 table_id: id,
                 name,
-                type: type || 'text',
-                config: config || {},
+                type: colType,
+                config: finalConfig,
                 is_required: false,
                 is_primary: existingCount === 0,
                 width: 150,

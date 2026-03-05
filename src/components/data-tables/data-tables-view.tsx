@@ -306,7 +306,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
         }
     };
 
-    const handleAddColumn = async (name: string, type: ColumnType) => {
+    const handleAddColumn = async (name: string, type: ColumnType): Promise<DataColumn | void> => {
         if (!activeTableId || isAddingColumn) return;
 
         setIsAddingColumn(true);
@@ -328,6 +328,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
                             : t
                     )
                 );
+                return column;
             }
         } catch (error) {
             console.error('Error adding column:', error);

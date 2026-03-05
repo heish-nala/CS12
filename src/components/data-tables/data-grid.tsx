@@ -153,7 +153,7 @@ interface DataGridProps {
     onAddRow: () => void;
     onUpdateRow: (rowId: string, data: Record<string, any>) => void;
     onDeleteRow: (rowId: string) => void;
-    onAddColumn: (name: string, type: ColumnType) => void;
+    onAddColumn: (name: string, type: ColumnType) => Promise<DataColumn | void> | void;
     onUpdateColumn: (columnId: string, updates: Partial<DataColumn>) => void;
     onDeleteColumn: (columnId: string) => void;
     // Time tracking props
@@ -186,10 +186,12 @@ function AddColumnDialog({
     onAdd,
     onConfigureTimeTracking,
     hasTimeTracking,
+    onAutoConfig,
 }: {
-    onAdd: (name: string, type: ColumnType) => void;
+    onAdd: (name: string, type: ColumnType) => Promise<DataColumn | void> | void;
     onConfigureTimeTracking?: () => void;
     hasTimeTracking?: boolean;
+    onAutoConfig?: (column: DataColumn) => void;
 }) {
     const [open, setOpen] = useState(false);
     const [step, setStep] = useState<'type' | 'name'>('type');
@@ -216,11 +218,15 @@ function AddColumnDialog({
         onConfigureTimeTracking?.();
     };
 
-    const handleCreate = () => {
+    const handleCreate = async () => {
         if (selectedType && name.trim()) {
-            onAdd(name.trim(), selectedType);
+            const result = await onAdd(name.trim(), selectedType);
             setOpen(false);
             reset();
+            // Auto-open config dialog for configurable column types
+            if (result && onAutoConfig && ['status', 'select', 'multi_select'].includes(selectedType)) {
+                onAutoConfig(result);
+            }
         }
     };
 
@@ -1255,6 +1261,7 @@ export function DataGrid({
                                 onAdd={onAddColumn}
                                 onConfigureTimeTracking={onConfigureTimeTracking}
                                 hasTimeTracking={hasTimeTracking}
+                                onAutoConfig={handleOpenConfig}
                             />
                         </div>
                     </div>
