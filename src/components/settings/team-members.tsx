@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { AddMemberDialog } from './add-member-dialog';
 import { toast } from 'sonner';
-import { UserRole } from '@/lib/db/types';
+import { OrgRole, UserRole } from '@/lib/db/types';
 import { useAuth } from '@/contexts/auth-context';
 import {
     Plus,
@@ -40,7 +40,7 @@ interface TeamMember {
     user_id: string;
     email: string;
     name: string;
-    role: UserRole;
+    role: TeamRole;
     created_at: string;
     is_current_user?: boolean;
 }
@@ -53,8 +53,10 @@ interface PendingInvite {
     created_at: string;
 }
 
+type TeamRole = UserRole | OrgRole;
+
 // Using design system CSS variables for consistent theming
-const ROLE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string; description: string }> = {
+const ROLE_CONFIG: Record<TeamRole, { label: string; icon: React.ReactNode; color: string; description: string }> = {
     owner: {
         label: 'Owner',
         icon: <Crown className="h-3.5 w-3.5" />,
@@ -87,6 +89,8 @@ const ROLE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color:
     },
 };
 
+const EDITABLE_ROLES: UserRole[] = ['admin', 'manager', 'viewer'];
+
 export function TeamMembers() {
     const { user } = useAuth();
     const [members, setMembers] = useState<TeamMember[]>([]);
@@ -99,7 +103,7 @@ export function TeamMembers() {
 
     // Derive current user's role from the member list returned by the API
     const currentUserRole = members.find(m => m.is_current_user)?.role;
-    const canManageTeam = currentUserRole === 'admin';
+    const canManageTeam = currentUserRole === 'admin' || currentUserRole === 'owner';
 
     // Get display name from email
     const getDisplayName = (email: string) => {
@@ -416,11 +420,11 @@ export function TeamMembers() {
                                             </SelectValue>
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {Object.entries(ROLE_CONFIG).map(([role, config]) => (
+                                            {EDITABLE_ROLES.map((role) => (
                                                 <SelectItem key={role} value={role}>
                                                     <div className="flex items-center gap-2">
-                                                        {config.icon}
-                                                        {config.label}
+                                                        {ROLE_CONFIG[role].icon}
+                                                        {ROLE_CONFIG[role].label}
                                                     </div>
                                                 </SelectItem>
                                             ))}
