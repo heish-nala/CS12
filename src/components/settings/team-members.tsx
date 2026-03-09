@@ -32,6 +32,7 @@ import {
     Clock,
     X,
     RefreshCw,
+    User,
 } from 'lucide-react';
 
 interface TeamMember {
@@ -53,7 +54,13 @@ interface PendingInvite {
 }
 
 // Using design system CSS variables for consistent theming
-const ROLE_CONFIG: Record<UserRole, { label: string; icon: React.ReactNode; color: string; description: string }> = {
+const ROLE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string; description: string }> = {
+    owner: {
+        label: 'Owner',
+        icon: <Crown className="h-3.5 w-3.5" />,
+        color: 'bg-[var(--notion-yellow)] text-[var(--notion-yellow-text)]',
+        description: 'Full access. Organization owner.',
+    },
     admin: {
         label: 'Admin',
         icon: <Shield className="h-3.5 w-3.5" />,
@@ -65,6 +72,12 @@ const ROLE_CONFIG: Record<UserRole, { label: string; icon: React.ReactNode; colo
         icon: <UserCog className="h-3.5 w-3.5" />,
         color: 'bg-[var(--notion-blue)] text-[var(--notion-blue-text)]',
         description: 'Can create and edit. Cannot delete or manage team.',
+    },
+    member: {
+        label: 'Member',
+        icon: <User className="h-3.5 w-3.5" />,
+        color: 'bg-[var(--notion-gray)] text-[var(--notion-gray-text)]',
+        description: 'Basic organization member.',
     },
     viewer: {
         label: 'Viewer',
@@ -352,7 +365,7 @@ export function TeamMembers() {
             {/* Member List */}
             <div className="rounded-lg border border-border divide-y divide-border">
                 {members.map((member) => {
-                    const roleConfig = ROLE_CONFIG[member.role];
+                    const roleConfig = ROLE_CONFIG[member.role] ?? ROLE_CONFIG.member;
                     const isUpdating = updatingRole === member.id;
 
                     return (
