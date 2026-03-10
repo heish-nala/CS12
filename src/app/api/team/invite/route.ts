@@ -3,6 +3,88 @@ import { supabaseAdmin } from '@/lib/db/client';
 import { UserRole } from '@/lib/db/types';
 import { requireAuth, requireAuthWithFallback, checkDsoAccess, getUserOrg } from '@/lib/auth';
 
+interface ExistingInvitee {
+    id: string;
+    email: string;
+}
+
+async function ensureOrgMembership(userId: string, orgId: string) {
+    const { data: existingOrgMember, error: existingOrgMemberError } = await supabaseAdmin
+        .from('org_members')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    if (existingOrgMemberError) {
+        throw existingOrgMemberError;
+    }
+
+    if (existingOrgMember) {
+        return;
+    }
+
+    const { error: orgMemberError } = await supabaseAdmin
+        .from('org_members')
+        .insert({ org_id: orgId, user_id: userId, role: 'member' });
+
+    if (orgMemberError && orgMemberError.code !== '23505') {
+        throw orgMemberError;
+    }
+}
+
+async function findExistingInviteeByEmail(normalizedEmail: string): Promise<ExistingInvitee | null> {
+    const { data: existingProfile, error: profileError } = await supabaseAdmin
+        .from('user_profiles')
+        .select('id, email')
+        .eq('email', normalizedEmail)
+        .maybeSingle();
+
+    if (profileError) {
+        throw profileError;
+    }
+
+    if (existingProfile) {
+        return existingProfile;
+    }
+
+    const { data: authUsers, error: authUsersError } = await supabaseAdmin.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000,
+    });
+
+    if (authUsersError) {
+        throw authUsersError;
+    }
+
+    const existingAuthUser = authUsers.users.find(
+        (user) => user.email?.toLowerCase() === normalizedEmail
+    );
+
+    if (!existingAuthUser?.email) {
+        return null;
+    }
+
+    const { error: profileInsertError } = await supabaseAdmin
+        .from('user_profiles')
+        .upsert({
+            id: existingAuthUser.id,
+            email: existingAuthUser.email.toLowerCase(),
+            name: existingAuthUser.user_metadata?.name
+                || existingAuthUser.user_metadata?.full_name
+                || null,
+        });
+
+    if (profileInsertError) {
+        throw profileInsertError;
+    }
+
+    return {
+        id: existingAuthUser.id,
+        email: existingAuthUser.email.toLowerCase(),
+    };
+}
+
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
@@ -87,21 +169,27 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Check if user already exists via user_profiles (avoids listUsers() N+1 anti-pattern)
-        const { data: existingProfile } = await supabaseAdmin
-            .from('user_profiles')
-            .select('id, email')
-            .eq('email', normalizedEmail)
-            .single();
+        // Check if user already exists. Legacy users may exist in auth.users without user_profiles.
+        const existingProfile = await findExistingInviteeByEmail(normalizedEmail);
 
         if (existingProfile) {
+            try {
+                await ensureOrgMembership(existingProfile.id, orgInfo.orgId);
+            } catch (orgMemberError) {
+                console.error('Error adding user org membership:', orgMemberError);
+                return NextResponse.json(
+                    { error: 'Failed to add user to organization' },
+                    { status: 500 }
+                );
+            }
+
             // Check if the existing user already has access to THIS specific DSO
             const { data: existingAccess } = await supabaseAdmin
                 .from('user_dso_access')
                 .select('dso_id')
                 .eq('user_id', existingProfile.id)
                 .eq('dso_id', dso_id)
-                .single();
+                .maybeSingle();
 
             if (existingAccess) {
                 // Clean up stale pending invites
