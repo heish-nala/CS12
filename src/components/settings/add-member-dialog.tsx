@@ -62,14 +62,21 @@ export function AddMemberDialog({
     currentUserId,
     currentUserName,
 }: AddMemberDialogProps) {
+    const validateEmail = (value: string) => {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    };
+
     const [email, setEmail] = useState('');
     const [role, setRole] = useState<UserRole>('viewer');
+    const [step, setStep] = useState<1 | 2>(1);
     const [selectedDsoIds, setSelectedDsoIds] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
 
     const allDsoIds = useMemo(() => availableDsos.map((dso) => dso.id), [availableDsos]);
-    const showDsoChecklist = availableDsos.length > 1;
+    const hasMultipleDsos = availableDsos.length > 1;
     const allSelected = availableDsos.length > 0 && selectedDsoIds.length === availableDsos.length;
+    const someSelected = selectedDsoIds.length > 0 && !allSelected;
+    const canAdvance = validateEmail(email) && !existingEmails.includes(email.toLowerCase());
 
     useEffect(() => {
         setSelectedDsoIds(allDsoIds);
@@ -78,6 +85,7 @@ export function AddMemberDialog({
     const resetForm = () => {
         setEmail('');
         setRole('viewer');
+        setStep(1);
         setSelectedDsoIds(allDsoIds);
     };
 
@@ -86,13 +94,7 @@ export function AddMemberDialog({
         onOpenChange(false);
     };
 
-    const validateEmail = (email: string) => {
-        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-
+    const handleSubmit = async () => {
         if (!email.trim()) {
             toast.error('Please enter an email address');
             return;
@@ -161,8 +163,33 @@ export function AddMemberDialog({
         );
     };
 
-    const toggleSelectAll = () => {
-        setSelectedDsoIds(allSelected ? [] : allDsoIds);
+    const handleNext = () => {
+        if (!email.trim()) {
+            toast.error('Please enter an email address');
+            return;
+        }
+
+        if (!validateEmail(email)) {
+            toast.error('Please enter a valid email address');
+            return;
+        }
+
+        if (existingEmails.includes(email.toLowerCase())) {
+            toast.error('This user is already a team member');
+            return;
+        }
+
+        if (availableDsos.length === 0) {
+            toast.error('Unable to send invite. Please try again later.');
+            return;
+        }
+
+        if (hasMultipleDsos) {
+            setStep(2);
+            return;
+        }
+
+        void handleSubmit();
     };
 
     return (
@@ -171,124 +198,173 @@ export function AddMemberDialog({
                 <DialogHeader>
                     <DialogTitle>Add Team Member</DialogTitle>
                     <DialogDescription>
-                        Add a new member to your workspace
+                        {step === 1 ? 'Step 1 of 2' : 'Step 2 of 2'}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="p-4 pt-4 space-y-4">
-                <form id="add-member-form" onSubmit={handleSubmit} className="space-y-4">
-                    {/* Email Input */}
-                    <div className="space-y-2">
-                        <Label htmlFor="email">
-                            <Mail className="h-4 w-4 inline mr-2" />
-                            Email Address
-                        </Label>
-                        <Input
-                            id="email"
-                            type="email"
-                            placeholder="colleague@company.com"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                        />
-                    </div>
+                    <form
+                        id="add-member-form"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            if (step === 1) {
+                                handleNext();
+                                return;
+                            }
 
-                    {/* Role Selection */}
-                    <div className="space-y-2">
-                        <Label>Role</Label>
-                        <Select value={role} onValueChange={(v: UserRole) => setRole(v)}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a role" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {ROLE_OPTIONS.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                        <div className="flex items-center gap-2">
-                                            {option.icon}
-                                            <div>
-                                                <div className="font-medium">{option.label}</div>
-                                            </div>
-                                        </div>
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">
-                            {ROLE_OPTIONS.find(o => o.value === role)?.description}
-                        </p>
-                    </div>
+                            void handleSubmit();
+                        }}
+                        className="space-y-4"
+                    >
+                        {step === 1 ? (
+                            <>
+                                <div className="space-y-2">
+                                    <Label htmlFor="email">
+                                        <Mail className="h-4 w-4 inline mr-2" />
+                                        Email Address
+                                    </Label>
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        placeholder="colleague@company.com"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        required
+                                    />
+                                </div>
 
-                    {showDsoChecklist && (
-                        <div className="space-y-3">
-                            <div className="flex items-start justify-between gap-4">
-                                <div>
+                                <div className="space-y-2">
+                                    <Label>Role</Label>
+                                    <Select value={role} onValueChange={(v: UserRole) => setRole(v)}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select a role" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {ROLE_OPTIONS.map((option) => (
+                                                <SelectItem key={option.value} value={option.value}>
+                                                    <div className="flex items-center gap-2">
+                                                        {option.icon}
+                                                        <div>
+                                                            <div className="font-medium">{option.label}</div>
+                                                        </div>
+                                                    </div>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-xs text-muted-foreground">
+                                        {ROLE_OPTIONS.find(o => o.value === role)?.description}
+                                    </p>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="space-y-1">
                                     <Label>Workspace Access</Label>
-                                    <p className="text-xs text-muted-foreground mt-1">
+                                    <p className="text-xs text-muted-foreground">
                                         Select which workspaces this member can access
                                     </p>
                                 </div>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-auto px-2 py-1 text-xs"
-                                    onClick={toggleSelectAll}
-                                    disabled={loading}
-                                >
-                                    {allSelected ? 'Deselect All' : 'Select All'}
-                                </Button>
-                            </div>
 
-                            <div className={`space-y-1 rounded-lg border border-border p-2 ${availableDsos.length > 5 ? 'max-h-48 overflow-y-auto' : ''}`}>
-                                {availableDsos.map((dso) => (
+                                <div className="rounded-lg border border-border overflow-hidden">
                                     <label
-                                        key={dso.id}
-                                        htmlFor={`invite-dso-${dso.id}`}
-                                        className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-muted/40 cursor-pointer"
+                                        htmlFor="invite-dso-select-all"
+                                        className="flex items-center gap-3 px-3 py-2 border-b bg-muted/30 cursor-pointer"
                                     >
                                         <Checkbox
-                                            id={`invite-dso-${dso.id}`}
-                                            checked={selectedDsoIds.includes(dso.id)}
-                                            onCheckedChange={() => toggleDso(dso.id)}
+                                            id="invite-dso-select-all"
+                                            checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                                            onCheckedChange={() => {
+                                                setSelectedDsoIds(allSelected ? [] : allDsoIds);
+                                            }}
                                             disabled={loading}
                                         />
-                                        <span className="text-sm text-foreground">{dso.name}</span>
+                                        <span className="text-sm font-medium text-foreground">Select All</span>
                                     </label>
-                                ))}
-                            </div>
-                        </div>
-                    )}
 
-                    {/* Info Box */}
-                    <div className="rounded-lg border border-border p-3 bg-muted/30">
-                        <p className="text-sm text-muted-foreground">
-                            An email invitation will be sent. The user will need to create an account
-                            or sign in to join the selected workspace{selectedDsoIds.length === 1 ? '' : 's'}.
-                        </p>
-                    </div>
+                                    <div className={availableDsos.length > 5 ? 'max-h-[240px] overflow-y-auto' : ''}>
+                                        {availableDsos.map((dso) => (
+                                            <label
+                                                key={dso.id}
+                                                htmlFor={`invite-dso-${dso.id}`}
+                                                className="flex items-center gap-3 px-3 py-2 hover:bg-muted/40 cursor-pointer"
+                                            >
+                                                <Checkbox
+                                                    id={`invite-dso-${dso.id}`}
+                                                    checked={selectedDsoIds.includes(dso.id)}
+                                                    onCheckedChange={() => toggleDso(dso.id)}
+                                                    disabled={loading}
+                                                />
+                                                <span className="text-sm text-foreground">{dso.name}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
 
-                </form>
+                                <div className="rounded-lg border border-border p-3 bg-muted/30">
+                                    <p className="text-sm text-muted-foreground">
+                                        An email invitation will be sent. The user will need to create an account or sign in.
+                                    </p>
+                                </div>
+                            </>
+                        )}
+                    </form>
                 </div>
 
                 <DialogFooter>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleClose}
-                        disabled={loading}
-                    >
-                        Cancel
-                    </Button>
-                    <Button type="submit" form="add-member-form" disabled={loading}>
-                        {loading ? (
-                            'Sending...'
-                        ) : (
-                            <>
-                                <Send className="h-4 w-4 mr-2" />
-                                Send Invite
-                            </>
-                        )}
-                    </Button>
+                    {step === 1 ? (
+                        <>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleClose}
+                                disabled={loading}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                form="add-member-form"
+                                disabled={loading || !canAdvance}
+                            >
+                                {loading ? (
+                                    'Sending...'
+                                ) : hasMultipleDsos ? (
+                                    'Next'
+                                ) : (
+                                    <>
+                                        <Send className="h-4 w-4 mr-2" />
+                                        Send Invite
+                                    </>
+                                )}
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setStep(1)}
+                                disabled={loading}
+                            >
+                                Back
+                            </Button>
+                            <Button
+                                type="submit"
+                                form="add-member-form"
+                                disabled={loading || selectedDsoIds.length === 0}
+                            >
+                                {loading ? (
+                                    'Sending...'
+                                ) : (
+                                    <>
+                                        <Send className="h-4 w-4 mr-2" />
+                                        Send Invite
+                                    </>
+                                )}
+                            </Button>
+                        </>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
