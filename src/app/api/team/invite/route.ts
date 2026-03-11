@@ -8,6 +8,22 @@ interface ExistingInvitee {
     email: string;
 }
 
+function normalizeDsoIds(dsoIds: unknown, dsoId: unknown): string[] {
+    if (Array.isArray(dsoIds)) {
+        return [...new Set(
+            dsoIds
+                .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+                .map((value) => value.trim())
+        )];
+    }
+
+    if (typeof dsoId === 'string' && dsoId.trim().length > 0) {
+        return [dsoId.trim()];
+    }
+
+    return [];
+}
+
 async function ensureOrgMembership(userId: string, orgId: string) {
     const { data: existingOrgMember, error: existingOrgMemberError } = await supabaseAdmin
         .from('org_members')
@@ -88,7 +104,8 @@ async function findExistingInviteeByEmail(normalizedEmail: string): Promise<Exis
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { email, role, dso_id, inviter_name, invited_by } = body;
+        const { email, role, dso_id, dso_ids, inviter_name, invited_by } = body;
+        const normalizedDsoIds = normalizeDsoIds(dso_ids, dso_id);
 
         // Try session auth first, fall back to invited_by from body
         const authResult = await requireAuth(request);
@@ -124,18 +141,24 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        if (!dso_id) {
+        if (normalizedDsoIds.length === 0) {
             return NextResponse.json(
-                { error: 'DSO ID is required' },
+                { error: 'At least one workspace is required' },
                 { status: 400 }
             );
         }
 
-        // Verify current user has admin access to this DSO
-        const { hasAccess, role: callerRole } = await checkDsoAccess(currentUser.id, dso_id);
-        if (!hasAccess || callerRole !== 'admin') {
+        // Verify current user has admin access to every requested DSO
+        const accessChecks = await Promise.all(
+            normalizedDsoIds.map((requestedDsoId) => checkDsoAccess(currentUser.id, requestedDsoId))
+        );
+        const canAccessAllDsos = accessChecks.every(
+            ({ hasAccess, role: callerRole }) => hasAccess && callerRole === 'admin'
+        );
+
+        if (!canAccessAllDsos) {
             return NextResponse.json(
-                { error: 'Admin access required to invite team members' },
+                { error: 'Admin access required for all selected workspaces' },
                 { status: 403 }
             );
         }
@@ -183,37 +206,51 @@ export async function POST(request: NextRequest) {
                 );
             }
 
-            // Check if the existing user already has access to THIS specific DSO
-            const { data: existingAccess } = await supabaseAdmin
+            const { data: existingAccessRows, error: existingAccessError } = await supabaseAdmin
                 .from('user_dso_access')
                 .select('dso_id')
                 .eq('user_id', existingProfile.id)
-                .eq('dso_id', dso_id)
-                .maybeSingle();
+                .in('dso_id', normalizedDsoIds);
 
-            if (existingAccess) {
-                // Clean up stale pending invites
+            if (existingAccessError) {
+                console.error('Error fetching existing user access:', existingAccessError);
+                return NextResponse.json(
+                    { error: 'Failed to check existing workspace access' },
+                    { status: 500 }
+                );
+            }
+
+            const existingAccessSet = new Set((existingAccessRows || []).map((row) => row.dso_id));
+            const dsoIdsToAdd = normalizedDsoIds.filter((requestedDsoId) => !existingAccessSet.has(requestedDsoId));
+
+            if (dsoIdsToAdd.length === 0) {
                 await supabaseAdmin
                     .from('team_invites')
                     .update({ status: 'accepted', accepted_at: new Date().toISOString() })
                     .eq('email', normalizedEmail)
-                    .eq('status', 'pending');
+                    .eq('status', 'pending')
+                    .in('dso_id', normalizedDsoIds);
 
                 return NextResponse.json(
-                    { error: 'User already has access to this workspace' },
+                    { error: 'User already has access to all selected workspaces' },
                     { status: 400 }
                 );
             }
 
-            // Grant access to ONLY this specific DSO (not all inviter's DSOs)
             const { error: accessError } = await supabaseAdmin
                 .from('user_dso_access')
-                .insert({ user_id: existingProfile.id, dso_id: dso_id, role: role });
+                .insert(
+                    dsoIdsToAdd.map((requestedDsoId) => ({
+                        user_id: existingProfile.id,
+                        dso_id: requestedDsoId,
+                        role,
+                    }))
+                );
 
             if (accessError) {
                 console.error('Error adding user access:', accessError);
                 return NextResponse.json(
-                    { error: 'Failed to add user to workspace' },
+                    { error: 'Failed to add user to selected workspaces' },
                     { status: 500 }
                 );
             }
@@ -223,45 +260,57 @@ export async function POST(request: NextRequest) {
                 .from('team_invites')
                 .update({ status: 'accepted', accepted_at: new Date().toISOString() })
                 .eq('email', normalizedEmail)
-                .eq('status', 'pending');
+                .eq('status', 'pending')
+                .in('dso_id', normalizedDsoIds);
 
             return NextResponse.json({
                 success: true,
-                message: `${normalizedEmail} has been added to the workspace`,
+                message: `${normalizedEmail} has been added to ${dsoIdsToAdd.length} workspace${dsoIdsToAdd.length === 1 ? '' : 's'}`,
                 added_directly: true,
+                added_count: dsoIdsToAdd.length,
             });
         }
 
-        // Check for existing pending invite
-        const { data: existingInvite } = await supabaseAdmin
+        const { data: existingPendingInvites, error: existingPendingInvitesError } = await supabaseAdmin
             .from('team_invites')
-            .select('id, expires_at')
+            .select('id, dso_id')
             .eq('email', normalizedEmail)
-            .eq('dso_id', dso_id)
             .eq('status', 'pending')
-            .single();
+            .in('dso_id', normalizedDsoIds);
 
-        if (existingInvite) {
+        if (existingPendingInvitesError) {
+            console.error('Error checking existing invites:', existingPendingInvitesError);
             return NextResponse.json(
-                { error: 'An invite has already been sent to this email' },
+                { error: 'Failed to check existing invites' },
+                { status: 500 }
+            );
+        }
+
+        const pendingDsoIds = new Set((existingPendingInvites || []).map((invite) => invite.dso_id));
+        const dsoIdsToInvite = normalizedDsoIds.filter((requestedDsoId) => !pendingDsoIds.has(requestedDsoId));
+
+        if (dsoIdsToInvite.length === 0) {
+            return NextResponse.json(
+                { error: 'Invites already sent for all selected workspaces' },
                 { status: 400 }
             );
         }
 
-        // Store the invite in our database first
         const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-        const { data: invite, error: inviteError } = await supabaseAdmin
+        const { data: invites, error: inviteError } = await supabaseAdmin
             .from('team_invites')
-            .insert({
-                email: normalizedEmail,
-                dso_id: dso_id,
-                role: role,
-                invited_by: currentUser.id,
-                expires_at: expiresAt.toISOString(),
-            })
+            .insert(
+                dsoIdsToInvite.map((requestedDsoId) => ({
+                    email: normalizedEmail,
+                    dso_id: requestedDsoId,
+                    role,
+                    invited_by: currentUser.id,
+                    expires_at: expiresAt.toISOString(),
+                }))
+            )
             .select()
-            .single();
+            ;
 
         if (inviteError) {
             console.error('Error creating invite record:', inviteError);
@@ -271,15 +320,15 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Send the invite email via Supabase Auth
-        // This will send a magic link email to the user
-        const { data: authInvite, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+        const inviteIds = (invites || []).map((invite) => invite.id);
+
+        const { error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
             normalizedEmail,
             {
                 data: {
-                    role: role,
-                    dso_id: dso_id,
-                    invite_id: invite.id,
+                    role,
+                    dso_ids: normalizedDsoIds,
+                    invite_ids: inviteIds,
                     inviter_name: inviter_name || 'Your teammate',
                 },
                 redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/login?invited=true`,
@@ -289,11 +338,11 @@ export async function POST(request: NextRequest) {
         if (authError) {
             console.error('Error sending invite email:', authError);
 
-            // Clean up the invite record if email fails
+            // Clean up the invite records if email fails
             await supabaseAdmin
                 .from('team_invites')
                 .delete()
-                .eq('id', invite.id);
+                .in('id', inviteIds);
 
             // Check if it's a rate limit or email configuration issue
             if (authError.message.includes('rate limit')) {
@@ -311,13 +360,16 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            message: `Invitation sent to ${normalizedEmail}`,
-            invite: {
+            message: `Invitation sent to ${normalizedEmail} for ${dsoIdsToInvite.length} workspace${dsoIdsToInvite.length === 1 ? '' : 's'}`,
+            invite_count: dsoIdsToInvite.length,
+            skipped_count: pendingDsoIds.size,
+            invites: (invites || []).map((invite) => ({
                 id: invite.id,
                 email: normalizedEmail,
-                role: role,
+                dso_id: invite.dso_id,
+                role,
                 expires_at: expiresAt.toISOString(),
-            }
+            })),
         });
     } catch (error) {
         console.error('Error sending invite:', error);

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -27,7 +28,7 @@ interface AddMemberDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     existingEmails: string[];
-    dsoId?: string | null;
+    availableDsos: { id: string; name: string }[];
     currentUserId?: string;
     currentUserName?: string;
 }
@@ -57,17 +58,27 @@ export function AddMemberDialog({
     open,
     onOpenChange,
     existingEmails,
-    dsoId,
+    availableDsos,
     currentUserId,
     currentUserName,
 }: AddMemberDialogProps) {
     const [email, setEmail] = useState('');
     const [role, setRole] = useState<UserRole>('viewer');
+    const [selectedDsoIds, setSelectedDsoIds] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
+
+    const allDsoIds = useMemo(() => availableDsos.map((dso) => dso.id), [availableDsos]);
+    const showDsoChecklist = availableDsos.length > 1;
+    const allSelected = availableDsos.length > 0 && selectedDsoIds.length === availableDsos.length;
+
+    useEffect(() => {
+        setSelectedDsoIds(allDsoIds);
+    }, [allDsoIds, open]);
 
     const resetForm = () => {
         setEmail('');
         setRole('viewer');
+        setSelectedDsoIds(allDsoIds);
     };
 
     const handleClose = () => {
@@ -97,7 +108,12 @@ export function AddMemberDialog({
             return;
         }
 
-        if (!dsoId) {
+        if (selectedDsoIds.length === 0) {
+            toast.error('Select at least one workspace');
+            return;
+        }
+
+        if (availableDsos.length === 0) {
             toast.error('Unable to send invite. Please try again later.');
             return;
         }
@@ -111,7 +127,7 @@ export function AddMemberDialog({
                 body: JSON.stringify({
                     email,
                     role,
-                    dso_id: dsoId,
+                    dso_ids: selectedDsoIds,
                     invited_by: currentUserId,
                     inviter_name: currentUserName,
                 }),
@@ -135,6 +151,18 @@ export function AddMemberDialog({
         } finally {
             setLoading(false);
         }
+    };
+
+    const toggleDso = (dsoId: string) => {
+        setSelectedDsoIds((current) =>
+            current.includes(dsoId)
+                ? current.filter((id) => id !== dsoId)
+                : [...current, dsoId]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        setSelectedDsoIds(allSelected ? [] : allDsoIds);
     };
 
     return (
@@ -190,11 +218,52 @@ export function AddMemberDialog({
                         </p>
                     </div>
 
+                    {showDsoChecklist && (
+                        <div className="space-y-3">
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <Label>Workspace Access</Label>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Select which workspaces this member can access
+                                    </p>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-auto px-2 py-1 text-xs"
+                                    onClick={toggleSelectAll}
+                                    disabled={loading}
+                                >
+                                    {allSelected ? 'Deselect All' : 'Select All'}
+                                </Button>
+                            </div>
+
+                            <div className={`space-y-1 rounded-lg border border-border p-2 ${availableDsos.length > 5 ? 'max-h-48 overflow-y-auto' : ''}`}>
+                                {availableDsos.map((dso) => (
+                                    <label
+                                        key={dso.id}
+                                        htmlFor={`invite-dso-${dso.id}`}
+                                        className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-muted/40 cursor-pointer"
+                                    >
+                                        <Checkbox
+                                            id={`invite-dso-${dso.id}`}
+                                            checked={selectedDsoIds.includes(dso.id)}
+                                            onCheckedChange={() => toggleDso(dso.id)}
+                                            disabled={loading}
+                                        />
+                                        <span className="text-sm text-foreground">{dso.name}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Info Box */}
                     <div className="rounded-lg border border-border p-3 bg-muted/30">
                         <p className="text-sm text-muted-foreground">
                             An email invitation will be sent. The user will need to create an account
-                            or sign in to join this workspace.
+                            or sign in to join the selected workspace{selectedDsoIds.length === 1 ? '' : 's'}.
                         </p>
                     </div>
 

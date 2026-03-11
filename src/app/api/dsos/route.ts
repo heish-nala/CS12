@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
         // Get DSOs that the user has access to, filtered to their org
         const { data: accessRecords, error: accessError } = await supabaseAdmin
             .from('user_dso_access')
-            .select('dso_id, dsos!inner(org_id)')
+            .select('dso_id, role, dsos!inner(*)')
             .eq('user_id', userId)
             .eq('dsos.org_id', orgInfo.orgId);
 
@@ -40,53 +40,17 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ dsos: [], archivedDsos: [] });
         }
 
-        const dsoIds = accessRecords.map(r => r.dso_id);
+        const dsosWithRoles = accessRecords
+            .map((record: any) => ({
+                ...record.dsos,
+                access_role: record.role,
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name));
 
-        // Try to get DSOs with archived filter, fall back to without if column doesn't exist
-        let activeDsos: any[] = [];
-        let archivedDsos: any[] = [];
-
-        // First try with archived filter
-        const { data: activeDsosWithFilter, error: activeError } = await supabaseAdmin
-            .from('dsos')
-            .select('*')
-            .in('id', dsoIds)
-            .or('archived.is.null,archived.eq.false')
-            .order('name');
-
-        // Check if error is due to missing 'archived' column
-        if (activeError && (activeError as any).code === '42703') {
-            // Column doesn't exist, fetch without filter
-            const { data: allDsos, error: fallbackError } = await supabaseAdmin
-                .from('dsos')
-                .select('*')
-                .in('id', dsoIds)
-                .order('name');
-
-            if (fallbackError) throw fallbackError;
-            activeDsos = allDsos || [];
-            // No archived DSOs since column doesn't exist
-            archivedDsos = [];
-        } else if (activeError) {
-            throw activeError;
-        } else {
-            activeDsos = activeDsosWithFilter || [];
-
-            // Get archived DSOs if requested and column exists
-            if (includeArchived) {
-                const { data: archived, error: archivedError } = await supabaseAdmin
-                    .from('dsos')
-                    .select('*')
-                    .in('id', dsoIds)
-                    .eq('archived', true)
-                    .order('name');
-
-                // Ignore error if column doesn't exist
-                if (!archivedError) {
-                    archivedDsos = archived || [];
-                }
-            }
-        }
+        const activeDsos = dsosWithRoles.filter((dso: any) => dso.archived !== true);
+        const archivedDsos = includeArchived
+            ? dsosWithRoles.filter((dso: any) => dso.archived === true)
+            : [];
 
         return NextResponse.json({
             dsos: activeDsos,

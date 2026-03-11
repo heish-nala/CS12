@@ -54,6 +54,7 @@ interface PendingInvite {
 }
 
 type TeamRole = UserRole | OrgRole;
+type AvailableDso = { id: string; name: string };
 
 // Using design system CSS variables for consistent theming
 const ROLE_CONFIG: Record<TeamRole, { label: string; icon: React.ReactNode; color: string; description: string }> = {
@@ -99,6 +100,7 @@ export function TeamMembers() {
     const [addDialogOpen, setAddDialogOpen] = useState(false);
     const [updatingRole, setUpdatingRole] = useState<string | null>(null);
     const [currentDsoId, setCurrentDsoId] = useState<string | null>(null);
+    const [availableDsos, setAvailableDsos] = useState<AvailableDso[]>([]);
     const [cancellingInvite, setCancellingInvite] = useState<string | null>(null);
 
     // Derive current user's role from the member list returned by the API
@@ -114,6 +116,35 @@ export function TeamMembers() {
     useEffect(() => {
         fetchMembers();
     }, [user]);
+
+    const fetchAvailableDsos = useCallback(async () => {
+        if (!user?.id) {
+            setAvailableDsos([]);
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/dsos?user_id=${user.id}`);
+            if (!response.ok) {
+                setAvailableDsos([]);
+                return;
+            }
+
+            const data = await response.json();
+            const adminDsos = (data.dsos || [])
+                .filter((dso: { id: string; name: string; access_role?: string }) => dso.access_role === 'admin')
+                .map((dso: { id: string; name: string }) => ({ id: dso.id, name: dso.name }));
+
+            setAvailableDsos(adminDsos);
+        } catch (error) {
+            console.error('Error fetching available DSOs:', error);
+            setAvailableDsos([]);
+        }
+    }, [user?.id]);
+
+    useEffect(() => {
+        fetchAvailableDsos();
+    }, [fetchAvailableDsos]);
 
     const fetchPendingInvites = useCallback(async () => {
         if (!currentDsoId) return;
@@ -533,7 +564,7 @@ export function TeamMembers() {
                 open={addDialogOpen}
                 onOpenChange={handleDialogClose}
                 existingEmails={members.map(m => m.email)}
-                dsoId={currentDsoId}
+                availableDsos={availableDsos}
                 currentUserId={user?.id}
                 currentUserName={members.find(m => m.is_current_user)?.name || getDisplayName(user?.email || 'User')}
             />

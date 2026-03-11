@@ -36,6 +36,12 @@ CS12 Platform - Customer success tracking for doctor/dentist onboarding programs
    supabase db push
    ```
 
+### Migration Rules (CRITICAL)
+
+- **NEVER modify any existing migration file.** These are already applied in production. Supabase tracks migrations by file hash — changing content will break `supabase db push` with hash mismatches.
+- If an existing migration causes errors during `supabase db reset`, fix it in a NEW migration file instead.
+- Only create NEW migration files. Never edit, rename, or delete existing ones.
+
 ### For Code Changes (No Database)
 
 1. Test with `npm run dev`
