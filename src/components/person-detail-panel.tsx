@@ -420,7 +420,7 @@ export function PersonDetailPanel({
                                                             </div>
 
                                                             {activity.description && (
-                                                                <p className="text-sm text-muted-foreground mt-1">
+                                                                <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
                                                                     {activity.description}
                                                                 </p>
                                                             )}
