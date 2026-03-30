@@ -489,25 +489,17 @@ export function ProgressTab({ clientId, clientName }: ProgressTabProps) {
                                         onClick={() => handleContactClick(contact)}
                                         className="text-left p-4 border rounded-lg hover:border-primary/50 hover:bg-muted/30 transition-colors"
                                     >
-                                        <div className="flex items-start justify-between mb-2">
+                                        <div className="mb-2">
                                             <h4 className="font-medium">{contact.name}</h4>
-                                            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                                                {contact.tableName}
-                                            </span>
                                         </div>
 
-                                        {/* Progress Summary */}
-                                        {contact.currentPeriodLabel && contact.metricsSummary && Object.keys(contact.metricsSummary).length > 0 && (
+                                        {/* Progress Summary — all-time totals */}
+                                        {contact.metricsSummary && Object.keys(contact.metricsSummary).length > 0 && (
                                             <div className="mb-3 p-2 bg-muted/50 rounded">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-xs text-muted-foreground">{contact.currentPeriodLabel}</span>
-                                                    {deltaPercent !== null && (
-                                                        <span className={`text-xs ${deltaPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                            {deltaPercent >= 0 ? '+' : ''}{deltaPercent}%
-                                                        </span>
-                                                    )}
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <span className="text-xs text-muted-foreground">Total</span>
                                                 </div>
-                                                <div className="flex gap-2 flex-wrap mt-1">
+                                                <div className="flex gap-2 flex-wrap">
                                                     {Object.entries(contact.metricsSummary).map(([name, value]) => (
                                                         <span key={name} className="text-xs text-muted-foreground">
                                                             {name}: <span className="font-medium text-foreground">{value}</span>

@@ -129,12 +129,10 @@ export async function GET(request: NextRequest) {
                     return Object.values(p.metrics).reduce((sum: number, val: any) => sum + (val || 0), 0);
                 };
 
-                // Build metrics summary with names
+                // Build all-time totals per metric across all periods
                 const metricsSummary: Record<string, number> = {};
-                if (currentPeriod?.metrics) {
-                    for (const metric of metrics) {
-                        metricsSummary[metric.name] = currentPeriod.metrics[metric.id] || 0;
-                    }
+                for (const metric of metrics) {
+                    metricsSummary[metric.name] = rowPeriods.reduce((sum, p) => sum + (p.metrics?.[metric.id] || 0), 0);
                 }
 
                 contacts.push({
