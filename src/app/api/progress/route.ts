@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
             // All period data for all time-tracking tables (need key fields only)
             supabaseAdmin
                 .from('period_data')
-                .select('id, table_id, row_id, period_start, period_end, period_label, metrics')
+                .select('id, table_id, row_id, period_start, period_end, period_label, metrics, updated_at')
                 .in('table_id', tableIds)
                 .order('period_start'),
         ]);
@@ -135,6 +135,13 @@ export async function GET(request: NextRequest) {
                     metricsSummary[metric.name] = rowPeriods.reduce((sum, p) => sum + (p.metrics?.[metric.id] || 0), 0);
                 }
 
+                // Use the most recent period_data update as lastUpdated, falling back to row updated_at
+                const latestPeriodUpdate = rowPeriods.reduce((latest: string | null, p: any) => {
+                    if (!p.updated_at) return latest;
+                    if (!latest) return p.updated_at;
+                    return p.updated_at > latest ? p.updated_at : latest;
+                }, null as string | null);
+
                 contacts.push({
                     id: `${table.id}-${row.id}`,
                     rowId: row.id,
@@ -143,7 +150,7 @@ export async function GET(request: NextRequest) {
                     email: emailColumn ? String(row.data?.[emailColumn.id] || '') : undefined,
                     phone: phoneColumn ? String(row.data?.[phoneColumn.id] || '') : undefined,
                     tableName: table.name,
-                    lastUpdated: row.updated_at,
+                    lastUpdated: latestPeriodUpdate || row.updated_at,
                     currentPeriodTotal: calcTotal(currentPeriod),
                     currentPeriodLabel: currentPeriod?.period_label,
                     previousPeriodTotal: calcTotal(previousPeriod),
