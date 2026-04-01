@@ -104,6 +104,7 @@ export function ActivityLoggingDialog({
     const [loading, setLoading] = useState(false);
     const [activityType, setActivityType] = useState<ActivityType>('phone');
     const [notes, setNotes] = useState('');
+    const [notableQuote, setNotableQuote] = useState('');
     const [outcome, setOutcome] = useState<string>('neutral');
 
     // Contacts state
@@ -123,6 +124,7 @@ export function ActivityLoggingDialog({
         if (!open) {
             setSelectedContactId('');
             setNotes('');
+            setNotableQuote('');
             setActivityType('phone');
             setOutcome('neutral');
             setContacts([]);
@@ -212,6 +214,7 @@ export function ActivityLoggingDialog({
                     client_id: clientId,
                     activity_type: activityType,
                     description: notes.trim(),
+                    notable_quote: notableQuote.trim() || undefined,
                     outcome,
                     contact_name: selectedContact?.name,
                     contact_email: selectedContact?.email,
@@ -355,6 +358,20 @@ export function ActivityLoggingDialog({
                         />
                         <p className="text-xs text-muted-foreground">
                             Include key discussion points, action items, and next steps.
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="notable-quote">Notable Quote <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                        <Textarea
+                            id="notable-quote"
+                            value={notableQuote}
+                            onChange={(e) => setNotableQuote(e.target.value)}
+                            placeholder="A direct quote from this doctor worth highlighting in reports..."
+                            rows={2}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Used in performance reports. Capture their exact words.
                         </p>
                     </div>
 

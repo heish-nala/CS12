@@ -85,7 +85,7 @@ interface ContactWithProgress {
     currentPeriodLabel?: string;
     previousPeriodTotal?: number;
     lastUpdated?: string;
-    metricsSummary?: Record<string, number>; // metric name -> value for current period
+    metricsSummary?: Record<string, number>; // metric name -> value for all-time totals
 }
 
 type ViewMode = 'cards' | 'table' | 'grid';
@@ -130,12 +130,6 @@ export function ProgressTab({ clientId, clientName }: ProgressTabProps) {
 
     // Track in-flight requests
     const pendingRequestsRef = useRef<Set<string>>(new Set());
-
-    // Keep ref for latest periodData to avoid stale closures in handleSave
-    const periodDataRef = useRef<PeriodData[]>([]);
-    useEffect(() => {
-        periodDataRef.current = periodData;
-    }, [periodData]);
 
     // Cached fetch helper
     const cachedFetch = useCallback(async (url: string) => {
@@ -235,7 +229,11 @@ export function ProgressTab({ clientId, clientName }: ProgressTabProps) {
             const userIdParam = user?.id ? `?user_id=${user.id}` : '';
             const response = await fetch(`/api/data-tables/${tableId}/rows/${rowId}/periods${userIdParam}`);
             const data = await response.json();
-            setPeriodData(data || []);
+            if (!response.ok || !Array.isArray(data)) {
+                setPeriodData([]);
+                return;
+            }
+            setPeriodData(data);
         } catch (error) {
             console.error('Error fetching periods:', error);
             setPeriodData([]);
@@ -296,42 +294,19 @@ export function ProgressTab({ clientId, clientName }: ProgressTabProps) {
 
             await Promise.all(savePromises);
             setPendingChanges({});
+            const updatedAt = new Date().toISOString();
+            setContacts(prev => prev.map(c =>
+                c.id === selectedContact.id
+                    ? {
+                        ...c,
+                        lastUpdated: updatedAt,
+                    }
+                    : c
+            ));
+            setSelectedContact(prev => prev ? { ...prev, lastUpdated: updatedAt } : prev);
 
-            // Update the contact card with new values from current period
-            // Use ref to get latest periodData to avoid stale closure issues
-            const latestPeriodData = periodDataRef.current;
-            const activeTable = tables.find(t => t.id === selectedContact.tableId);
-            const tableMetrics = activeTable?.time_tracking?.metrics || [];
-            const today = new Date();
-            const currentPeriod = latestPeriodData.find(p => {
-                const start = new Date(p.period_start + 'T12:00:00');
-                const end = new Date(p.period_end + 'T12:00:00');
-                return today >= start && today <= end;
-            });
-
-            if (currentPeriod) {
-                const newTotal = Object.values(currentPeriod.metrics || {}).reduce((sum, val) => sum + (val || 0), 0);
-                const newMetricsSummary: Record<string, number> = {};
-                for (const metric of tableMetrics) {
-                    newMetricsSummary[metric.name] = currentPeriod.metrics?.[metric.id] || 0;
-                }
-
-                // Update contacts state to reflect changes on card
-                setContacts(prev => prev.map(c =>
-                    c.id === selectedContact.id
-                        ? {
-                            ...c,
-                            currentPeriodTotal: newTotal,
-                            currentPeriodLabel: currentPeriod.period_label,
-                            metricsSummary: newMetricsSummary,
-                            lastUpdated: new Date().toISOString()
-                          }
-                        : c
-                ));
-
-                // Invalidate cache so next load gets fresh data
-                getCache().delete(`progress-${clientId}`);
-            }
+            getCache().delete(`progress-${clientId}`);
+            await fetchData();
 
             toast.success('Changes saved');
         } catch (error) {

@@ -25,6 +25,7 @@ export interface Client {
     contact_name?: string;
     contact_email?: string;
     archived?: boolean;
+    lead_ortho?: string;
     created_at: string;
     updated_at: string;
 }
@@ -71,12 +72,84 @@ export interface Activity {
     doctor_id?: string;
     activity_type: ActivityType;
     description: string;
+    notable_quote?: string;
     outcome?: 'positive' | 'neutral' | 'negative' | 'follow_up_needed';
     contact_name?: string;
     contact_email?: string;
     contact_phone?: string;
     created_by: string;
     created_at: string;
+}
+
+// ============================================================================
+// REPORT TYPES
+// ============================================================================
+
+export interface ReportDoctorRow {
+    name: string;
+    blueprintPct: number | null;
+    callCount: number;
+    priorActivity: string;
+    currentActivity: string;
+    status: string;
+    accepted: number;
+    scans: number;
+    diagnosed: number;
+}
+
+export interface ReportQuote {
+    text: string;
+    doctorName: string;
+    date: string;
+    sentiment: 'positive' | 'neutral' | 'negative' | 'follow_up_needed';
+}
+
+export interface ReportSentimentRow {
+    element: string;
+    sentiment: string;
+    whoSaidIt: string;
+}
+
+export interface ReportData {
+    dso: {
+        id: string;
+        name: string;
+        leadOrtho: string;
+        doctorCount: number;
+    };
+    period: {
+        start: string;
+        end: string;
+        reportDate: string;
+    };
+    stats: {
+        callCount: number;
+        doctorsContacted: number;
+        casesAccepted: number;
+        scans: number;
+        diagnosed: number;
+    };
+    doctors: ReportDoctorRow[];
+    quotes: ReportQuote[];
+    sentimentSummary: ReportSentimentRow[];
+    doctorBuckets: {
+        confidenceParadox: string[];   // doctor names
+        mentorshipMismatch: string[];
+        structuralBarriers: string[];
+    };
+}
+
+export interface ReportNarratives {
+    executiveSummary: string;
+    finding1Intro: string;
+    finding1Implication: string;
+    finding2Intro: string;
+    finding2Implication: string;
+    finding3Intro: string;
+    finding3Analysis: string;
+    callSummaryNarrative: string;
+    nextSteps: string;
+    bottomLine: string;
 }
 
 export interface TaskGroup {

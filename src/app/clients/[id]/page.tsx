@@ -10,7 +10,8 @@ import { MetricConfigProvider, useMetricConfig } from '@/contexts/metric-config-
 import { ActivityTimeline } from '@/components/activities/activity-timeline';
 import { ProgressTab } from '@/components/clients/progress-tab';
 import { Button } from '@/components/ui/button';
-import { Settings, Building2, Mail, User } from 'lucide-react';
+import { Settings, Building2, Mail, User, FileText } from 'lucide-react';
+import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useClients } from '@/contexts/clients-context';
 
@@ -168,15 +169,23 @@ function ClientDetailContent({
                                     {client.name}
                                 </h1>
                             </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setSettingsOpen(true)}
-                                className="shadow-sm"
-                            >
-                                <Settings className="h-4 w-4 mr-1.5" />
-                                Settings
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <Link href={`/clients/${clientId}/report`}>
+                                    <Button variant="outline" size="sm" className="shadow-sm">
+                                        <FileText className="h-4 w-4 mr-1.5" />
+                                        Generate Report
+                                    </Button>
+                                </Link>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setSettingsOpen(true)}
+                                    className="shadow-sm"
+                                >
+                                    <Settings className="h-4 w-4 mr-1.5" />
+                                    Settings
+                                </Button>
+                            </div>
                         </div>
 
                         {/* Contact Info */}

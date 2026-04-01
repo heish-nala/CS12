@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
         const {
             activity_type,
             description,
+            notable_quote,
             outcome,
             contact_name,
             contact_email,
@@ -154,6 +155,7 @@ export async function POST(request: NextRequest) {
             };
 
             // Only include optional fields if they have values
+            if (notable_quote) insertData.notable_quote = notable_quote;
             if (outcome) insertData.outcome = outcome;
             if (contact_name) insertData.contact_name = contact_name;
             if (contact_email) insertData.contact_email = contact_email;
@@ -206,6 +208,7 @@ export async function POST(request: NextRequest) {
         };
 
         // Only include optional fields if they have values
+        if (notable_quote) insertData.notable_quote = notable_quote;
         if (outcome) insertData.outcome = outcome;
         if (contact_name) insertData.contact_name = contact_name;
         if (contact_email) insertData.contact_email = contact_email;
