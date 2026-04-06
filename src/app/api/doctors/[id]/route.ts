@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, supabaseAdmin } from '@/lib/db/client';
+import { supabaseAdmin } from '@/lib/db/client';
 import { requireOrgDsoAccess } from '@/lib/auth';
 
 export async function GET(
@@ -11,7 +11,7 @@ export async function GET(
         const { id } = await params;
 
         // First fetch the doctor to get its dso_id
-        const { data: doctor, error } = await supabase
+        const { data: doctor, error } = await supabaseAdmin
             .from('doctors')
             .select(`
     *,

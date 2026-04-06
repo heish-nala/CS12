@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/db/client';
 import { calculateRiskLevel, getDaysSinceActivity } from '@/lib/calculations/risk-level';
 import { supabaseAdmin } from '@/lib/db/client';
 import { requireAuthWithFallback, requireOrgDsoAccess, getUserOrg } from '@/lib/auth';
@@ -44,7 +43,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Build query
-        let query = supabase
+        let query = supabaseAdmin
             .from('doctors')
             .select(`
                 *,
@@ -129,7 +128,7 @@ export async function POST(request: NextRequest) {
             return accessResult.response;
         }
 
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
             .from('doctors')
             .insert({ dso_id, name, email, phone, start_date, status: status || 'active', notes })
             .select()

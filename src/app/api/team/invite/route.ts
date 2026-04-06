@@ -104,25 +104,14 @@ async function findExistingInviteeByEmail(normalizedEmail: string): Promise<Exis
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { email, role, dso_id, dso_ids, inviter_name, invited_by } = body;
+        const { email, role, dso_id, dso_ids, inviter_name } = body;
         const normalizedDsoIds = normalizeDsoIds(dso_ids, dso_id);
 
-        // Try session auth first, fall back to invited_by from body
         const authResult = await requireAuth(request);
-        let currentUser: { id: string; email: string };
         if (authResult.response) {
-            // Session auth failed - use invited_by as fallback
-            if (!invited_by) {
-                return authResult.response;
-            }
-            const { data: userData } = await supabaseAdmin.auth.admin.getUserById(invited_by);
-            if (!userData?.user) {
-                return authResult.response;
-            }
-            currentUser = { id: userData.user.id, email: userData.user.email || '' };
-        } else {
-            currentUser = authResult.user;
+            return authResult.response;
         }
+        const currentUser = authResult.user;
 
         // Verify caller is an org member (org boundary check)
         const orgInfo = await getUserOrg(currentUser.id);

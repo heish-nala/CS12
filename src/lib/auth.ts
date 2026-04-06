@@ -110,8 +110,8 @@ export async function requireAuth(request: NextRequest): Promise<
 }
 
 /**
- * Middleware helper to require authentication with user_id param fallback
- * Tries session auth first, falls back to user_id query param for GET requests
+ * Middleware helper to require authentication.
+ * Session cookies are the only accepted proof of identity.
  */
 export async function requireAuthWithFallback(request: NextRequest): Promise<
     { userId: string; response?: never } | { userId?: never; response: NextResponse }
@@ -120,14 +120,6 @@ export async function requireAuthWithFallback(request: NextRequest): Promise<
 
     if (user) {
         return { userId: user.id };
-    }
-
-    // Fallback to user_id param for GET requests
-    const { searchParams } = new URL(request.url);
-    const userIdParam = searchParams.get('user_id');
-
-    if (userIdParam) {
-        return { userId: userIdParam };
     }
 
     return {
@@ -184,44 +176,29 @@ export async function requireDsoAccess(
 }
 
 /**
- * Middleware helper to require DSO access with user_id fallback
- * Tries session auth first, falls back to user_id from:
- * - Query params (for all requests)
- * - Request body (for POST/PUT/PATCH - pass parsedBody if already parsed)
+ * Middleware helper to require DSO access.
+ * Session cookies are the only accepted proof of identity.
  */
 export async function requireDsoAccessWithFallback(
     request: NextRequest,
     dsoId: string,
     requireWrite = false,
-    parsedBody?: { user_id?: string }
+    _parsedBody?: { user_id?: string }
 ): Promise<
     { userId: string; role: string; response?: never } | { userId?: never; role?: never; response: NextResponse }
 > {
-    // Try session auth first
+    void _parsedBody;
     const { user } = await getAuthUser(request);
-    let userId: string;
-
-    if (user) {
-        userId = user.id;
-    } else {
-        // Fallback to user_id from query params (works for all methods including DELETE)
-        const { searchParams } = new URL(request.url);
-        const userIdParam = searchParams.get('user_id');
-
-        if (userIdParam) {
-            userId = userIdParam;
-        } else if (parsedBody?.user_id) {
-            // Fallback to user_id from parsed body (for POST/PUT/PATCH)
-            userId = parsedBody.user_id;
-        } else {
-            return {
-                response: NextResponse.json(
-                    { error: 'Unauthorized' },
-                    { status: 401 }
-                ),
-            };
-        }
+    if (!user) {
+        return {
+            response: NextResponse.json(
+                { error: 'Unauthorized' },
+                { status: 401 }
+            ),
+        };
     }
+
+    const userId = user.id;
 
     const { hasAccess, role } = await checkDsoAccess(userId, dsoId);
 
@@ -267,7 +244,7 @@ export async function getUserOrg(
  * Replaces requireDsoAccessWithFallback as the standard auth check for all DSO-scoped routes.
  *
  * Steps:
- * 1. Identify user (session → query param → parsedBody fallback)
+ * 1. Identify user from the session
  * 2. Look up DSO to get its org_id
  * 3. Verify user is an org member (org boundary check)
  * 4. Verify user has per-DSO access (ISO-02 per-DSO assignment)
@@ -277,34 +254,23 @@ export async function requireOrgDsoAccess(
     request: NextRequest,
     dsoId: string,
     requireWrite = false,
-    parsedBody?: { user_id?: string }
+    _parsedBody?: { user_id?: string }
 ): Promise<
     { userId: string; orgId: string; role: string; response?: never } |
     { userId?: never; orgId?: never; role?: never; response: NextResponse }
 > {
-    // Step 1: identify user (session or fallback)
+    void _parsedBody;
     const { user } = await getAuthUser(request);
-    let userId: string;
-
-    if (user) {
-        userId = user.id;
-    } else {
-        const { searchParams } = new URL(request.url);
-        const userIdParam = searchParams.get('user_id');
-
-        if (userIdParam) {
-            userId = userIdParam;
-        } else if (parsedBody?.user_id) {
-            userId = parsedBody.user_id;
-        } else {
-            return {
-                response: NextResponse.json(
-                    { error: 'Unauthorized' },
-                    { status: 401 }
-                ),
-            };
-        }
+    if (!user) {
+        return {
+            response: NextResponse.json(
+                { error: 'Unauthorized' },
+                { status: 401 }
+            ),
+        };
     }
+
+    const userId = user.id;
 
     // Step 2: look up DSO to get org_id
     const { data: dso } = await supabaseAdmin

@@ -8,7 +8,6 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
@@ -25,9 +24,6 @@ import {
     Download,
     Plus,
     MessageSquare,
-    Video,
-    BookOpen,
-    Briefcase,
     MoreHorizontal,
     Clock,
     CheckCircle2,
@@ -105,9 +101,6 @@ export function PersonDetailPanel({
                 params.set('contact_name', person.name);
             }
             params.set('limit', '50');
-            if (user?.id) {
-                params.set('user_id', user.id);
-            }
 
             const response = await fetch(`/api/activities?${params}`);
             if (response.ok) {
@@ -149,7 +142,6 @@ export function PersonDetailPanel({
                     contact_name: person.name,
                     contact_email: person.email,
                     contact_phone: person.phone,
-                    user_id: user.id,
                 }),
             });
 

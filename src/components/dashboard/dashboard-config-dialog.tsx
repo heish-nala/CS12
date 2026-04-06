@@ -131,6 +131,77 @@ interface DashboardConfigDialogProps {
     onSave: (metrics: DashboardMetricConfig[]) => void;
 }
 
+function getCategoryLabel(category: DashboardMetricConfig['category']) {
+    switch (category) {
+        case 'overview':
+            return 'Program Overview';
+        case 'engagement':
+            return 'Engagement & Activity';
+        case 'performance':
+            return 'Performance Metrics';
+    }
+}
+
+interface CategorySectionProps {
+    category: DashboardMetricConfig['category'];
+    metrics: DashboardMetricConfig[];
+    onToggle: (metricId: string) => void;
+}
+
+function CategorySection({ category, metrics, onToggle }: CategorySectionProps) {
+    const categoryMetrics = metrics.filter((metric) => metric.category === category);
+    const enabledCount = categoryMetrics.filter((metric) => metric.enabled).length;
+
+    return (
+        <div className="space-y-3">
+            <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold">{getCategoryLabel(category)}</h4>
+                <Badge variant="outline" className="text-xs">
+                    {enabledCount} / {categoryMetrics.length}
+                </Badge>
+            </div>
+            <div className="grid gap-2">
+                {categoryMetrics.map((metric) => (
+                    <div
+                        key={metric.id}
+                        onClick={() => onToggle(metric.id)}
+                        className={`flex items-center gap-3 p-3 border-2 rounded-lg transition-all cursor-pointer ${
+                            metric.enabled
+                                ? 'border-primary bg-primary/5 shadow-sm'
+                                : 'border-border bg-background hover:border-primary/50 hover:bg-accent/30'
+                        }`}
+                    >
+                        <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">
+                                {metric.label}
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">
+                                {metric.description}
+                            </p>
+                        </div>
+                        {metric.enabled && (
+                            <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                                <svg
+                                    className="h-3 w-3 text-primary-foreground"
+                                    fill="none"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 export function DashboardConfigDialog({
     open,
     onOpenChange,
@@ -163,75 +234,6 @@ export function DashboardConfigDialog({
         setLocalMetrics(DEFAULT_DASHBOARD_METRICS);
     };
 
-    const getCategoryMetrics = (category: DashboardMetricConfig['category']) => {
-        return localMetrics.filter(m => m.category === category);
-    };
-
-    const getCategoryLabel = (category: DashboardMetricConfig['category']) => {
-        switch (category) {
-            case 'overview':
-                return 'Program Overview';
-            case 'engagement':
-                return 'Engagement & Activity';
-            case 'performance':
-                return 'Performance Metrics';
-        }
-    };
-
-    const CategorySection = ({ category }: { category: DashboardMetricConfig['category'] }) => {
-        const categoryMetrics = getCategoryMetrics(category);
-        const enabledCount = categoryMetrics.filter(m => m.enabled).length;
-
-        return (
-            <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-semibold">{getCategoryLabel(category)}</h4>
-                    <Badge variant="outline" className="text-xs">
-                        {enabledCount} / {categoryMetrics.length}
-                    </Badge>
-                </div>
-                <div className="grid gap-2">
-                    {categoryMetrics.map((metric) => (
-                        <div
-                            key={metric.id}
-                            onClick={() => handleToggle(metric.id)}
-                            className={`flex items-center gap-3 p-3 border-2 rounded-lg transition-all cursor-pointer ${
-                                metric.enabled
-                                    ? 'border-primary bg-primary/5 shadow-sm'
-                                    : 'border-border bg-background hover:border-primary/50 hover:bg-accent/30'
-                            }`}
-                        >
-                            <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium truncate">
-                                    {metric.label}
-                                </div>
-                                <p className="text-xs text-muted-foreground truncate">
-                                    {metric.description}
-                                </p>
-                            </div>
-                            {metric.enabled && (
-                                <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                                    <svg
-                                        className="h-3 w-3 text-primary-foreground"
-                                        fill="none"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth="2"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                    >
-                                        <path d="M5 13l4 4L19 7" />
-                                    </svg>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
-    };
-
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -243,9 +245,9 @@ export function DashboardConfigDialog({
                 </DialogHeader>
 
                 <div className="space-y-6 p-4 pt-4">
-                    <CategorySection category="overview" />
-                    <CategorySection category="engagement" />
-                    <CategorySection category="performance" />
+                    <CategorySection category="overview" metrics={localMetrics} onToggle={handleToggle} />
+                    <CategorySection category="engagement" metrics={localMetrics} onToggle={handleToggle} />
+                    <CategorySection category="performance" metrics={localMetrics} onToggle={handleToggle} />
                 </div>
 
                 <DialogFooter className="gap-2">
