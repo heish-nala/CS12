@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
         const clientId = searchParams.get('client_id');
+        const cohortId = searchParams.get('cohort_id');
 
         if (!clientId) {
             return NextResponse.json(
@@ -22,11 +23,17 @@ export async function GET(request: NextRequest) {
         }
 
         // Fetch tables from Supabase
-        const { data: tables, error: tablesError } = await supabaseAdmin
+        let tablesQuery = supabaseAdmin
             .from('data_tables')
             .select('*')
             .eq('client_id', clientId)
             .order('order_index');
+
+        if (cohortId) {
+            tablesQuery = tablesQuery.eq('cohort_id', cohortId);
+        }
+
+        const { data: tables, error: tablesError } = await tablesQuery;
 
         if (tablesError) throw tablesError;
 
@@ -105,11 +112,18 @@ const ATTENDEE_LIST_COLUMNS = [
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { client_id, name, template_id, type } = body;
+        const { client_id, cohort_id, name, template_id, type } = body;
 
         if (!client_id) {
             return NextResponse.json(
                 { error: 'client_id is required' },
+                { status: 400 }
+            );
+        }
+
+        if (!cohort_id) {
+            return NextResponse.json(
+                { error: 'cohort_id is required' },
                 { status: 400 }
             );
         }
@@ -174,6 +188,7 @@ export async function POST(request: NextRequest) {
             .from('data_tables')
             .insert({
                 client_id,
+                cohort_id,
                 name: tableName,
                 description: template?.description || (isAttendeeList ? 'Track attendees with Name, Email, Phone, Blueprint, and Status' : null),
                 icon: tableIcon,

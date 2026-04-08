@@ -9,9 +9,10 @@ import { useAuth } from '@/contexts/auth-context';
 
 interface OverviewDashboardProps {
     dsoId?: string;
+    cohortId?: string;
 }
 
-export function OverviewDashboard({ dsoId }: OverviewDashboardProps) {
+export function OverviewDashboard({ dsoId, cohortId }: OverviewDashboardProps) {
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<OverviewDashboardResponse | null>(null);
@@ -23,8 +24,15 @@ export function OverviewDashboard({ dsoId }: OverviewDashboardProps) {
         }
 
         try {
-            const userIdParam = user?.id ? `&user_id=${user.id}` : '';
-            const response = await fetch(`/api/overview-dashboard?client_id=${dsoId}${userIdParam}`);
+            const params = new URLSearchParams();
+            params.set('dso_id', dsoId);
+            if (cohortId) {
+                params.set('cohort_id', cohortId);
+            }
+            if (user?.id) {
+                params.set('user_id', user.id);
+            }
+            const response = await fetch(`/api/overview-dashboard?${params.toString()}`);
             const json = await response.json();
             setData(json);
         } catch (error) {
@@ -32,7 +40,7 @@ export function OverviewDashboard({ dsoId }: OverviewDashboardProps) {
         } finally {
             setLoading(false);
         }
-    }, [dsoId, user?.id]);
+    }, [cohortId, dsoId, user?.id]);
 
     useEffect(() => {
         fetchDashboard();

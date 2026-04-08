@@ -1,29 +1,31 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { CreateClientDialog } from '@/components/clients/create-client-dialog';
+import { CreateCohortDialog } from '@/components/clients/create-cohort-dialog';
 import { SearchCommand } from '@/components/layout/search-command';
 import { useAuth } from '@/contexts/auth-context';
 import { useClients } from '@/contexts/clients-context';
 import { useOrg } from '@/contexts/org-context';
 import { useOnboarding } from '@/contexts/onboarding-context';
+import { Cohort } from '@/lib/db/types';
 import {
-    Home,
-    Users,
-    Settings,
-    Plus,
-    Search,
-    LogOut,
-    Building2,
     Archive,
+    Building2,
     ChevronDown,
     ChevronRight,
+    Circle,
+    Home,
+    Loader2,
+    LogOut,
+    Plus,
+    Search,
+    Settings,
 } from 'lucide-react';
-
 
 interface SidebarItemProps {
     href: string;
@@ -54,6 +56,7 @@ function SidebarItem({ href, icon, label, isActive }: SidebarItemProps) {
 
 export function NotionSidebar() {
     const pathname = usePathname();
+    const router = useRouter();
     const { user, signOut } = useAuth();
     const { clients, archivedClients } = useClients();
     const { org } = useOrg();
@@ -61,16 +64,107 @@ export function NotionSidebar() {
     const [createClientOpen, setCreateClientOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
     const [showArchived, setShowArchived] = useState(false);
+    const [expandedClientIds, setExpandedClientIds] = useState<Set<string>>(new Set());
+    const [cohortsByClientId, setCohortsByClientId] = useState<Record<string, Cohort[]>>({});
+    const [loadingClientIds, setLoadingClientIds] = useState<Set<string>>(new Set());
+    const [createCohortTarget, setCreateCohortTarget] = useState<{ id: string; name: string } | null>(null);
 
-    // Show add-client button during onboarding create-client step
     const showAddClientButton = isOnboardingActive && currentStep === 'create-client';
-
     const userEmail = user?.email || '';
     const userInitial = userEmail.charAt(0).toUpperCase() || 'U';
 
+    const fetchCohorts = async (clientId: string, force = false) => {
+        if (!force && cohortsByClientId[clientId]) {
+            return cohortsByClientId[clientId];
+        }
+
+        setLoadingClientIds((current) => {
+            const next = new Set(current);
+            next.add(clientId);
+            return next;
+        });
+
+        try {
+            const response = await fetch(`/api/cohorts?dso_id=${clientId}`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to fetch cohorts');
+            }
+
+            const nextCohorts = data.cohorts || [];
+            setCohortsByClientId((current) => ({
+                ...current,
+                [clientId]: nextCohorts,
+            }));
+            return nextCohorts as Cohort[];
+        } catch (error) {
+            console.error('Error fetching cohorts:', error);
+            setCohortsByClientId((current) => ({
+                ...current,
+                [clientId]: [],
+            }));
+            return [] as Cohort[];
+        } finally {
+            setLoadingClientIds((current) => {
+                const next = new Set(current);
+                next.delete(clientId);
+                return next;
+            });
+        }
+    };
+
+    useEffect(() => {
+        const cohortPathMatch = pathname.match(/^\/clients\/([^/]+)\/cohorts\/([^/]+)/);
+        if (!cohortPathMatch) {
+            return;
+        }
+
+        const activeClientId = cohortPathMatch[1];
+        setExpandedClientIds((current) => {
+            if (current.has(activeClientId)) {
+                return current;
+            }
+
+            const next = new Set(current);
+            next.add(activeClientId);
+            return next;
+        });
+
+        void fetchCohorts(activeClientId);
+    }, [pathname]);
+
+    const toggleClientExpansion = async (clientId: string) => {
+        const isExpanded = expandedClientIds.has(clientId);
+
+        if (!isExpanded) {
+            await fetchCohorts(clientId);
+        }
+
+        setExpandedClientIds((current) => {
+            const next = new Set(current);
+            if (next.has(clientId)) {
+                next.delete(clientId);
+            } else {
+                next.add(clientId);
+            }
+            return next;
+        });
+    };
+
+    const handleClientNavigation = async (clientId: string) => {
+        const cohorts = await fetchCohorts(clientId);
+
+        if (cohorts.length === 1) {
+            router.push(`/clients/${clientId}/cohorts/${cohorts[0].id}`);
+            return;
+        }
+
+        router.push(`/clients/${clientId}`);
+    };
+
     return (
         <div className="fixed left-0 top-0 w-60 border-r border-border bg-sidebar flex flex-col h-screen" data-onboarding="sidebar">
-            {/* Header - Logo */}
             <div className="px-2 py-3 border-b border-border">
                 <div className="flex items-center gap-2 px-2 py-1">
                     <div className="w-5 h-5 rounded-lg bg-primary flex items-center justify-center text-primary-foreground text-[11px] font-semibold">
@@ -82,7 +176,6 @@ export function NotionSidebar() {
                 </div>
             </div>
 
-            {/* Search */}
             <div className="px-2 py-2">
                 <Button
                     variant="ghost"
@@ -97,7 +190,6 @@ export function NotionSidebar() {
                 </Button>
             </div>
 
-            {/* Navigation */}
             <div className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
                 <SidebarItem
                     href="/"
@@ -106,7 +198,6 @@ export function NotionSidebar() {
                     isActive={pathname === '/'}
                 />
 
-                {/* Clients Section */}
                 <div className="pt-4 pb-1">
                     <div className="flex items-center justify-between px-2 py-1 group">
                         <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -116,8 +207,8 @@ export function NotionSidebar() {
                             variant="ghost"
                             size="icon-sm"
                             className={cn(
-                                "h-5 w-5 p-0 hover:bg-accent rounded-lg transition-opacity duration-100",
-                                showAddClientButton ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                                'h-5 w-5 p-0 hover:bg-accent rounded-lg transition-opacity duration-100',
+                                showAddClientButton ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                             )}
                             onClick={() => setCreateClientOpen(true)}
                             data-onboarding="add-client-btn"
@@ -127,17 +218,109 @@ export function NotionSidebar() {
                     </div>
                 </div>
 
-                {clients.map((client) => (
-                    <SidebarItem
-                        key={client.id}
-                        href={`/clients/${client.id}`}
-                        icon={<Building2 className="h-[18px] w-[18px]" />}
-                        label={client.name}
-                        isActive={pathname === `/clients/${client.id}`}
-                    />
-                ))}
+                {clients.map((client) => {
+                    const cohorts = cohortsByClientId[client.id] || [];
+                    const isLoading = loadingClientIds.has(client.id);
+                    const isClientActive = pathname === `/clients/${client.id}` || pathname.startsWith(`/clients/${client.id}/cohorts/`);
+                    const isExpanded = expandedClientIds.has(client.id);
+                    const showChildren = isExpanded || pathname.startsWith(`/clients/${client.id}/cohorts/`);
 
-                {/* Archived Section */}
+                    return (
+                        <div key={client.id} className="space-y-0.5">
+                            <div
+                                className={cn(
+                                    'group/client flex items-center gap-1 px-1 py-0.5 rounded-lg text-[14px] transition-colors duration-75',
+                                    isClientActive
+                                        ? 'bg-accent text-foreground font-medium'
+                                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                                )}
+                            >
+                                <button
+                                    type="button"
+                                    className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-background/60"
+                                    onClick={() => void toggleClientExpansion(client.id)}
+                                    aria-label={isExpanded ? `Collapse ${client.name}` : `Expand ${client.name}`}
+                                >
+                                    {isExpanded ? (
+                                        <ChevronDown className="h-3.5 w-3.5" />
+                                    ) : (
+                                        <ChevronRight className="h-3.5 w-3.5" />
+                                    )}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-left"
+                                    onClick={() => void handleClientNavigation(client.id)}
+                                >
+                                    <div className="flex items-center justify-center w-5 h-5 shrink-0">
+                                        <Building2 className="h-[18px] w-[18px]" />
+                                    </div>
+                                    <span className="flex-1 truncate">{client.name}</span>
+                                </button>
+
+                                <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    className="h-6 w-6 p-0 opacity-0 transition-opacity group-hover/client:opacity-100"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        setCreateCohortTarget({ id: client.id, name: client.name });
+                                        setExpandedClientIds((current) => {
+                                            const next = new Set(current);
+                                            next.add(client.id);
+                                            return next;
+                                        });
+                                    }}
+                                    title={`Add cohort to ${client.name}`}
+                                >
+                                    <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+                                </Button>
+                            </div>
+
+                            {showChildren && (
+                                <div className="ml-8 space-y-0.5">
+                                    {isLoading ? (
+                                        <div className="flex items-center gap-2 px-2 py-1 text-[13px] text-muted-foreground">
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            <span>Loading cohorts...</span>
+                                        </div>
+                                    ) : cohorts.length === 0 ? (
+                                        <button
+                                            type="button"
+                                            className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-[13px] text-muted-foreground hover:bg-accent hover:text-foreground"
+                                            onClick={() => setCreateCohortTarget({ id: client.id, name: client.name })}
+                                        >
+                                            <Plus className="h-3.5 w-3.5" />
+                                            <span>Add first cohort</span>
+                                        </button>
+                                    ) : (
+                                        cohorts.map((cohort) => {
+                                            const isCohortActive = pathname === `/clients/${client.id}/cohorts/${cohort.id}`;
+
+                                            return (
+                                                <Link key={cohort.id} href={`/clients/${client.id}/cohorts/${cohort.id}`}>
+                                                    <div
+                                                        className={cn(
+                                                            'flex items-center gap-2 rounded-lg px-2 py-1 text-[13px] transition-colors duration-75',
+                                                            isCohortActive
+                                                                ? 'bg-accent text-foreground font-medium'
+                                                                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                                                        )}
+                                                    >
+                                                        <Circle className="h-2.5 w-2.5 fill-current" />
+                                                        <span className="truncate">{cohort.name}</span>
+                                                    </div>
+                                                </Link>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+
                 {archivedClients.length > 0 && (
                     <>
                         <div className="pt-4 pb-1">
@@ -168,7 +351,6 @@ export function NotionSidebar() {
                     </>
                 )}
 
-                {/* Settings Section */}
                 <div className="pt-4 pb-1">
                     <div className="px-2 py-1">
                         <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -185,7 +367,6 @@ export function NotionSidebar() {
                 />
             </div>
 
-            {/* Footer - User Profile */}
             <div className="px-2 py-2 border-t border-border">
                 <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent transition-colors duration-75">
                     <div className="w-5 h-5 rounded-lg bg-[var(--notion-orange)] flex items-center justify-center text-[var(--notion-orange-text)] text-[10px] font-semibold">
@@ -206,13 +387,38 @@ export function NotionSidebar() {
                 </div>
             </div>
 
-            {/* Create Client Dialog */}
             <CreateClientDialog
                 open={createClientOpen}
                 onOpenChange={setCreateClientOpen}
             />
 
-            {/* Search Command */}
+            <CreateCohortDialog
+                open={!!createCohortTarget}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setCreateCohortTarget(null);
+                    }
+                }}
+                dsoId={createCohortTarget?.id || ''}
+                clientName={createCohortTarget?.name}
+                onCreated={(cohort) => {
+                    if (!createCohortTarget) {
+                        return;
+                    }
+
+                    const clientId = createCohortTarget.id;
+                    setCohortsByClientId((current) => ({
+                        ...current,
+                        [clientId]: [...(current[clientId] || []), cohort],
+                    }));
+                    setExpandedClientIds((current) => {
+                        const next = new Set(current);
+                        next.add(clientId);
+                        return next;
+                    });
+                }}
+            />
+
             <SearchCommand
                 open={searchOpen}
                 onOpenChange={setSearchOpen}

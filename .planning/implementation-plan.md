@@ -258,7 +258,7 @@ Show formatted date: "Feb 27, 2026"
 |-------|------|------------|-------|--------|
 | 1 | Add Role column | Nothing | Small | DONE |
 | 2 | Update Status options | Nothing | Small | DONE (partial propagation risk) |
-| 3 | Reorder time-tracking metrics | Nothing | Small | DONE (Cases Submitted rolled back) |
+| 3 | Reorder time-tracking metrics | Nothing | Small | DONE (Cases Submitted removed again Mar 5) |
 | 4 | Copy buttons on detail panel | Nothing | Tiny | DONE |
 | 5 | Actual dates on activities | Nothing | Tiny | DONE |
 | 6 | Replace Overview tab with pre-built dashboard | #1, #2, #3 | Medium | DONE |
@@ -270,7 +270,11 @@ Show formatted date: "Feb 27, 2026"
 | 10 | Connect activities to attendee rows (`activities.data_row_id`) | Nothing (can parallel after 6c) | Medium | Not started |
 | 11 | Retire doctors table and routes | #7 and #10 | Small | Not started |
 
-Items 1-6b are complete. **Item 6c is now the immediate prerequisite**, then item 7.
+Items 1-6b are complete. Metric IDs fix pushed to production Mar 5 (migration `20260305000000`). Cases Submitted removed again Mar 5 (migration `20260305205555`). All older migrations made idempotent and synced to production.
+
+**Two-agent workflow** established: Claude Code plans + reviews, Codex implements. See `CODEX-HANDOFF.md` for detailed implementation specs. Workflow doc at `ASC/RIH/.planning/codebase/TWO-AGENT-WORKFLOW.md`.
+
+**Item 6c is the immediate prerequisite**, then item 7.
 
 ---
 

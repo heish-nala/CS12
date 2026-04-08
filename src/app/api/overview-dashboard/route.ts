@@ -7,7 +7,8 @@ import { findAttendeeTables, getStatusOptions, getStatusColorHex } from '@/lib/a
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
-        const clientId = searchParams.get('client_id');
+        const clientId = searchParams.get('dso_id') || searchParams.get('client_id');
+        const cohortId = searchParams.get('cohort_id');
 
         if (!clientId) {
             return NextResponse.json(
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Use shared attendee tracker detection
-        const { tables: attendeeTables } = await findAttendeeTables(clientId);
+        const { tables: attendeeTables } = await findAttendeeTables(clientId, cohortId || undefined);
 
         if (attendeeTables.length === 0) {
             return NextResponse.json(emptyDashboard());
@@ -144,12 +145,18 @@ export async function GET(request: NextRequest) {
 
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-        const { data: activities } = await supabaseAdmin
+        let activitiesQuery = supabaseAdmin
             .from('activities')
             .select('activity_type, created_at')
             .eq('client_id', clientId)
             .gte('created_at', monthStart)
             .order('created_at', { ascending: false });
+
+        if (cohortId) {
+            activitiesQuery = activitiesQuery.eq('cohort_id', cohortId);
+        }
+
+        const { data: activities } = await activitiesQuery;
 
         const activityByType: Record<string, number> = {};
         for (const act of (activities || [])) {

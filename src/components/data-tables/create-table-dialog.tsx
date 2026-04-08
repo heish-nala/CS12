@@ -62,6 +62,7 @@ interface CreateTableDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     clientId: string;
+    cohortId?: string;
     onTableCreated: () => void;
     onUploadCSV?: () => void;
 }
@@ -70,6 +71,7 @@ export function CreateTableDialog({
     open,
     onOpenChange,
     clientId,
+    cohortId,
     onTableCreated,
     onUploadCSV,
 }: CreateTableDialogProps) {
@@ -100,6 +102,7 @@ export function CreateTableDialog({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     client_id: clientId,
+                    cohort_id: cohortId,
                     type: 'attendee_list',
                     user_id: user?.id,
                 }),

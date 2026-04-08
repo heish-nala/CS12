@@ -29,6 +29,7 @@ import { toast } from 'sonner';
 interface ActivityTimelineProps {
     clientId: string;
     clientName?: string;
+    cohortId?: string;
 }
 
 type ViewMode = 'cards' | 'table' | 'grid';
@@ -44,7 +45,7 @@ interface ContactWithActivity {
     activityCount: number;
 }
 
-export function ActivityTimeline({ clientId, clientName }: ActivityTimelineProps) {
+export function ActivityTimeline({ clientId, clientName, cohortId }: ActivityTimelineProps) {
     const { user } = useAuth();
     const [contacts, setContacts] = useState<ContactWithActivity[]>([]);
     const [activities, setActivities] = useState<Activity[]>([]);
@@ -76,7 +77,7 @@ export function ActivityTimeline({ clientId, clientName }: ActivityTimelineProps
 
     useEffect(() => {
         fetchData();
-    }, [clientId]);
+    }, [clientId, cohortId]);
 
     const fetchData = async () => {
         try {
@@ -129,6 +130,9 @@ export function ActivityTimeline({ clientId, clientName }: ActivityTimelineProps
         try {
             const params = new URLSearchParams();
             params.set('client_id', clientId);
+            if (cohortId) {
+                params.set('cohort_id', cohortId);
+            }
             if (user?.id) {
                 params.set('user_id', user.id);
             }
@@ -145,13 +149,27 @@ export function ActivityTimeline({ clientId, clientName }: ActivityTimelineProps
 
     const fetchContacts = async (): Promise<ContactWithActivity[]> => {
         const allContacts: ContactWithActivity[] = [];
-        const userIdParam = user?.id ? `&user_id=${user.id}` : '';
 
         try {
             // Fetch tables and doctors in parallel
+            const tableParams = new URLSearchParams();
+            tableParams.set('client_id', clientId);
+            if (cohortId) {
+                tableParams.set('cohort_id', cohortId);
+            }
+            if (user?.id) {
+                tableParams.set('user_id', user.id);
+            }
+
+            const doctorParams = new URLSearchParams();
+            doctorParams.set('dso_id', clientId);
+            if (user?.id) {
+                doctorParams.set('user_id', user.id);
+            }
+
             const [tablesResponse, doctorsResponse] = await Promise.all([
-                fetch(`/api/data-tables?client_id=${clientId}${userIdParam}`),
-                fetch(`/api/doctors?dso_id=${clientId}${userIdParam}`)
+                fetch(`/api/data-tables?${tableParams.toString()}`),
+                fetch(`/api/doctors?${doctorParams.toString()}`)
             ]);
 
             // Process tables response
@@ -500,6 +518,7 @@ export function ActivityTimeline({ clientId, clientName }: ActivityTimelineProps
                 onOpenChange={setPanelOpen}
                 person={selectedPerson}
                 clientId={clientId}
+                cohortId={cohortId}
             />
 
             {/* Activity Report Dialog */}

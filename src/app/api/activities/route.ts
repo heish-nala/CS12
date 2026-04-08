@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
         const doctorId = searchParams.get('doctor_id');
         const contactName = searchParams.get('contact_name');
         const clientId = searchParams.get('client_id');
+        const cohortId = searchParams.get('cohort_id');
         const limit = parseInt(searchParams.get('limit') || '100');
 
         if (!clientId?.trim()) {
@@ -44,6 +45,10 @@ export async function GET(request: NextRequest) {
             query = query.eq('contact_name', contactName);
         }
 
+        if (cohortId) {
+            query = query.eq('cohort_id', cohortId);
+        }
+
         // Get doctors that belong to this client (for legacy activity lookup)
         const { data: clientDoctors } = await supabaseAdmin
             .from('doctors')
@@ -69,6 +74,10 @@ export async function GET(request: NextRequest) {
                 scopedQuery = scopedQuery.eq('contact_name', contactName);
             }
 
+            if (cohortId) {
+                scopedQuery = scopedQuery.eq('cohort_id', cohortId);
+            }
+
             const result = await scopedQuery.limit(limit);
 
             // If client_id column doesn't exist, fall back to doctor_id only
@@ -85,6 +94,10 @@ export async function GET(request: NextRequest) {
 
                 if (contactName) {
                     fallbackQuery = fallbackQuery.eq('contact_name', contactName);
+                }
+
+                if (cohortId) {
+                    fallbackQuery = fallbackQuery.eq('cohort_id', cohortId);
                 }
 
                 const fallback = await fallbackQuery.limit(limit);
@@ -131,6 +144,7 @@ export async function POST(request: NextRequest) {
             contact_email,
             contact_phone,
             client_id,
+            cohort_id,
             doctor_id,
         } = body;
 
@@ -166,6 +180,7 @@ export async function POST(request: NextRequest) {
             client_id,
         };
 
+        if (cohort_id) insertData.cohort_id = cohort_id;
         if (notable_quote) insertData.notable_quote = notable_quote;
         if (outcome) insertData.outcome = outcome;
         if (contact_name) insertData.contact_name = contact_name;

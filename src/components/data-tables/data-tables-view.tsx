@@ -88,9 +88,10 @@ interface DataTableWithMeta extends DataTable {
 
 interface DataTablesViewProps {
     clientId: string;
+    cohortId?: string;
 }
 
-export function DataTablesView({ clientId }: DataTablesViewProps) {
+export function DataTablesView({ clientId, cohortId }: DataTablesViewProps) {
     const { user } = useAuth();
     const [tables, setTables] = useState<DataTableWithMeta[]>([]);
     const [activeTableId, setActiveTableId] = useState<string | null>(null);
@@ -119,7 +120,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
 
     useEffect(() => {
         fetchTables();
-    }, [clientId]);
+    }, [clientId, cohortId]);
 
     const autoSaveContactSourceConfig = (table: DataTableWithMeta) => {
         // Only auto-save if no config exists
@@ -140,7 +141,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
     };
 
     const fetchTables = async () => {
-        const requestKey = `tables-${clientId}`;
+        const requestKey = `tables-${clientId}-${cohortId || 'all'}`;
 
         // Skip if request is already in flight
         if (pendingRequestsRef.current.has(requestKey)) {
@@ -150,8 +151,15 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
         pendingRequestsRef.current.add(requestKey);
 
         try {
-            const userIdParam = user?.id ? `&user_id=${user.id}` : '';
-            const response = await fetch(`/api/data-tables?client_id=${clientId}${userIdParam}`);
+            const params = new URLSearchParams();
+            params.set('client_id', clientId);
+            if (cohortId) {
+                params.set('cohort_id', cohortId);
+            }
+            if (user?.id) {
+                params.set('user_id', user.id);
+            }
+            const response = await fetch(`/api/data-tables?${params.toString()}`);
             const data = await response.json();
             const tablesWithData = data.tables || [];
             setTables(tablesWithData);
@@ -537,6 +545,10 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
     }, [activeTableId, activeTable?.rows?.length]);
 
     const createBlankAttendeeList = async () => {
+        if (!cohortId) {
+            return;
+        }
+
         setIsCreatingBlankList(true);
         try {
             const response = await fetch('/api/data-tables', {
@@ -544,6 +556,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     client_id: clientId,
+                    cohort_id: cohortId,
                     type: 'attendee_list',
                     user_id: user?.id,
                 }),
@@ -634,6 +647,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
                     tableId=""
                     tableName="Attendee List"
                     clientId={clientId}
+                    cohortId={cohortId}
                     isNewTable={true}
                     onImportComplete={() => {
                         fetchTables();
@@ -774,6 +788,7 @@ export function DataTablesView({ clientId }: DataTablesViewProps) {
                     onOpenChange={setImportDialogOpen}
                     tableId={activeTable.id}
                     tableName={activeTable.name}
+                    cohortId={cohortId}
                     onImportComplete={() => {
                         fetchTableData(activeTable.id, true);
                     }}

@@ -93,9 +93,10 @@ type ViewMode = 'cards' | 'table' | 'grid';
 interface ProgressTabProps {
     clientId: string;
     clientName?: string;
+    cohortId?: string;
 }
 
-export function ProgressTab({ clientId, clientName }: ProgressTabProps) {
+export function ProgressTab({ clientId, clientName, cohortId }: ProgressTabProps) {
     const { user } = useAuth();
     const [tables, setTables] = useState<DataTableWithMeta[]>([]);
     const [contacts, setContacts] = useState<ContactWithProgress[]>([]);
@@ -161,10 +162,10 @@ export function ProgressTab({ clientId, clientName }: ProgressTabProps) {
     // Fetch tables and contacts on mount
     useEffect(() => {
         fetchData();
-    }, [clientId]);
+    }, [clientId, cohortId]);
 
     const fetchData = async () => {
-        const cacheKey = `progress-${clientId}`;
+        const cacheKey = `progress-${clientId}-${cohortId || 'all'}`;
 
         // Check module-level cache first
         const cached = getCache().get(cacheKey);
@@ -191,8 +192,15 @@ export function ProgressTab({ clientId, clientName }: ProgressTabProps) {
         const fetchPromise = (async () => {
             try {
                 // OPTIMIZATION: Single API call for all progress data
-                const userIdParam = user?.id ? `&user_id=${user.id}` : '';
-                const response = await fetch(`/api/progress?client_id=${clientId}${userIdParam}`);
+                const params = new URLSearchParams();
+                params.set('client_id', clientId);
+                if (cohortId) {
+                    params.set('cohort_id', cohortId);
+                }
+                if (user?.id) {
+                    params.set('user_id', user.id);
+                }
+                const response = await fetch(`/api/progress?${params.toString()}`);
                 const data = await response.json();
 
                 return {

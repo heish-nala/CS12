@@ -4,6 +4,7 @@
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 export type DoctorStatus = 'active' | 'inactive' | 'completed';
 export type ActivityType = 'phone' | 'email' | 'text';
+export type CohortStatus = 'active' | 'completed' | 'archived';
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'blocked';
 export type UserRole = 'admin' | 'manager' | 'viewer';
 export type OrgRole = 'owner' | 'admin' | 'member';
@@ -32,6 +33,17 @@ export interface Client {
 
 // Legacy alias for backwards compatibility
 export type DSO = Client;
+
+export interface Cohort {
+    id: string;
+    dso_id: string;
+    name: string;
+    start_date: string | null;
+    status: CohortStatus;
+    created_at: string;
+    updated_at: string;
+    attendee_count?: number;
+}
 
 export interface Doctor {
     id: string;
@@ -69,6 +81,7 @@ export interface PeriodProgress {
 export interface Activity {
     id: string;
     client_id?: string;
+    cohort_id?: string | null;
     doctor_id?: string;
     activity_type: ActivityType;
     description: string;
@@ -424,6 +437,7 @@ export interface PeriodData {
 export interface DataTable {
     id: string;
     client_id: string;
+    cohort_id: string | null;
     name: string;
     description: string | null;
     icon: string;

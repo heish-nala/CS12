@@ -46,12 +46,18 @@ export interface AttendeeTablesResult {
 /**
  * Find data_tables that are attendee trackers (have Status + Blueprint columns).
  */
-export async function findAttendeeTables(clientId: string): Promise<AttendeeTablesResult> {
-    const { data: tables, error: tablesError } = await supabaseAdmin
+export async function findAttendeeTables(clientId: string, cohortId?: string): Promise<AttendeeTablesResult> {
+    let tablesQuery = supabaseAdmin
         .from('data_tables')
         .select('*')
         .eq('client_id', clientId)
         .order('order_index');
+
+    if (cohortId) {
+        tablesQuery = tablesQuery.eq('cohort_id', cohortId);
+    }
+
+    const { data: tables, error: tablesError } = await tablesQuery;
 
     if (tablesError) throw tablesError;
 

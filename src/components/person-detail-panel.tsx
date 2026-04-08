@@ -67,6 +67,7 @@ interface PersonDetailPanelProps {
     onOpenChange: (open: boolean) => void;
     person: PersonInfo | null;
     clientId: string;
+    cohortId?: string;
 }
 
 export function PersonDetailPanel({
@@ -74,6 +75,7 @@ export function PersonDetailPanel({
     onOpenChange,
     person,
     clientId,
+    cohortId,
 }: PersonDetailPanelProps) {
     const { user } = useAuth();
     const [activities, setActivities] = useState<Activity[]>([]);
@@ -95,6 +97,9 @@ export function PersonDetailPanel({
         try {
             const params = new URLSearchParams();
             params.set('client_id', clientId);
+            if (cohortId) {
+                params.set('cohort_id', cohortId);
+            }
             if (person.source === 'doctor') {
                 params.set('doctor_id', person.id);
             } else {
@@ -112,7 +117,7 @@ export function PersonDetailPanel({
         } finally {
             setLoading(false);
         }
-    }, [person, clientId]);
+    }, [person, clientId, cohortId]);
 
     useEffect(() => {
         if (open && person) {
@@ -135,6 +140,7 @@ export function PersonDetailPanel({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     client_id: clientId,
+                    cohort_id: cohortId,
                     doctor_id: person.source === 'doctor' ? person.id : null,
                     activity_type: activityType,
                     description: notes || `${activityTypeConfig[activityType].label} with ${person.name}`,

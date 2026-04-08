@@ -1,35 +1,97 @@
 'use client';
 
-import { use, useEffect, useState, useMemo } from 'react';
-import { Client } from '@/lib/db/types';
-import { OverviewDashboard } from '@/components/dashboard/overview-dashboard';
-import { DataTablesView } from '@/components/data-tables/data-tables-view';
-import { ClientSettingsDialog } from '@/components/clients/client-settings-dialog';
-import { MetricConfigDialog } from '@/components/metrics/metric-config-dialog';
-import { MetricConfigProvider, useMetricConfig } from '@/contexts/metric-config-context';
-import { ActivityTimeline } from '@/components/activities/activity-timeline';
-import { ProgressTab } from '@/components/clients/progress-tab';
-import { Button } from '@/components/ui/button';
-import { Settings, Building2, Mail, User, FileText } from 'lucide-react';
+import { use, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Client, Cohort } from '@/lib/db/types';
+import { ClientSettingsDialog } from '@/components/clients/client-settings-dialog';
+import { CreateCohortDialog } from '@/components/clients/create-cohort-dialog';
+import {
+    Building2,
+    CalendarDays,
+    ChevronRight,
+    Plus,
+    Settings,
+    Users,
+} from 'lucide-react';
 import { useClients } from '@/contexts/clients-context';
 
 interface ClientDetailPageProps {
     params: Promise<{ id: string }>;
 }
 
+function formatDate(date: string | null) {
+    if (!date) {
+        return 'No start date';
+    }
+
+    return new Date(`${date}T12:00:00`).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+    });
+}
+
+function getStatusClasses(status: Cohort['status']) {
+    switch (status) {
+        case 'completed':
+            return 'border-green-200 bg-green-50 text-green-700';
+        case 'archived':
+            return 'border-slate-200 bg-slate-100 text-slate-700';
+        default:
+            return 'border-blue-200 bg-blue-50 text-blue-700';
+    }
+}
+
 export default function ClientDetailPage({ params }: ClientDetailPageProps) {
     const { id } = use(params);
     const { clients, archivedClients, loading: clientsLoading, refreshClients } = useClients();
     const [settingsOpen, setSettingsOpen] = useState(false);
-    const [metricsDialogOpen, setMetricsDialogOpen] = useState(false);
+    const [createCohortOpen, setCreateCohortOpen] = useState(false);
+    const [cohorts, setCohorts] = useState<Cohort[]>([]);
+    const [cohortsLoading, setCohortsLoading] = useState(true);
 
-    // Find client in the context (includes both active and archived)
     const client = useMemo(() => {
         const allClients = [...clients, ...archivedClients];
-        return allClients.find((c) => c.id === id) as Client | undefined;
-    }, [clients, archivedClients, id]);
+        return allClients.find((candidate) => candidate.id === id) as Client | undefined;
+    }, [archivedClients, clients, id]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function fetchCohorts() {
+            setCohortsLoading(true);
+
+            try {
+                const response = await fetch(`/api/cohorts?dso_id=${id}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to fetch cohorts');
+                }
+
+                if (!cancelled) {
+                    setCohorts(data.cohorts || []);
+                }
+            } catch (error) {
+                console.error('Error fetching cohorts:', error);
+                if (!cancelled) {
+                    setCohorts([]);
+                }
+            } finally {
+                if (!cancelled) {
+                    setCohortsLoading(false);
+                }
+            }
+        }
+
+        fetchCohorts();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [id]);
 
     if (clientsLoading) {
         return (
@@ -43,24 +105,10 @@ export default function ClientDetailPage({ params }: ClientDetailPageProps) {
                     </div>
                 </div>
                 <div className="px-6 lg:px-8 py-6">
-                    <div className="max-w-6xl mx-auto space-y-6">
-                        {/* Tabs skeleton */}
-                        <div className="flex gap-2">
-                            <div className="h-9 w-24 bg-muted/40 animate-pulse rounded-lg" />
-                            <div className="h-9 w-24 bg-muted/30 animate-pulse rounded-lg" />
-                            <div className="h-9 w-20 bg-muted/30 animate-pulse rounded-lg" />
-                        </div>
-                        {/* Table skeleton */}
-                        <div className="rounded-xl border border-border/50 overflow-hidden">
-                            <div className="h-12 bg-muted/30 border-b border-border/50" />
-                            {[...Array(5)].map((_, i) => (
-                                <div key={i} className="h-12 border-b border-border/50 flex items-center gap-4 px-4" style={{ opacity: 1 - i * 0.15 }}>
-                                    <div className="h-4 w-8 bg-muted animate-pulse rounded" />
-                                    <div className="h-4 flex-1 max-w-[150px] bg-muted animate-pulse rounded" />
-                                    <div className="h-4 flex-1 max-w-[100px] bg-muted/60 animate-pulse rounded" />
-                                </div>
-                            ))}
-                        </div>
+                    <div className="max-w-6xl mx-auto grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                        {Array.from({ length: 3 }).map((_, index) => (
+                            <div key={index} className="h-48 rounded-2xl border border-border/50 bg-muted/20 animate-pulse" />
+                        ))}
                     </div>
                 </div>
             </div>
@@ -87,7 +135,7 @@ export default function ClientDetailPage({ params }: ClientDetailPageProps) {
                             </div>
                             <h2 className="text-lg font-semibold text-foreground mb-2">Client not found</h2>
                             <p className="text-sm text-muted-foreground">
-                                The client you're looking for doesn't exist or has been removed.
+                                The client you&apos;re looking for doesn&apos;t exist or has been removed.
                             </p>
                         </div>
                     </div>
@@ -97,85 +145,26 @@ export default function ClientDetailPage({ params }: ClientDetailPageProps) {
     }
 
     return (
-        <MetricConfigProvider clientId={id}>
-            <ClientDetailContent
-                client={client}
-                clientId={id}
-                settingsOpen={settingsOpen}
-                setSettingsOpen={setSettingsOpen}
-                metricsDialogOpen={metricsDialogOpen}
-                setMetricsDialogOpen={setMetricsDialogOpen}
-                refreshClients={refreshClients}
-            />
-        </MetricConfigProvider>
-    );
-}
-
-function ClientDetailContent({
-    client,
-    clientId,
-    settingsOpen,
-    setSettingsOpen,
-    metricsDialogOpen,
-    setMetricsDialogOpen,
-    refreshClients,
-}: {
-    client: Client;
-    clientId: string;
-    settingsOpen: boolean;
-    setSettingsOpen: (open: boolean) => void;
-    metricsDialogOpen: boolean;
-    setMetricsDialogOpen: (open: boolean) => void;
-    refreshClients: () => Promise<void>;
-}) {
-    const { metricConfigs, refresh } = useMetricConfig();
-
-    const handleSaveMetricConfig = async (configs: any[]) => {
-        const response = await fetch('/api/metrics/config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                client_id: clientId,
-                configs,
-            }),
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to save metric configuration');
-        }
-
-        await refresh();
-    };
-
-    return (
-        <div className="flex-1 bg-background min-h-screen content-loaded" data-onboarding="client-dashboard">
-            {/* Modern Header */}
+        <div className="flex-1 bg-background min-h-screen content-loaded">
             <div className="border-b border-border/50 bg-gradient-to-b from-muted/30 to-background">
                 <div className="px-6 lg:px-8 pt-8 pb-6">
                     <div className="max-w-6xl mx-auto">
-                        <div className="flex items-start justify-between">
+                        <div className="flex items-start justify-between gap-4">
                             <div>
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                                     <Building2 className="w-4 h-4" />
                                     <span>Client</span>
-                                    {client.industry && (
-                                        <>
-                                            <span className="text-border">•</span>
-                                            <span>{client.industry}</span>
-                                        </>
-                                    )}
+                                    <span className="text-border">•</span>
+                                    <span>Cohorts</span>
                                 </div>
                                 <h1 className="text-2xl font-semibold tracking-tight text-foreground">
                                     {client.name}
                                 </h1>
+                                <p className="text-sm text-muted-foreground mt-2">
+                                    Organize attendee data, activity, and progress by cohort.
+                                </p>
                             </div>
                             <div className="flex items-center gap-2">
-                                <Link href={`/clients/${clientId}/report`}>
-                                    <Button variant="outline" size="sm" className="shadow-sm">
-                                        <FileText className="h-4 w-4 mr-1.5" />
-                                        Generate Report
-                                    </Button>
-                                </Link>
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -185,81 +174,101 @@ function ClientDetailContent({
                                     <Settings className="h-4 w-4 mr-1.5" />
                                     Settings
                                 </Button>
+                                <Button size="sm" onClick={() => setCreateCohortOpen(true)} className="shadow-sm">
+                                    <Plus className="h-4 w-4 mr-1.5" />
+                                    Add Cohort
+                                </Button>
                             </div>
                         </div>
-
-                        {/* Contact Info */}
-                        {client.contact_name && (
-                            <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border/50">
-                                <div className="flex items-center gap-2 text-sm">
-                                    <User className="w-4 h-4 text-muted-foreground" />
-                                    <span className="text-muted-foreground">Contact:</span>
-                                    <span className="font-medium">{client.contact_name}</span>
-                                </div>
-                                {client.contact_email && (
-                                    <div className="flex items-center gap-2 text-sm">
-                                        <Mail className="w-4 h-4 text-muted-foreground" />
-                                        <span className="text-muted-foreground">{client.contact_email}</span>
-                                    </div>
-                                )}
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>
 
-            {/* Content */}
             <div className="px-6 lg:px-8 py-6">
-                <div className="max-w-6xl mx-auto">
-                    {/* Tabs - unchanged content */}
-                    <Tabs defaultValue="attendees" className="space-y-6">
-                        <TabsList>
-                            <TabsTrigger value="attendees" data-onboarding="data-tables-tab">Attendees</TabsTrigger>
-                            <TabsTrigger value="overview">Overview</TabsTrigger>
-                            <TabsTrigger value="activity">Activity</TabsTrigger>
-                            <TabsTrigger value="progress">Progress</TabsTrigger>
-                        </TabsList>
+                <div className="max-w-6xl mx-auto space-y-6">
+                    <div>
+                        <h2 className="text-lg font-semibold text-foreground">Cohorts</h2>
+                        <p className="text-sm text-muted-foreground">
+                            Choose a cohort to open its attendees, overview, activity, and progress tabs.
+                        </p>
+                    </div>
 
-                        <TabsContent value="attendees" className="space-y-6 mt-0">
-                            <DataTablesView clientId={clientId} />
-                        </TabsContent>
+                    {cohortsLoading ? (
+                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                            {Array.from({ length: 3 }).map((_, index) => (
+                                <div key={index} className="h-48 rounded-2xl border border-border/50 bg-muted/20 animate-pulse" />
+                            ))}
+                        </div>
+                    ) : cohorts.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-border/70 bg-gradient-to-br from-muted/20 to-muted/5 p-16 text-center">
+                            <div className="p-4 rounded-2xl bg-muted/50 inline-block mb-4">
+                                <Users className="w-8 h-8 text-muted-foreground" />
+                            </div>
+                            <h2 className="text-lg font-semibold text-foreground mb-2">No cohorts yet</h2>
+                            <p className="text-sm text-muted-foreground mb-6">
+                                Add the first cohort for this client to start grouping attendee data.
+                            </p>
+                            <Button onClick={() => setCreateCohortOpen(true)}>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Cohort
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                            {cohorts.map((cohort) => (
+                                <Link
+                                    key={cohort.id}
+                                    href={`/clients/${id}/cohorts/${cohort.id}`}
+                                    className="group"
+                                >
+                                    <div className="h-full rounded-2xl border border-border/60 bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <div className="text-lg font-semibold text-foreground">
+                                                    {cohort.name}
+                                                </div>
+                                                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+                                                    <CalendarDays className="h-4 w-4" />
+                                                    <span>{formatDate(cohort.start_date)}</span>
+                                                </div>
+                                            </div>
+                                            <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
+                                        </div>
 
-                        <TabsContent value="overview" className="space-y-6 mt-0">
-                            <OverviewDashboard dsoId={clientId} />
-                        </TabsContent>
-
-                        <TabsContent value="activity" className="space-y-6 mt-0">
-                            <ActivityTimeline clientId={clientId} clientName={client.name} />
-                        </TabsContent>
-
-                        <TabsContent value="progress" className="space-y-6 mt-0">
-                            <ProgressTab clientId={clientId} clientName={client.name} />
-                        </TabsContent>
-                    </Tabs>
+                                        <div className="mt-6 flex items-center justify-between gap-4">
+                                            <div>
+                                                <div className="text-2xl font-semibold text-foreground">
+                                                    {cohort.attendee_count || 0}
+                                                </div>
+                                                <div className="text-sm text-muted-foreground">Attendees</div>
+                                            </div>
+                                            <Badge variant="outline" className={getStatusClasses(cohort.status)}>
+                                                {cohort.status}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {/* Client Settings Dialog */}
             <ClientSettingsDialog
                 open={settingsOpen}
                 onOpenChange={setSettingsOpen}
                 client={client}
                 onUpdate={refreshClients}
-                onOpenMetricsDialog={() => {
-                    setSettingsOpen(false);
-                    setTimeout(() => {
-                        setMetricsDialogOpen(true);
-                    }, 100);
-                }}
             />
 
-            {/* Metric Configuration Dialog */}
-            <MetricConfigDialog
-                open={metricsDialogOpen}
-                onOpenChange={setMetricsDialogOpen}
-                clientId={clientId}
-                currentConfig={metricConfigs}
-                onSave={handleSaveMetricConfig}
+            <CreateCohortDialog
+                open={createCohortOpen}
+                onOpenChange={setCreateCohortOpen}
+                dsoId={id}
+                clientName={client.name}
+                onCreated={(cohort) => {
+                    setCohorts((current) => [...current, cohort]);
+                }}
             />
         </div>
     );

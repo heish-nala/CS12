@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
         const clientId = searchParams.get('client_id');
+        const cohortId = searchParams.get('cohort_id');
 
         if (!clientId) {
             return NextResponse.json(
@@ -22,12 +23,18 @@ export async function GET(request: NextRequest) {
         }
 
         // Step 1: Fetch all tables with time tracking enabled for this client
-        const { data: tables, error: tablesError } = await supabaseAdmin
+        let tablesQuery = supabaseAdmin
             .from('data_tables')
             .select('*')
             .eq('client_id', clientId)
             .not('time_tracking', 'is', null)
             .order('order_index');
+
+        if (cohortId) {
+            tablesQuery = tablesQuery.eq('cohort_id', cohortId);
+        }
+
+        const { data: tables, error: tablesError } = await tablesQuery;
 
         if (tablesError) throw tablesError;
 

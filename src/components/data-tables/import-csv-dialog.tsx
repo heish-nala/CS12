@@ -65,6 +65,7 @@ interface ImportCSVDialogProps {
     tableName: string;
     onImportComplete: () => void;
     clientId?: string;
+    cohortId?: string;
     isNewTable?: boolean;
 }
 
@@ -75,6 +76,7 @@ export function ImportCSVDialog({
     tableName,
     onImportComplete,
     clientId,
+    cohortId,
     isNewTable = false,
 }: ImportCSVDialogProps) {
     const { user } = useAuth();
@@ -210,6 +212,7 @@ export function ImportCSVDialog({
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         client_id: clientId,
+                        cohort_id: cohortId,
                         name: 'Attendee List',
                         user_id: user?.id,
                     }),
