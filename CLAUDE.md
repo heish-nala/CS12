@@ -7,6 +7,13 @@
 - Always test locally before pushing to production
 - Ask before making significant changes
 
+## Deployment
+- **Live URL**: https://cs12.allsolutions.consulting
+- **Vercel team**: craig-iotts-projects (scope: `team_w3SdRDDcBwS3DqRavugjo78K`)
+- **Deploy command**: `npx vercel --prod --scope team_w3SdRDDcBwS3DqRavugjo78K`
+- **GitHub auto-deploy**: NOT connected — manual deploy required
+- **Repo**: https://github.com/heish-nala/CS12.git
+
 ## Project Overview
 CS12 Platform - Customer success tracking for doctor/dentist onboarding programs.
 
@@ -79,7 +86,10 @@ docs/
 
 ## Database
 
-- **Production**: Supabase cloud (vekxzuupejmitvwwokrf)
+- **Production**: Supabase cloud — Craig's paid PRO org (`gvtphsbqipapirpwrlhp`)
+  - URL: https://gvtphsbqipapirpwrlhp.supabase.co
+  - Credentials in `.env.local` (already set correctly)
+- **OLD DB** (retired 2026-04-08): `vekxzuupejmitvwwokrf` — Alan's free tier, do not use
 - **Local**: `supabase start` (port 54321)
 - **Local Studio**: http://127.0.0.1:54323
 
