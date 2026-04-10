@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ThemeProvider } from "next-themes";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/contexts/auth-context";
@@ -20,23 +21,30 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en">
+        <html lang="en" suppressHydrationWarning>
             <body className="antialiased">
-                <AuthProvider>
-                    <ClientsProvider>
-                        <OrgProvider>
-                            <OnboardingProvider>
-                                <AuthGuard>
-                                    <AppShell>{children}</AppShell>
-                                    <OnboardingTrigger />
-                                    <OnboardingTour />
-                                    <OnboardingChecklist />
-                                </AuthGuard>
-                            </OnboardingProvider>
-                        </OrgProvider>
-                    </ClientsProvider>
-                </AuthProvider>
-                <Toaster />
+                <ThemeProvider
+                    attribute="class"
+                    defaultTheme="dark"
+                    enableSystem={false}
+                    disableTransitionOnChange
+                >
+                    <AuthProvider>
+                        <ClientsProvider>
+                            <OrgProvider>
+                                <OnboardingProvider>
+                                    <AuthGuard>
+                                        <AppShell>{children}</AppShell>
+                                        <OnboardingTrigger />
+                                        <OnboardingTour />
+                                        <OnboardingChecklist />
+                                    </AuthGuard>
+                                </OnboardingProvider>
+                            </OrgProvider>
+                        </ClientsProvider>
+                    </AuthProvider>
+                    <Toaster />
+                </ThemeProvider>
             </body>
         </html>
     );

@@ -152,48 +152,48 @@
 
 .dark {
   /* ===== NOTION DARK MODE ===== */
-  --background: rgb(25, 25, 25);
-  --foreground: rgba(255, 255, 255, 0.9);
+  --background: #0f1117;
+  --foreground: #e2e8f0;
 
-  --card: rgb(32, 32, 32);
-  --card-foreground: rgba(255, 255, 255, 0.9);
+  --card: #141920;
+  --card-foreground: #e2e8f0;
 
-  --popover: rgb(37, 37, 37);
-  --popover-foreground: rgba(255, 255, 255, 0.9);
+  --popover: #141920;
+  --popover-foreground: #e2e8f0;
 
-  --primary: rgb(55, 145, 230);
+  --primary: #6366f1;
   --primary-foreground: #ffffff;
 
-  --secondary: rgba(255, 255, 255, 0.055);
-  --secondary-foreground: rgba(255, 255, 255, 0.9);
+  --secondary: rgba(255, 255, 255, 0.06);
+  --secondary-foreground: #e2e8f0;
 
   --muted: rgba(255, 255, 255, 0.03);
-  --muted-foreground: rgba(255, 255, 255, 0.6);
+  --muted-foreground: #94a3b8;
 
-  --accent: rgba(255, 255, 255, 0.08);
-  --accent-foreground: rgba(255, 255, 255, 0.9);
+  --accent: #1e293b;
+  --accent-foreground: #e2e8f0;
 
-  --destructive: rgb(235, 87, 87);
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
 
-  --border: rgba(255, 255, 255, 0.09);
-  --input: rgba(255, 255, 255, 0.09);
-  --ring: rgb(55, 145, 230);
+  --border: #1e293b;
+  --input: #1e293b;
+  --ring: #6366f1;
 
-  --chart-1: rgb(35, 131, 226);
-  --chart-2: rgb(235, 87, 87);
-  --chart-3: rgb(223, 171, 1);
-  --chart-4: rgb(155, 154, 151);
-  --chart-5: rgb(15, 123, 108);
+  --chart-1: #6366f1;
+  --chart-2: #ef4444;
+  --chart-3: #f59e0b;
+  --chart-4: #94a3b8;
+  --chart-5: #10b981;
 
-  --sidebar: rgb(32, 32, 32);
-  --sidebar-foreground: rgba(255, 255, 255, 0.9);
-  --sidebar-primary: rgb(55, 145, 230);
+  --sidebar: #141920;
+  --sidebar-foreground: #e2e8f0;
+  --sidebar-primary: #6366f1;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(255, 255, 255, 0.08);
-  --sidebar-accent-foreground: rgba(255, 255, 255, 0.9);
-  --sidebar-border: rgba(255, 255, 255, 0.09);
-  --sidebar-ring: rgb(55, 145, 230);
+  --sidebar-accent: #1e293b;
+  --sidebar-accent-foreground: #e2e8f0;
+  --sidebar-border: #1e293b;
+  --sidebar-ring: #6366f1;
 
   /* Notion Dark Mode Tag Colors */
   --notion-default: rgba(206, 205, 202, 0.3);

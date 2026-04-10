@@ -11,7 +11,7 @@
 - **Live URL**: https://cs12.allsolutions.consulting
 - **Vercel team**: craig-iotts-projects (scope: `team_w3SdRDDcBwS3DqRavugjo78K`)
 - **Deploy command**: `npx vercel --prod --scope team_w3SdRDDcBwS3DqRavugjo78K`
-- **GitHub auto-deploy**: NOT connected — manual deploy required
+- **GitHub auto-deploy**: ✅ Connected — `git push origin main` deploys automatically
 - **Repo**: https://github.com/heish-nala/CS12.git
 
 ## Project Overview

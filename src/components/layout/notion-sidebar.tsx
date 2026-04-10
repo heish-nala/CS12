@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { CreateClientDialog } from '@/components/clients/create-client-dialog';
@@ -22,9 +23,11 @@ import {
     Home,
     Loader2,
     LogOut,
+    Moon,
     Plus,
     Search,
     Settings,
+    Sun,
 } from 'lucide-react';
 
 interface SidebarItemProps {
@@ -57,10 +60,12 @@ function SidebarItem({ href, icon, label, isActive }: SidebarItemProps) {
 export function NotionSidebar() {
     const pathname = usePathname();
     const router = useRouter();
+    const { theme, setTheme } = useTheme();
     const { user, signOut } = useAuth();
     const { clients, archivedClients } = useClients();
     const { org } = useOrg();
     const { isOnboardingActive, currentStep } = useOnboarding();
+    const [mounted, setMounted] = useState(false);
     const [createClientOpen, setCreateClientOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
     const [showArchived, setShowArchived] = useState(false);
@@ -72,6 +77,8 @@ export function NotionSidebar() {
     const showAddClientButton = isOnboardingActive && currentStep === 'create-client';
     const userEmail = user?.email || '';
     const userInitial = userEmail.charAt(0).toUpperCase() || 'U';
+
+    useEffect(() => setMounted(true), []);
 
     const fetchCohorts = async (clientId: string, force = false) => {
         if (!force && cohortsByClientId[clientId]) {
@@ -366,6 +373,23 @@ export function NotionSidebar() {
                     isActive={pathname === '/settings'}
                 />
             </div>
+
+            {mounted && (
+                <div className="px-2 py-2 border-t border-border">
+                    <Button
+                        variant="ghost"
+                        className="w-full justify-start gap-2 h-7 px-2 text-[14px] text-muted-foreground hover:bg-accent hover:text-foreground"
+                        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                    >
+                        {theme === 'dark' ? (
+                            <Sun className="h-4 w-4" />
+                        ) : (
+                            <Moon className="h-4 w-4" />
+                        )}
+                        <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+                    </Button>
+                </div>
+            )}
 
             <div className="px-2 py-2 border-t border-border">
                 <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent transition-colors duration-75">
