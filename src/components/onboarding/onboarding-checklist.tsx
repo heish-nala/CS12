@@ -49,48 +49,48 @@ export function OnboardingChecklist() {
   const content = (
     <div className="fixed bottom-6 right-6 z-[9000] w-80">
       {/* Checklist Card */}
-      <div className="bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
+      <div className="bg-popover rounded-xl shadow-2xl border border-border overflow-hidden">
         {/* Header */}
         <div
-          className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+          className="flex items-center justify-between p-4 cursor-pointer hover:bg-accent transition-colors"
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <div className="flex items-center gap-3">
             <div className={cn(
               "w-10 h-10 rounded-full flex items-center justify-center",
-              allComplete ? "bg-green-100" : "bg-blue-100"
+              allComplete ? "bg-emerald-500/20" : "bg-primary/20"
             )}>
               {allComplete ? (
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
               ) : (
-                <Sparkles className="h-5 w-5 text-blue-600" />
+                <Sparkles className="h-5 w-5 text-primary" />
               )}
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900 text-sm">
+              <h3 className="font-semibold text-foreground text-sm">
                 {allComplete ? "Setup Complete!" : "Getting Started"}
               </h3>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 {completedCount} of {totalCount} tasks complete
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {isExpanded ? (
-              <ChevronDown className="h-4 w-4 text-gray-400" />
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
             ) : (
-              <ChevronUp className="h-4 w-4 text-gray-400" />
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
             )}
           </div>
         </div>
 
         {/* Progress Bar */}
         <div className="px-4 pb-3">
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-2 bg-muted rounded-full overflow-hidden">
             <div
               className={cn(
                 "h-full rounded-full transition-all duration-500",
-                allComplete ? "bg-green-500" : "bg-blue-500"
+                allComplete ? "bg-emerald-500" : "bg-primary"
               )}
               style={{ width: `${checklistProgress}%` }}
             />
@@ -99,7 +99,7 @@ export function OnboardingChecklist() {
 
         {/* Checklist Items */}
         {isExpanded && (
-          <div className="border-t border-gray-100">
+          <div className="border-t border-border">
             <div className="p-3 space-y-1">
               {defaultChecklistItems.map((item) => {
                 const isComplete = checklistItems[item.id as keyof typeof checklistItems]
@@ -108,26 +108,26 @@ export function OnboardingChecklist() {
                     key={item.id}
                     className={cn(
                       "flex items-start gap-3 p-2 rounded-lg transition-colors",
-                      isComplete ? "bg-green-50" : "hover:bg-gray-50"
+                      isComplete ? "bg-emerald-500/10" : "hover:bg-accent"
                     )}
                   >
                     <div className="mt-0.5">
                       {isComplete ? (
-                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                       ) : (
-                        <Circle className="h-5 w-5 text-gray-300" />
+                        <Circle className="h-5 w-5 text-muted-foreground" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className={cn(
                         "text-sm font-medium",
-                        isComplete ? "text-green-700 line-through" : "text-gray-700"
+                        isComplete ? "text-emerald-500 line-through" : "text-foreground"
                       )}>
                         {item.label}
                       </p>
                       <p className={cn(
                         "text-xs",
-                        isComplete ? "text-green-600" : "text-gray-500"
+                        isComplete ? "text-emerald-500/70" : "text-muted-foreground"
                       )}>
                         {item.description}
                       </p>
@@ -142,7 +142,7 @@ export function OnboardingChecklist() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="flex-1 text-gray-500"
+                className="flex-1 text-muted-foreground"
                 onClick={hideChecklist}
               >
                 <X className="h-4 w-4 mr-1" />
