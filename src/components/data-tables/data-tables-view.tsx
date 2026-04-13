@@ -254,6 +254,80 @@ export function DataTablesView({ clientId, cohortId }: DataTablesViewProps) {
         }
     };
 
+    const handleDuplicateRow = async (rowId: string) => {
+        if (!activeTableId) return;
+
+        const sourceTable = tables.find((table) => table.id === activeTableId);
+        const sourceRow = sourceTable?.rows.find((row) => row.id === rowId);
+
+        if (!sourceRow) {
+            console.error('Error duplicating row: source row not found');
+            return;
+        }
+
+        const duplicatedData = JSON.parse(JSON.stringify(sourceRow.data ?? {}));
+        const tempRowId = `temp-${rowId}-${Date.now()}`;
+        const tempTimestamp = new Date().toISOString();
+        const optimisticRow: DataRow = {
+            id: tempRowId,
+            table_id: activeTableId,
+            data: duplicatedData,
+            created_at: tempTimestamp,
+            updated_at: tempTimestamp,
+        };
+
+        setTables((prev) =>
+            prev.map((table) =>
+                table.id === activeTableId
+                    ? {
+                        ...table,
+                        rows: [...table.rows, optimisticRow],
+                        row_count: (table.row_count || 0) + 1,
+                    }
+                    : table
+            )
+        );
+
+        try {
+            const response = await fetch(`/api/data-tables/${activeTableId}/rows`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ data: duplicatedData, user_id: user?.id }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to duplicate row: ${response.status}`);
+            }
+
+            const { row } = await response.json();
+            setTables((prev) =>
+                prev.map((table) =>
+                    table.id === activeTableId
+                        ? {
+                            ...table,
+                            rows: table.rows.map((existingRow) =>
+                                existingRow.id === tempRowId ? row : existingRow
+                            ),
+                        }
+                        : table
+                )
+            );
+        } catch (error) {
+            console.error('Error duplicating row:', error);
+            setTables((prev) =>
+                prev.map((table) =>
+                    table.id === activeTableId
+                        ? {
+                            ...table,
+                            rows: table.rows.filter((existingRow) => existingRow.id !== tempRowId),
+                            row_count: Math.max(0, (table.row_count || 0) - 1),
+                        }
+                        : table
+                )
+            );
+        }
+    };
+
     // Debounced row update to prevent rapid API calls during inline editing
     const debouncedUpdateRow = useDebouncedCallback(
         async (rowId: string, data: Record<string, any>, tableId: string, userId?: string) => {
@@ -742,6 +816,7 @@ export function DataTablesView({ clientId, cohortId }: DataTablesViewProps) {
                             columns={activeTable.columns || []}
                             rows={activeTable.rows || []}
                             onAddRow={handleAddRow}
+                            onDuplicateRow={handleDuplicateRow}
                             onUpdateRow={handleUpdateRow}
                             onDeleteRow={handleDeleteRow}
                             onAddColumn={handleAddColumn}

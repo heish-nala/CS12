@@ -151,6 +151,7 @@ interface DataGridProps {
     columns: DataColumn[];
     rows: DataRow[];
     onAddRow: () => void;
+    onDuplicateRow: (rowId: string) => void;
     onUpdateRow: (rowId: string, data: Record<string, any>) => void;
     onDeleteRow: (rowId: string) => void;
     onAddColumn: (name: string, type: ColumnType) => Promise<DataColumn | void> | void;
@@ -1011,6 +1012,7 @@ export function DataGrid({
     columns,
     rows,
     onAddRow,
+    onDuplicateRow,
     onUpdateRow,
     onDeleteRow,
     onAddColumn,
@@ -1119,14 +1121,12 @@ export function DataGrid({
     };
 
     const handleDuplicateSelected = () => {
-        // For now, just add new rows - in a real app you'd copy the data
-        selectedRows.forEach(() => onAddRow());
+        selectedRows.forEach((rowId) => onDuplicateRow(rowId));
         setSelectedRows(new Set());
     };
 
     const handleArchiveSelected = () => {
-        // Archive functionality - could be implemented as a status change
-        // For now, we'll just clear selection
+        selectedRows.forEach((rowId) => onDeleteRow(rowId));
         setSelectedRows(new Set());
     };
 
