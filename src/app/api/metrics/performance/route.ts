@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getRecentMetrics } from '@/lib/api-monitor';
+import { requireAuth } from '@/lib/auth';
 
 /**
  * GET /api/metrics/performance
@@ -18,8 +19,10 @@ import { getRecentMetrics } from '@/lib/api-monitor';
  *   }
  * }
  */
-export async function GET() {
-  // In production, you might want to restrict access to this endpoint
+export async function GET(request: NextRequest) {
+  const authResult = await requireAuth(request);
+  if (authResult.response) return authResult.response;
+
   const metrics = getRecentMetrics();
 
   return NextResponse.json(metrics);

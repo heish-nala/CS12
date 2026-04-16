@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DashboardMetricConfig } from '@/lib/db/types';
+import { requireAuth } from '@/lib/auth';
 
 // Mock in-memory storage (in production, this would be in Supabase)
 // Format: { [dsoId: string]: DashboardMetricConfig[] }
@@ -7,6 +8,9 @@ const mockConfigs: Record<string, DashboardMetricConfig[]> = {};
 
 export async function GET(request: NextRequest) {
     try {
+        const authResult = await requireAuth(request);
+        if (authResult.response) return authResult.response;
+
         const searchParams = request.nextUrl.searchParams;
         const dsoId = searchParams.get('dso_id');
 
@@ -32,6 +36,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
+        const authResult = await requireAuth(request);
+        if (authResult.response) return authResult.response;
+
         const body = await request.json();
         const { dso_id, configs } = body;
 

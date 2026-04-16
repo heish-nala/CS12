@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { MetricConfig } from '@/lib/db/types';
+import { requireAuth } from '@/lib/auth';
 
 // Mock in-memory storage (in production, this would be in Supabase)
 // Format: { [clientId: string]: MetricConfig[] }
@@ -7,6 +8,9 @@ const mockConfigs: Record<string, MetricConfig[]> = {};
 
 export async function GET(request: NextRequest) {
     try {
+        const authResult = await requireAuth(request);
+        if (authResult.response) return authResult.response;
+
         const searchParams = request.nextUrl.searchParams;
         const clientId = searchParams.get('client_id');
 
@@ -32,6 +36,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
+        const authResult = await requireAuth(request);
+        if (authResult.response) return authResult.response;
+
         const body = await request.json();
         const { client_id, configs } = body;
 
