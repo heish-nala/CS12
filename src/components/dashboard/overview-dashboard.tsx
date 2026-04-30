@@ -187,7 +187,7 @@ export function OverviewDashboard({ dsoId, cohortId }: OverviewDashboardProps) {
                         <CardTitle className="text-sm font-medium">
                             Clinical Funnel — All-Time
                         </CardTitle>
-                        <span className="text-xs text-muted-foreground">Since cohort start</span>
+                        <span className="text-xs text-muted-foreground">All-Time</span>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-3">
