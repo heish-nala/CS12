@@ -192,8 +192,8 @@ export function OverviewDashboard({ dsoId, cohortId }: OverviewDashboardProps) {
                     <CardContent>
                         <div className="space-y-3">
                             {data.clinical_funnel.all_time_stages.map((stage, i) => {
-                                const total = data.clinical_funnel.all_time_stages.reduce((s, x) => s + x.value, 0) || 1;
-                                const pct = Math.round((stage.value / total) * 100);
+                                const maxVal = Math.max(...data.clinical_funnel.all_time_stages.map(s => s.value), 1);
+                                const width = stage.value > 0 ? Math.max((stage.value / maxVal) * 100, 8) : 0;
                                 return (
                                     <div key={i} className="flex items-center gap-3">
                                         <Badge variant="outline" className="min-w-[100px] justify-center">
@@ -202,11 +202,11 @@ export function OverviewDashboard({ dsoId, cohortId }: OverviewDashboardProps) {
                                         <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
                                             <div
                                                 className="h-full rounded-full bg-primary transition-all"
-                                                style={{ width: `${Math.max(pct, stage.value > 0 ? 3 : 0)}%` }}
+                                                style={{ width: `${width}%` }}
                                             />
                                         </div>
-                                        <span className="text-sm font-medium min-w-[60px] text-right tabular-nums">
-                                            {stage.value} <span className="text-xs text-muted-foreground">({pct}%)</span>
+                                        <span className="text-sm font-medium min-w-[40px] text-right tabular-nums">
+                                            {stage.value}
                                         </span>
                                     </div>
                                 );
