@@ -191,26 +191,14 @@ export function OverviewDashboard({ dsoId, cohortId }: OverviewDashboardProps) {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-3">
-                            {data.clinical_funnel.all_time_stages.map((stage, i) => {
-                                const maxVal = Math.max(...data.clinical_funnel.all_time_stages.map(s => s.value), 1);
-                                const width = stage.value > 0 ? Math.max((stage.value / maxVal) * 100, 8) : 0;
-                                return (
-                                    <div key={i} className="flex items-center gap-3">
-                                        <Badge variant="outline" className="min-w-[100px] justify-center">
-                                            {stage.label}
-                                        </Badge>
-                                        <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
-                                            <div
-                                                className="h-full rounded-full bg-primary transition-all"
-                                                style={{ width: `${width}%` }}
-                                            />
-                                        </div>
-                                        <span className="text-sm font-medium min-w-[40px] text-right tabular-nums">
-                                            {stage.value}
-                                        </span>
+                            <div className="grid grid-cols-3 gap-4">
+                                {data.clinical_funnel.all_time_stages.map((stage, i) => (
+                                    <div key={i} className="text-center space-y-1">
+                                        <p className="text-2xl font-bold tabular-nums">{stage.value}</p>
+                                        <p className="text-xs text-muted-foreground">{stage.label}</p>
                                     </div>
-                                );
-                            })}
+                                ))}
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
