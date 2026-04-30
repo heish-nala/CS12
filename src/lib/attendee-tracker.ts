@@ -126,6 +126,9 @@ export interface ClientDashboardMetrics {
     diagnosed: number;
     scans: number;
     accepted: number;
+    diagnosed_all_time: number;
+    scans_all_time: number;
+    accepted_all_time: number;
 }
 
 /**
@@ -144,6 +147,9 @@ export async function computeClientMetrics(clientId: string): Promise<ClientDash
             diagnosed: 0,
             scans: 0,
             accepted: 0,
+            diagnosed_all_time: 0,
+            scans_all_time: 0,
+            accepted_all_time: 0,
         };
     }
 
@@ -194,16 +200,16 @@ export async function computeClientMetrics(clientId: string): Promise<ClientDash
         ? Math.round(blueprintValues.reduce((s, v) => s + v, 0) / blueprintValues.length)
         : 0;
 
-    // Clinical totals from current month's period_data
+    // Fetch ALL period_data for these tables (no date filter) — compute monthly + all-time from one query
     const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     const attendeeTableIds = attendeeTables.map(at => at.tableId);
 
     const { data: periodData } = await supabaseAdmin
         .from('period_data')
         .select('*')
-        .in('table_id', attendeeTableIds)
-        .gte('period_start', new Date(now.getFullYear(), now.getMonth(), 1).toISOString())
-        .lte('period_end', new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString());
+        .in('table_id', attendeeTableIds);
 
     // Resolve metric IDs to names using the time_tracking config
     const metricIdToName: Record<string, string> = {};
@@ -215,29 +221,36 @@ export async function computeClientMetrics(clientId: string): Promise<ClientDash
         }
     }
 
-    // Aggregate period metrics
+    // Aggregate period metrics — monthly and all-time in one pass
     const metricTotals: Record<string, number> = {};
+    const metricTotalsAllTime: Record<string, number> = {};
     for (const pd of (periodData || [])) {
-        if (pd.metrics && typeof pd.metrics === 'object') {
-            for (const [metricId, value] of Object.entries(pd.metrics)) {
-                const name = metricIdToName[metricId] || metricId;
-                metricTotals[name] = (metricTotals[name] || 0) + (Number(value) || 0);
+        if (!pd.metrics || typeof pd.metrics !== 'object') continue;
+        const pdStart = new Date(pd.period_start + 'T12:00:00');
+        const isCurrentMonth = pdStart >= currentMonthStart && pdStart <= currentMonthEnd;
+        for (const [metricId, value] of Object.entries(pd.metrics)) {
+            const name = metricIdToName[metricId] || metricId;
+            const num = Number(value) || 0;
+            metricTotalsAllTime[name] = (metricTotalsAllTime[name] || 0) + num;
+            if (isCurrentMonth) {
+                metricTotals[name] = (metricTotals[name] || 0) + num;
             }
         }
     }
 
     // Needs attention: Blueprint >= 50% but current period Accepted = 0
-    // We check per-row if their blueprint is high but they have no accepted cases this period
     const rowPeriodAccepted: Record<string, number> = {};
     for (const pd of (periodData || [])) {
-        if (pd.metrics && typeof pd.metrics === 'object') {
-            for (const [metricId, value] of Object.entries(pd.metrics)) {
-                const name = metricIdToName[metricId] || metricId;
-                if (name === 'accepted') {
-                    const rowId = pd.row_id;
-                    if (rowId) {
-                        rowPeriodAccepted[rowId] = (rowPeriodAccepted[rowId] || 0) + (Number(value) || 0);
-                    }
+        if (!pd.metrics || typeof pd.metrics !== 'object') continue;
+        const pdStart = new Date(pd.period_start + 'T12:00:00');
+        const isCurrentMonth = pdStart >= currentMonthStart && pdStart <= currentMonthEnd;
+        if (!isCurrentMonth) continue;
+        for (const [metricId, value] of Object.entries(pd.metrics)) {
+            const name = metricIdToName[metricId] || metricId;
+            if (name === 'accepted') {
+                const rowId = pd.row_id;
+                if (rowId) {
+                    rowPeriodAccepted[rowId] = (rowPeriodAccepted[rowId] || 0) + (Number(value) || 0);
                 }
             }
         }
@@ -264,5 +277,8 @@ export async function computeClientMetrics(clientId: string): Promise<ClientDash
         diagnosed: metricTotals['diagnosed'] || 0,
         scans: metricTotals['scans'] || 0,
         accepted: metricTotals['accepted'] || 0,
+        diagnosed_all_time: metricTotalsAllTime['diagnosed'] || 0,
+        scans_all_time: metricTotalsAllTime['scans'] || 0,
+        accepted_all_time: metricTotalsAllTime['accepted'] || 0,
     };
 }

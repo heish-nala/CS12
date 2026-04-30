@@ -180,6 +180,41 @@ export function OverviewDashboard({ dsoId, cohortId }: OverviewDashboardProps) {
                 )}
             </div>
 
+            {/* All-Time Clinical Funnel */}
+            {data.clinical_funnel.all_time_stages && data.clinical_funnel.all_time_stages.length > 0 && (
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                            Clinical Funnel — All-Time
+                        </CardTitle>
+                        <span className="text-xs text-muted-foreground">Since cohort start</span>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-3">
+                            {data.clinical_funnel.all_time_stages.map((stage, i) => {
+                                const maxVal = Math.max(...data.clinical_funnel.all_time_stages.map(s => s.value), 1);
+                                return (
+                                    <div key={i} className="flex items-center gap-3">
+                                        <Badge variant="outline" className="min-w-[100px] justify-center">
+                                            {stage.label}
+                                        </Badge>
+                                        <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full bg-primary transition-all"
+                                                style={{ width: `${(stage.value / maxVal) * 100}%` }}
+                                            />
+                                        </div>
+                                        <span className="text-sm font-medium min-w-[40px] text-right">
+                                            {stage.value}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Activity Summary */}
             {(data.activity_summary.total_this_month > 0 || data.activity_summary.last_contact_date) && (
                 <Card>

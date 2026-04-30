@@ -529,6 +529,7 @@ export interface OverviewDashboardResponse {
     clinical_funnel: {
         period_label: string;
         stages: Array<{ label: string; value: number }>;
+        all_time_stages: Array<{ label: string; value: number }>;
     };
     activity_summary: {
         total_this_month: number;

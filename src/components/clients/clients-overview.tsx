@@ -29,6 +29,9 @@ interface ClientMetrics {
     diagnosed: number;
     scans: number;
     accepted: number;
+    diagnosed_all_time: number;
+    scans_all_time: number;
+    accepted_all_time: number;
 }
 
 interface ClientWithMetrics extends Client {
@@ -121,15 +124,15 @@ function ClientCard({
             case 'accepted':
                 return {
                     label: 'Accepted',
-                    value: client.metrics.accepted,
-                    sub: 'this period',
-                    trendData: generateTrendData(client.metrics.accepted, 0.2),
+                    value: client.metrics.accepted_all_time,
+                    sub: 'all-time',
+                    trendData: generateTrendData(client.metrics.accepted_all_time, 0.2),
                 };
             case 'clinical_summary':
                 return {
                     label: 'Clinical',
-                    value: client.metrics.diagnosed,
-                    sub: `diag / ${client.metrics.scans} scans`,
+                    value: client.metrics.diagnosed_all_time,
+                    sub: `diag / ${client.metrics.scans_all_time} scans`,
                 };
             default:
                 return null;

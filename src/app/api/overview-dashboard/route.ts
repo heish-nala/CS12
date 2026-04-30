@@ -105,23 +105,15 @@ export async function GET(request: NextRequest) {
         const now = new Date();
         const currentMonth = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
+        const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         const attendeeTableIds = attendeeTables.map(at => at.tableId);
+
+        // Fetch ALL period_data (no date filter) — compute monthly + all-time in one pass
         const { data: periodData } = await supabaseAdmin
             .from('period_data')
             .select('*')
-            .in('table_id', attendeeTableIds)
-            .gte('period_start', new Date(now.getFullYear(), now.getMonth(), 1).toISOString())
-            .lte('period_end', new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString());
-
-        // Aggregate period metrics by metric name
-        const metricTotals: Record<string, number> = {};
-        for (const pd of (periodData || [])) {
-            if (pd.metrics && typeof pd.metrics === 'object') {
-                for (const [metricId, value] of Object.entries(pd.metrics)) {
-                    metricTotals[metricId] = (metricTotals[metricId] || 0) + (Number(value) || 0);
-                }
-            }
-        }
+            .in('table_id', attendeeTableIds);
 
         // Resolve metric IDs to names using the time_tracking config from tables
         const metricIdToName: Record<string, string> = {};
@@ -133,13 +125,35 @@ export async function GET(request: NextRequest) {
             }
         }
 
+        // Aggregate period metrics — monthly and all-time in one pass
+        const metricTotals: Record<string, number> = {};
+        const metricTotalsAllTime: Record<string, number> = {};
+        for (const pd of (periodData || [])) {
+            if (!pd.metrics || typeof pd.metrics !== 'object') continue;
+            const pdStart = new Date(pd.period_start + 'T12:00:00');
+            const isCurrentMonth = pdStart >= currentMonthStart && pdStart <= currentMonthEnd;
+            for (const [metricId, value] of Object.entries(pd.metrics)) {
+                const name = metricIdToName[metricId] || metricId;
+                const num = Number(value) || 0;
+                metricTotalsAllTime[name] = (metricTotalsAllTime[name] || 0) + num;
+                if (isCurrentMonth) {
+                    metricTotals[name] = (metricTotals[name] || 0) + num;
+                }
+            }
+        }
+
         // Build clinical funnel stages sorted by value desc
         const funnelStages: Array<{ label: string; value: number }> = [];
-        for (const [metricId, total] of Object.entries(metricTotals)) {
-            const name = metricIdToName[metricId] || metricId;
+        for (const [name, total] of Object.entries(metricTotals)) {
             funnelStages.push({ label: name, value: total });
         }
         funnelStages.sort((a, b) => b.value - a.value);
+
+        const allTimeFunnelStages: Array<{ label: string; value: number }> = [];
+        for (const [name, total] of Object.entries(metricTotalsAllTime)) {
+            allTimeFunnelStages.push({ label: name, value: total });
+        }
+        allTimeFunnelStages.sort((a, b) => b.value - a.value);
 
         // ── Activity summary for current month ──
 
@@ -182,6 +196,7 @@ export async function GET(request: NextRequest) {
             clinical_funnel: {
                 period_label: currentMonth,
                 stages: funnelStages,
+                all_time_stages: allTimeFunnelStages,
             },
             activity_summary: {
                 total_this_month: (activities || []).length,
@@ -213,6 +228,7 @@ function emptyDashboard(): OverviewDashboardResponse {
         clinical_funnel: {
             period_label: '',
             stages: [],
+            all_time_stages: [],
         },
         activity_summary: {
             total_this_month: 0,
