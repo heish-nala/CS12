@@ -1,13 +1,13 @@
 'use client';
 
-import { use, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Download, Loader2, FileText, Sparkles } from 'lucide-react';
-import type { ReportData, ReportNarratives } from '@/lib/db/types';
+import type { Cohort, ReportData, ReportNarratives } from '@/lib/db/types';
 
 interface ReportPageProps {
     params: Promise<{ id: string }>;
@@ -31,6 +31,21 @@ export default function ReportPage({ params }: ReportPageProps) {
     });
     const [periodEnd, setPeriodEnd] = useState(() => formatDateInput(new Date()));
 
+    // Cohort selector state
+    const [cohorts, setCohorts] = useState<Cohort[]>([]);
+    const [cohortId, setCohortId] = useState<string>('');
+
+    useEffect(() => {
+        fetch(`/api/cohorts?dso_id=${id}`)
+            .then(r => r.json())
+            .then(data => {
+                const list: Cohort[] = data.cohorts || [];
+                setCohorts(list);
+                if (list.length > 0) setCohortId(list[0].id);
+            })
+            .catch(() => {});
+    }, [id]);
+
     // Report generation state
     const [loading, setLoading] = useState(false);
     const [loadingPdf, setLoadingPdf] = useState(false);
@@ -50,7 +65,7 @@ export default function ReportPage({ params }: ReportPageProps) {
             const res = await fetch(`/api/report/generate-data`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ clientId: id, periodStart, periodEnd }),
+                body: JSON.stringify({ clientId: id, periodStart, periodEnd, cohortId: cohortId || undefined }),
             });
 
             if (!res.ok) {
@@ -156,7 +171,23 @@ export default function ReportPage({ params }: ReportPageProps) {
                     {/* Date Range + Generate */}
                     <div className="rounded-xl border border-border/50 bg-card p-6 space-y-4">
                         <h2 className="text-base font-semibold">Reporting Period</h2>
-                        <div className="flex items-end gap-4">
+                        <div className="flex items-end gap-4 flex-wrap">
+                            {cohorts.length > 0 && (
+                                <div className="space-y-1.5">
+                                    <Label>Cohort</Label>
+                                    <select
+                                        value={cohortId}
+                                        onChange={e => setCohortId(e.target.value)}
+                                        style={{ cursor: 'pointer' }}
+                                        className="h-10 w-52 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                                    >
+                                        <option value="">All cohorts</option>
+                                        {cohorts.map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+            )}
                             <div className="space-y-1.5">
                                 <Label>Start Date</Label>
                                 <Input

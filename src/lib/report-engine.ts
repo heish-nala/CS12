@@ -14,17 +14,18 @@ export async function generateReportData(
     clientId: string,
     periodStart: string,
     periodEnd: string,
+    cohortId?: string,
 ): Promise<ReportData> {
     // 1. Fetch client/DSO details
     const { data: client, error: clientError } = await supabaseAdmin
-        .from('clients')
+        .from('dsos')
         .select('*')
         .eq('id', clientId)
         .single();
     if (clientError) throw clientError;
 
-    // 2. Get attendee tracker tables (doctor roster)
-    const { tables: attendeeTables } = await findAttendeeTables(clientId);
+    // 2. Get attendee tracker tables (doctor roster) — scoped to cohort if provided
+    const { tables: attendeeTables } = await findAttendeeTables(clientId, cohortId);
 
     // 3. Build doctor name → row map from attendee tracker
     const doctorRows: Array<{
@@ -103,14 +104,16 @@ export async function generateReportData(
         totalStats.accepted += metrics['metric-accepted'] || metrics['accepted'] || 0;
     }
 
-    // 5. Pull activities for the date range
-    const { data: activities } = await supabaseAdmin
+    // 5. Pull activities for the date range — scoped to cohort if provided
+    let actQuery = supabaseAdmin
         .from('activities')
         .select('*')
         .eq('client_id', clientId)
         .gte('created_at', periodStart)
         .lte('created_at', periodEnd + 'T23:59:59Z')
         .order('created_at', { ascending: false });
+    if (cohortId) actQuery = actQuery.eq('cohort_id', cohortId);
+    const { data: activities } = await actQuery;
 
     // Count calls per doctor contact_name
     const callsPerDoctor: Record<string, number> = {};

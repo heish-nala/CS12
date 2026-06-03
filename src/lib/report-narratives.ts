@@ -68,7 +68,7 @@ Each value should be 1-3 paragraphs of polished report prose (not bullet points 
 Return ONLY valid JSON. No preamble, no explanation.`;
 
     const message = await client.messages.create({
-        model: 'claude-opus-4-6',
+        model: 'claude-sonnet-4-6',
         max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }],
     });
