@@ -157,17 +157,27 @@ export function buildReportHtml(data: ReportData, narratives: ReportNarratives):
     );
 
     // ── Next steps / per-doctor recommendations ───────────────────────────────
+    // Build per-doctor hot buttons + TM directions if available
+    const hasTmData = Object.keys(narratives.tmDirections || {}).length > 0;
+    const doctorActionContent = hasTmData
+        ? data.doctors.map(d => {
+            const hotButton = narratives.doctorHotButtons?.[d.name] || '';
+            const tmDir = narratives.tmDirections?.[d.name] || '';
+            return `<strong>${escHtml(d.name)}</strong>${hotButton ? ` — ${escHtml(hotButton)}` : ''}${tmDir ? `<br><em>TM: ${escHtml(tmDir)}</em>` : ''}`;
+          }).join('<br><br>')
+        : narratives.nextSteps;
+
     html = html.replace(
         '[DOCTOR_NAME] — [ACTION_TITLE]',
         data.doctors.length > 0 ? `${data.doctors[0].name} — Priority Action` : 'Doctor — Priority Action',
     );
     html = html.replace(
         '[DOCTOR_SPECIFIC_RECOMMENDATION — What is the single most important next action for this doctor, and why will it move them forward?]',
-        narratives.nextSteps,
+        doctorActionContent,
     );
     html = html.replace(
         '[BEGINNER_SESSION_RECOMMENDATION — Which doctors need this, and what would the session focus on for this DSO\'s specific gaps?]',
-        `Beginner-track session recommended for: ${data.doctorBuckets.confidenceParadox.join(', ') || 'TBD based on next assessment'}`,
+        narratives.nextSteps,
     );
 
     // Barrier one-liners

@@ -163,6 +163,8 @@ export interface ReportNarratives {
     callSummaryNarrative: string;
     nextSteps: string;
     bottomLine: string;
+    doctorHotButtons: Record<string, string>;
+    tmDirections: Record<string, string>;
 }
 
 export interface TaskGroup {
