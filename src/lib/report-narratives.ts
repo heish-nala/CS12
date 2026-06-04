@@ -8,18 +8,24 @@ const client = new Anthropic({
 });
 
 export async function draftNarratives(data: ReportData): Promise<ReportNarratives> {
+    // Enrolled doctor names — the allowlist. Every name that appears in the
+    // report must be on this list. No exceptions.
+    const enrolledNames = new Set(data.doctors.map(d => d.name));
+
     const doctorList = data.doctors.map(d =>
         `- ${d.name}: Blueprint ${d.blueprintPct ?? 'N/A'}%, Status: ${d.status}, Calls: ${d.callCount}, Accepted: ${d.accepted}, Scans: ${d.scans}, Diagnosed: ${d.diagnosed}`
     ).join('\n');
 
-    const quoteList = data.quotes.length > 0
-        ? data.quotes.map(q => `- "${q.text}" — ${q.doctorName} (${q.date}, ${q.sentiment})`).join('\n')
+    // Filter quotes to enrolled doctors only
+    const enrolledQuotes = data.quotes.filter(q => enrolledNames.has(q.doctorName));
+    const quoteList = enrolledQuotes.length > 0
+        ? enrolledQuotes.map(q => `- "${q.text}" — ${q.doctorName} (${q.date}, ${q.sentiment})`).join('\n')
         : '(No notable quotes captured this period)';
 
     const bucketSummary = `
-Confidence Paradox doctors (high Blueprint%, 0 accepted): ${data.doctorBuckets.confidenceParadox.join(', ') || 'None'}
-Mentorship Mismatch doctors (negative mentorship sentiment): ${data.doctorBuckets.mentorshipMismatch.join(', ') || 'None'}
-Structural Barrier doctors (timing/office/relocation issues): ${data.doctorBuckets.structuralBarriers.join(', ') || 'None'}`;
+Confidence Paradox doctors (high Blueprint%, 0 accepted): ${data.doctorBuckets.confidenceParadox.filter(n => enrolledNames.has(n)).join(', ') || 'None'}
+Mentorship Mismatch doctors (negative mentorship sentiment): ${data.doctorBuckets.mentorshipMismatch.filter(n => enrolledNames.has(n)).join(', ') || 'None'}
+Structural Barrier doctors (timing/office/relocation issues): ${data.doctorBuckets.structuralBarriers.filter(n => enrolledNames.has(n)).join(', ') || 'None'}`;
 
     // Build full activity notes block — each doctor gets a ### heading with their verbatim call/email logs
     const activityNotes = data.doctors
@@ -39,6 +45,10 @@ What he values most:
 - Suggested directions for territory managers — concrete actions by doctor name
 - Direct, no-filler language. Lead with what changed. Name the doctor, name the issue.
 
+ENROLLED DOCTOR ALLOWLIST: The DOCTOR ROSTER below is the complete, authoritative list of doctors enrolled in this cohort. You may ONLY name doctors from this list anywhere in the report. Do not name any doctor not on this list, even if their name appears in activity notes.
+
+CLIENT-APPROPRIATE FILTER: This report goes to a DSO account executive. Exclude from the report: where a doctor lives, illness or medical recovery, personal travel, family situations, or any internal program-management context. Include only: clinical performance data, pipeline status, program engagement observations, and specific barriers to case submission.
+
 ATTRIBUTION CONTRACT: For doctorHotButtons, tmDirections, and doctorGroups, use the EXACT doctor names from the DOCTOR ROSTER as JSON keys. Base each doctor's hot button and TM direction on that doctor's entry under FULL ACTIVITY NOTES — cite the specific blocker, person, platform, or quote from their notes. Do not invent names, blockers, or quotes not present in the notes. Only include doctors who have activity notes this period.
 
 DSO: ${data.dso.name}
@@ -51,7 +61,7 @@ Cases Accepted: ${data.stats.casesAccepted}
 Scans: ${data.stats.scans}
 Diagnosed: ${data.stats.diagnosed}
 
-DOCTOR ROSTER:
+DOCTOR ROSTER (enrolled in this cohort only — no other names may appear in the report):
 ${doctorList}
 
 FULL ACTIVITY NOTES (verbatim call/email logs, grouped by doctor — newest first):
@@ -120,6 +130,18 @@ Return ONLY valid JSON. No preamble, no explanation, no markdown code fences.`;
     if (!parsed.doctorGroups) {
         parsed.doctorGroups = { readyToSubmit: [], buildingHabits: [], structuralBarriers: [] };
     }
+
+    // ENFORCEMENT: strip any name Claude returned that isn't in the enrolled roster.
+    // This is the hard backstop against non-enrolled doctors appearing in the report.
+    const stripNonEnrolled = (obj: Record<string, string>) =>
+        Object.fromEntries(Object.entries(obj).filter(([name]) => enrolledNames.has(name)));
+    const filterNames = (arr: string[]) => arr.filter(name => enrolledNames.has(name));
+
+    parsed.doctorHotButtons = stripNonEnrolled(parsed.doctorHotButtons);
+    parsed.tmDirections = stripNonEnrolled(parsed.tmDirections);
+    parsed.doctorGroups.readyToSubmit = filterNames(parsed.doctorGroups.readyToSubmit);
+    parsed.doctorGroups.buildingHabits = filterNames(parsed.doctorGroups.buildingHabits);
+    parsed.doctorGroups.structuralBarriers = filterNames(parsed.doctorGroups.structuralBarriers);
 
     return parsed;
 }
