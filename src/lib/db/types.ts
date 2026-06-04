@@ -104,6 +104,7 @@ export interface ReportDoctorRow {
     callCount: number;
     priorActivity: string;
     currentActivity: string;
+    activityNotesFull: string;  // full notes block for AI prompt — NOT rendered in table
     status: string;
     accepted: number;
     scans: number;
@@ -161,10 +162,14 @@ export interface ReportNarratives {
     finding3Intro: string;
     finding3Analysis: string;
     callSummaryNarrative: string;
-    nextSteps: string;
     bottomLine: string;
     doctorHotButtons: Record<string, string>;
     tmDirections: Record<string, string>;
+    doctorGroups: {
+        readyToSubmit: string[];      // doctor names — pipeline-ready / strong producers
+        buildingHabits: string[];     // names — habit formation in progress
+        structuralBarriers: string[]; // names — blockers needing DSO/regional escalation
+    };
 }
 
 export interface TaskGroup {

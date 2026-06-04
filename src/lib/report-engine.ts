@@ -181,6 +181,7 @@ export async function generateReportData(
         const currentActivity = doctorActivities.length > 0
             ? summarizeActivity(doctorActivities[0])
             : 'No activity logged';
+        const activityNotesFull = buildFullActivityNotes(doctorActivities);
 
         return {
             name: dr.name,
@@ -188,6 +189,7 @@ export async function generateReportData(
             callCount,
             priorActivity,
             currentActivity,
+            activityNotesFull,
             status: dr.status,
             accepted,
             scans,
@@ -265,4 +267,19 @@ function summarizeActivity(act: any): string {
     const typeLabel = act.activity_type === 'phone' ? 'Call' : act.activity_type === 'email' ? 'Email' : 'Text';
     const snippet = act.description?.slice(0, 80) || '';
     return `${typeLabel} on ${date}: ${snippet}${act.description?.length > 80 ? '…' : ''}`;
+}
+
+function buildFullActivityNotes(acts: any[]): string {
+    if (!acts || acts.length === 0) return 'No activity logged this period.';
+    // acts is already sorted newest-first (query .order created_at desc)
+    const recent = acts.slice(0, 5);
+    return recent.map(a => {
+        const date = new Date(a.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const typeLabel = a.activity_type === 'phone' ? 'Call'
+            : a.activity_type === 'email' ? 'Email' : 'Text';
+        const outcome = a.outcome ? ` [outcome: ${a.outcome}]` : '';
+        const quote = a.notable_quote ? `\n  Notable quote: "${a.notable_quote}"` : '';
+        const desc = a.description || '(no notes)';
+        return `[${typeLabel} — ${date}${outcome}]\n  ${desc}${quote}`;
+    }).join('\n\n');
 }
