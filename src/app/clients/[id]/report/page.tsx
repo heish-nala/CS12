@@ -360,13 +360,6 @@ export default function ReportPage({ params }: ReportPageProps) {
                                     onChange={updateNarrative}
                                 />
                                 <NarrativeField
-                                    label="Next Steps"
-                                    field="nextSteps"
-                                    value={editedNarratives.nextSteps}
-                                    onChange={updateNarrative}
-                                    rows={6}
-                                />
-                                <NarrativeField
                                     label="Bottom Line"
                                     field="bottomLine"
                                     value={editedNarratives.bottomLine}
