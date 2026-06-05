@@ -1,7 +1,7 @@
 'use client';
 
 import { use, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,6 +23,7 @@ function formatDateInput(date: Date): string {
 export default function ReportPage({ params }: ReportPageProps) {
     const { id } = use(params);
     const router = useRouter();
+    const searchParams = useSearchParams();
 
     // Date range state
     const [periodStart, setPeriodStart] = useState(() => {
@@ -41,10 +42,16 @@ export default function ReportPage({ params }: ReportPageProps) {
             .then(data => {
                 const list: Cohort[] = data.cohorts || [];
                 setCohorts(list);
-                if (list.length > 0) setCohortId(list[0].id);
+                // If a cohortId was passed in the URL, pre-select it; otherwise default to first
+                const urlCohortId = searchParams.get('cohortId');
+                if (urlCohortId && list.some(c => c.id === urlCohortId)) {
+                    setCohortId(urlCohortId);
+                } else if (list.length > 0) {
+                    setCohortId(list[0].id);
+                }
             })
             .catch(() => {});
-    }, [id]);
+    }, [id, searchParams]);
 
     // Report generation state
     const [loading, setLoading] = useState(false);
@@ -187,7 +194,7 @@ export default function ReportPage({ params }: ReportPageProps) {
                                         ))}
                                     </select>
                                 </div>
-            )}
+                            )}
                             <div className="space-y-1.5">
                                 <Label>Start Date</Label>
                                 <Input

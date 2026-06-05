@@ -13,7 +13,7 @@ import { ProgressTab } from '@/components/clients/progress-tab';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useClients } from '@/contexts/clients-context';
-import { Building2, ChevronRight, Settings } from 'lucide-react';
+import { Building2, ChevronRight, FileText, Settings } from 'lucide-react';
 
 interface CohortDetailPageProps {
     params: Promise<{ id: string; cohortId: string }>;
@@ -207,15 +207,23 @@ function CohortDetailContent({
                                     {cohort.name}
                                 </h1>
                             </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setSettingsOpen(true)}
-                                className="shadow-sm"
-                            >
-                                <Settings className="h-4 w-4 mr-1.5" />
-                                Settings
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <Link href={`/clients/${clientId}/report?cohortId=${cohortId}`}>
+                                    <Button variant="outline" size="sm" className="shadow-sm" style={{ cursor: 'pointer' }}>
+                                        <FileText className="h-4 w-4 mr-1.5" />
+                                        Generate Report
+                                    </Button>
+                                </Link>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setSettingsOpen(true)}
+                                    className="shadow-sm"
+                                >
+                                    <Settings className="h-4 w-4 mr-1.5" />
+                                    Settings
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 </div>
