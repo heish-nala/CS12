@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { ArrowLeft, Download, Loader2, FileText, Sparkles } from 'lucide-react';
 import type { Cohort, ReportData, ReportNarratives } from '@/lib/db/types';
 
@@ -20,17 +19,29 @@ function formatDateInput(date: Date): string {
     return `${year}-${month}-${day}`;
 }
 
+function monthStart(month: string): string {
+    return `${month}-01`;
+}
+
+function monthEnd(month: string): string {
+    const [year, mon] = month.split('-').map(Number);
+    const lastDay = new Date(year, mon, 0); // day 0 of next month = last day of this month
+    return formatDateInput(lastDay);
+}
+
+function defaultMonth(): string {
+    const today = new Date();
+    // Default to last month
+    const d = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 export default function ReportPage({ params }: ReportPageProps) {
     const { id } = use(params);
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    // Date range state
-    const [periodStart, setPeriodStart] = useState(() => {
-        const today = new Date();
-        return formatDateInput(new Date(today.getFullYear(), today.getMonth(), 1));
-    });
-    const [periodEnd, setPeriodEnd] = useState(() => formatDateInput(new Date()));
+    const [month, setMonth] = useState(defaultMonth);
 
     // Cohort selector state
     const [cohorts, setCohorts] = useState<Cohort[]>([]);
@@ -42,7 +53,6 @@ export default function ReportPage({ params }: ReportPageProps) {
             .then(data => {
                 const list: Cohort[] = data.cohorts || [];
                 setCohorts(list);
-                // If a cohortId was passed in the URL, pre-select it; otherwise default to first
                 const urlCohortId = searchParams.get('cohortId');
                 if (urlCohortId && list.some(c => c.id === urlCohortId)) {
                     setCohortId(urlCohortId);
@@ -72,7 +82,12 @@ export default function ReportPage({ params }: ReportPageProps) {
             const res = await fetch(`/api/report/generate-data`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ clientId: id, periodStart, periodEnd, cohortId: cohortId || undefined }),
+                body: JSON.stringify({
+                    clientId: id,
+                    periodStart: monthStart(month),
+                    periodEnd: monthEnd(month),
+                    cohortId: cohortId || undefined,
+                }),
             });
 
             if (!res.ok) {
@@ -111,12 +126,10 @@ export default function ReportPage({ params }: ReportPageProps) {
                 throw new Error(errMsg);
             }
 
-            // Returns filled HTML — open in a new tab so user can print to PDF
             const html = await res.text();
             const blob = new Blob([html], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
             const win = window.open(url, '_blank');
-            // Auto-trigger print dialog after load
             if (win) {
                 win.addEventListener('load', () => {
                     win.focus();
@@ -125,7 +138,6 @@ export default function ReportPage({ params }: ReportPageProps) {
             } else {
                 setError('Popup blocked. Please allow popups for this site and try again.');
             }
-            // Revoke after a delay to allow the tab to load
             setTimeout(() => URL.revokeObjectURL(url), 10000);
         } catch (e) {
             setError(e instanceof Error ? e.message : 'PDF download failed');
@@ -175,13 +187,13 @@ export default function ReportPage({ params }: ReportPageProps) {
             <div className="px-6 lg:px-8 py-6">
                 <div className="max-w-5xl mx-auto space-y-8">
 
-                    {/* Date Range + Generate */}
+                    {/* Month + Cohort + Generate */}
                     <div className="rounded-xl border border-border/50 bg-card p-6 space-y-4">
                         <h2 className="text-base font-semibold">Reporting Period</h2>
                         <div className="flex items-end gap-4 flex-wrap">
                             {cohorts.length > 0 && (
                                 <div className="space-y-1.5">
-                                    <Label>Cohort</Label>
+                                    <label className="text-sm font-medium">Cohort</label>
                                     <select
                                         value={cohortId}
                                         onChange={e => setCohortId(e.target.value)}
@@ -196,21 +208,13 @@ export default function ReportPage({ params }: ReportPageProps) {
                                 </div>
                             )}
                             <div className="space-y-1.5">
-                                <Label>Start Date</Label>
-                                <Input
-                                    type="date"
-                                    value={periodStart}
-                                    onChange={e => setPeriodStart(e.target.value)}
-                                    className="w-44"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label>End Date</Label>
-                                <Input
-                                    type="date"
-                                    value={periodEnd}
-                                    onChange={e => setPeriodEnd(e.target.value)}
-                                    className="w-44"
+                                <label className="text-sm font-medium">Month</label>
+                                <input
+                                    type="month"
+                                    value={month}
+                                    onChange={e => setMonth(e.target.value)}
+                                    style={{ cursor: 'pointer' }}
+                                    className="h-10 w-44 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                                 />
                             </div>
                             <Button onClick={handleGenerateReport} disabled={loading} className="mb-0">
@@ -318,60 +322,15 @@ export default function ReportPage({ params }: ReportPageProps) {
                                     <p className="text-xs text-muted-foreground">Edit any section before downloading</p>
                                 </div>
 
-                                <NarrativeField
-                                    label="Executive Summary"
-                                    field="executiveSummary"
-                                    value={editedNarratives.executiveSummary}
-                                    onChange={updateNarrative}
-                                />
-                                <NarrativeField
-                                    label="Finding #1 — Confidence Paradox (Intro)"
-                                    field="finding1Intro"
-                                    value={editedNarratives.finding1Intro}
-                                    onChange={updateNarrative}
-                                />
-                                <NarrativeField
-                                    label="Finding #1 — Implication"
-                                    field="finding1Implication"
-                                    value={editedNarratives.finding1Implication}
-                                    onChange={updateNarrative}
-                                />
-                                <NarrativeField
-                                    label="Finding #2 — Mentorship Mismatch (Intro)"
-                                    field="finding2Intro"
-                                    value={editedNarratives.finding2Intro}
-                                    onChange={updateNarrative}
-                                />
-                                <NarrativeField
-                                    label="Finding #2 — Implication"
-                                    field="finding2Implication"
-                                    value={editedNarratives.finding2Implication}
-                                    onChange={updateNarrative}
-                                />
-                                <NarrativeField
-                                    label="Finding #3 — Structural Barriers (Intro)"
-                                    field="finding3Intro"
-                                    value={editedNarratives.finding3Intro}
-                                    onChange={updateNarrative}
-                                />
-                                <NarrativeField
-                                    label="Finding #3 — Analysis"
-                                    field="finding3Analysis"
-                                    value={editedNarratives.finding3Analysis}
-                                    onChange={updateNarrative}
-                                />
-                                <NarrativeField
-                                    label="Call Summary Narrative"
-                                    field="callSummaryNarrative"
-                                    value={editedNarratives.callSummaryNarrative}
-                                    onChange={updateNarrative}
-                                />
-                                <NarrativeField
-                                    label="Bottom Line"
-                                    field="bottomLine"
-                                    value={editedNarratives.bottomLine}
-                                    onChange={updateNarrative}
-                                />
+                                <NarrativeField label="Executive Summary" field="executiveSummary" value={editedNarratives.executiveSummary} onChange={updateNarrative} />
+                                <NarrativeField label="Finding #1 — Confidence Paradox (Intro)" field="finding1Intro" value={editedNarratives.finding1Intro} onChange={updateNarrative} />
+                                <NarrativeField label="Finding #1 — Implication" field="finding1Implication" value={editedNarratives.finding1Implication} onChange={updateNarrative} />
+                                <NarrativeField label="Finding #2 — Mentorship Mismatch (Intro)" field="finding2Intro" value={editedNarratives.finding2Intro} onChange={updateNarrative} />
+                                <NarrativeField label="Finding #2 — Implication" field="finding2Implication" value={editedNarratives.finding2Implication} onChange={updateNarrative} />
+                                <NarrativeField label="Finding #3 — Structural Barriers (Intro)" field="finding3Intro" value={editedNarratives.finding3Intro} onChange={updateNarrative} />
+                                <NarrativeField label="Finding #3 — Analysis" field="finding3Analysis" value={editedNarratives.finding3Analysis} onChange={updateNarrative} />
+                                <NarrativeField label="Call Summary Narrative" field="callSummaryNarrative" value={editedNarratives.callSummaryNarrative} onChange={updateNarrative} />
+                                <NarrativeField label="Bottom Line" field="bottomLine" value={editedNarratives.bottomLine} onChange={updateNarrative} />
                             </div>
 
                             {/* Quotes */}
@@ -433,7 +392,7 @@ function NarrativeField({
 }) {
     return (
         <div className="space-y-2">
-            <Label className="text-sm font-medium">{label}</Label>
+            <label className="text-sm font-medium">{label}</label>
             <Textarea
                 value={value}
                 onChange={e => onChange(field, e.target.value)}
