@@ -6,7 +6,7 @@ import { draftNarratives } from '@/lib/report-narratives';
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { clientId, periodStart, periodEnd } = body;
+        const { clientId, periodStart, periodEnd, cohortId } = body;
 
         if (!clientId || !periodStart || !periodEnd) {
             return NextResponse.json(
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Pull structured data
-        const reportData = await generateReportData(clientId, periodStart, periodEnd);
+        const reportData = await generateReportData(clientId, periodStart, periodEnd, cohortId);
 
         // Draft narratives via Claude
         const narratives = await draftNarratives(reportData);

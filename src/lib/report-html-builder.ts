@@ -77,13 +77,7 @@ export function buildReportHtml(data: ReportData, narratives: ReportNarratives):
             d.blueprintPct >= 80 ? 'bp-green' :
             d.blueprintPct >= 50 ? 'bp-orange' : 'bp-red';
         const bp = d.blueprintPct !== null ? `${d.blueprintPct}%` : '—';
-        return `<tr>
-  <td><strong>${escHtml(d.name)}</strong></td>
-  <td class="${bpClass}">${bp}</td>
-  <td>${d.callCount}</td>
-  <td>${escHtml(d.priorActivity)}</td>
-  <td>${escHtml(d.currentActivity)}</td>
-</tr>`;
+        return `<tr>\n  <td><strong>${escHtml(d.name)}</strong></td>\n  <td class="${bpClass}">${bp}</td>\n  <td>${d.callCount}</td>\n  <td>${escHtml(d.priorActivity)}</td>\n  <td>${escHtml(d.currentActivity)}</td>\n</tr>`;
     }).join('\n');
 
     // Replace the placeholder table body
@@ -93,7 +87,6 @@ export function buildReportHtml(data: ReportData, narratives: ReportNarratives):
     );
 
     // ── Quotes ────────────────────────────────────────────────────────────────
-    // Replace the two fixed quote placeholders with actual quotes (or empty if none)
     const q1 = data.quotes[0];
     const q2 = data.quotes[1];
     const q3 = data.quotes[2];
@@ -156,31 +149,53 @@ export function buildReportHtml(data: ReportData, narratives: ReportNarratives):
         `<!-- SENTIMENT_TABLE_START -->\n    <tbody>\n${sentimentRows ? `${sentimentRows}\n` : ''}    </tbody>`,
     );
 
-    // ── Next steps / per-doctor recommendations ───────────────────────────────
+    // ── Next Steps — three-section render ────────────────────────────────────
+    // Section 1: readyToSubmit → per-doctor .box-green with hot button + TM direction
+    const readyDoctors = (narratives.doctorGroups?.readyToSubmit || []);
+    const readyBoxes = readyDoctors
+        .filter(name => narratives.doctorHotButtons?.[name])
+        .map(name => {
+            const hb = narratives.doctorHotButtons[name];
+            const tm = narratives.tmDirections?.[name] || '';
+            return `<div class="box-green">\n  <div class="box-label">${escHtml(name)} — Hot Button</div>\n  <p>${escHtml(hb)}</p>\n${tm ? `  <p style="margin-top:8px;"><strong>TM Direction:</strong> ${escHtml(tm)}</p>\n` : ''}</div>`;
+        }).join('\n');
+
+    // Replace the single template box-green with the generated set
     html = html.replace(
-        '[DOCTOR_NAME] — [ACTION_TITLE]',
-        data.doctors.length > 0 ? `${data.doctors[0].name} — Priority Action` : 'Doctor — Priority Action',
-    );
-    html = html.replace(
-        '[DOCTOR_SPECIFIC_RECOMMENDATION — What is the single most important next action for this doctor, and why will it move them forward?]',
-        narratives.nextSteps,
-    );
-    html = html.replace(
-        '[BEGINNER_SESSION_RECOMMENDATION — Which doctors need this, and what would the session focus on for this DSO\'s specific gaps?]',
-        `Beginner-track session recommended for: ${data.doctorBuckets.confidenceParadox.join(', ') || 'TBD based on next assessment'}`,
+        /<div class="box-green">[\s\n]*<div class="box-label">\[DOCTOR_NAME\] — \[ACTION_TITLE\]<\/div>[\s\n]*<p>\[DOCTOR_SPECIFIC_RECOMMENDATION[^\]]*\]<\/p>[\s\n]*<\/div>/,
+        readyBoxes || '<div class="box-green"><div class="box-label">No pipeline-ready doctors this period</div><p>All doctors are still in the habit-building phase.</p></div>',
     );
 
-    // Barrier one-liners
-    const barrierOneLiner = structuralDoctors.length > 0
-        ? `${structuralDoctors.map(n => `<strong>${escHtml(n)}</strong> — structural barrier, monitor for resolution`).join('. ')}.`
+    // Section 2: buildingHabits → grouped .box-research (blue) box
+    const habitDoctors = (narratives.doctorGroups?.buildingHabits || []);
+    const habitContent = habitDoctors.length > 0
+        ? habitDoctors.map(name => {
+            const hb = narratives.doctorHotButtons?.[name] || '';
+            const tm = narratives.tmDirections?.[name] || '';
+            return `<p><strong>${escHtml(name)}:</strong>${hb ? ` ${escHtml(hb)}` : ''}${tm ? ` TM suggested direction: ${escHtml(tm)}` : ''}</p>`;
+          }).join('\n')
+        : '<p>No doctors currently in the habit-building phase.</p>';
+
+    html = html.replace(
+        '[BEGINNER_SESSION_RECOMMENDATION — Which doctors need this, and what would the session focus on for this DSO\'s specific gaps?]',
+        habitContent,
+    );
+
+    // Section 3: structuralBarriers → one bolded line per doctor
+    const barrierDoctors = (narratives.doctorGroups?.structuralBarriers || structuralDoctors);
+    const barrierOneLiner = barrierDoctors.length > 0
+        ? barrierDoctors.map(name => {
+            const note = narratives.doctorHotButtons?.[name] || 'structural barrier, monitor for resolution';
+            return `<strong>${escHtml(name)}</strong> — ${escHtml(note)}`;
+          }).join('. ') + '.'
         : 'No structural barriers identified this period.';
+
     html = html.replace(
         '<strong>[DOCTOR_NAME]</strong> — [BARRIER_ONE_LINER: status + next action]. <strong>[DOCTOR_NAME_2]</strong> — [BARRIER_ONE_LINER: status + next action].',
         barrierOneLiner,
     );
 
     // ── Sweep up any remaining obvious placeholders ───────────────────────────
-    // These are section-level placeholders that are part of the template structure
     html = html.replace(/\[BARRIER_TYPE\]/g, 'Structural Barrier');
     html = html.replace(/\[DOCTOR_NAME\]/g, '');
     html = html.replace(/\[DOCTOR_NAME_2\]/g, '');
@@ -209,11 +224,7 @@ function buildSentimentTableRows(data: ReportData): string {
         seen.add(s.element);
         const color = s.sentiment === 'positive' ? '#2a8a3a' :
             s.sentiment === 'negative' ? '#cc2222' : '#8899bb';
-        rows.push(`<tr>
-  <td>${escHtml(s.element)}</td>
-  <td><span style="color:${color};font-weight:600;">${s.sentiment}</span></td>
-  <td>${escHtml(s.whoSaidIt)}</td>
-</tr>`);
+        rows.push(`<tr>\n  <td>${escHtml(s.element)}</td>\n  <td><span style="color:${color};font-weight:600;">${s.sentiment}</span></td>\n  <td>${escHtml(s.whoSaidIt)}</td>\n</tr>`);
     }
     return rows.join('\n');
 }
