@@ -4,6 +4,10 @@ import { GENERATION_RULES, VALIDATION_RULES } from '@/lib/report-rules';
 
 export type { ReportNarratives };
 
+// Model used for every report call. Opus 4.8 is the strongest model for the
+// judgment-heavy bucketing and client-grade prose this report requires.
+const REPORT_MODEL = 'claude-opus-4-8';
+
 interface ValidationViolation {
     rule: string;
     field: string;
@@ -18,6 +22,50 @@ interface ValidationResult {
 const client = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
 });
+
+/**
+ * Strip markdown code fences and parse Claude's response as JSON.
+ * Shared by the initial draft and the corrective regeneration.
+ */
+function parseNarrativesJson(rawText: string): ReportNarratives {
+    let jsonText = rawText.trim();
+    if (jsonText.startsWith('```')) {
+        jsonText = jsonText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+    }
+    try {
+        return JSON.parse(jsonText) as ReportNarratives;
+    } catch (e) {
+        console.error('Failed to parse Claude response as JSON. Raw text:', jsonText);
+        throw new Error(`Claude returned invalid JSON (possibly truncated). Raw length: ${jsonText.length}. Parse error: ${e}`);
+    }
+}
+
+/**
+ * Apply the deterministic enrolled-only enforcement to a parsed narratives
+ * object. Runs after every Claude call (initial draft AND corrective rewrite)
+ * so a non-enrolled name can never survive into the report, regardless of what
+ * the model returns.
+ */
+function enforceEnrolledOnly(parsed: ReportNarratives, enrolledNames: Set<string>): ReportNarratives {
+    // Ensure new fields always exist even if Claude omits them
+    if (!parsed.doctorHotButtons) parsed.doctorHotButtons = {};
+    if (!parsed.tmDirections) parsed.tmDirections = {};
+    if (!parsed.doctorGroups) {
+        parsed.doctorGroups = { readyToSubmit: [], buildingHabits: [], structuralBarriers: [] };
+    }
+
+    const stripNonEnrolled = (obj: Record<string, string>) =>
+        Object.fromEntries(Object.entries(obj).filter(([name]) => enrolledNames.has(name)));
+    const filterNames = (arr: string[]) => arr.filter(name => enrolledNames.has(name));
+
+    parsed.doctorHotButtons = stripNonEnrolled(parsed.doctorHotButtons);
+    parsed.tmDirections = stripNonEnrolled(parsed.tmDirections);
+    parsed.doctorGroups.readyToSubmit = filterNames(parsed.doctorGroups.readyToSubmit);
+    parsed.doctorGroups.buildingHabits = filterNames(parsed.doctorGroups.buildingHabits);
+    parsed.doctorGroups.structuralBarriers = filterNames(parsed.doctorGroups.structuralBarriers);
+
+    return parsed;
+}
 
 export async function draftNarratives(data: ReportData): Promise<ReportNarratives> {
     // Enrolled doctor names — the allowlist. Every name in the report must be on this list.
@@ -106,10 +154,10 @@ doctorHotButtons, tmDirections, and doctorGroups must use the EXACT doctor names
   }
 }
 
-Return ONLY valid JSON. No preamble, no explanation, no markdown code fences.`;
+Return ONLY the JSON object. No preamble, no explanation, no markdown code fences, no reasoning about your choices — just the final JSON.`;
 
     const message = await client.messages.create({
-        model: 'claude-sonnet-4-6',
+        model: REPORT_MODEL,
         max_tokens: 6000,
         messages: [{ role: 'user', content: generationPrompt }],
     });
@@ -117,50 +165,101 @@ Return ONLY valid JSON. No preamble, no explanation, no markdown code fences.`;
     const content = message.content[0];
     if (content.type !== 'text') throw new Error('Unexpected response type from Claude API');
 
-    let jsonText = content.text.trim();
-    if (jsonText.startsWith('```')) {
-        jsonText = jsonText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-    }
-
-    let parsed: ReportNarratives;
-    try {
-        parsed = JSON.parse(jsonText) as ReportNarratives;
-    } catch (e) {
-        console.error('Failed to parse Claude response as JSON. Raw text:', jsonText);
-        throw new Error(`Claude returned invalid JSON (possibly truncated). Raw length: ${jsonText.length}. Parse error: ${e}`);
-    }
-
-    // Ensure new fields always exist even if Claude omits them
-    if (!parsed.doctorHotButtons) parsed.doctorHotButtons = {};
-    if (!parsed.tmDirections) parsed.tmDirections = {};
-    if (!parsed.doctorGroups) {
-        parsed.doctorGroups = { readyToSubmit: [], buildingHabits: [], structuralBarriers: [] };
-    }
+    let parsed = parseNarrativesJson(content.text);
 
     // ENFORCEMENT: hard strip of any non-enrolled names Claude returned
-    const stripNonEnrolled = (obj: Record<string, string>) =>
-        Object.fromEntries(Object.entries(obj).filter(([name]) => enrolledNames.has(name)));
-    const filterNames = (arr: string[]) => arr.filter(name => enrolledNames.has(name));
-
-    parsed.doctorHotButtons = stripNonEnrolled(parsed.doctorHotButtons);
-    parsed.tmDirections = stripNonEnrolled(parsed.tmDirections);
-    parsed.doctorGroups.readyToSubmit = filterNames(parsed.doctorGroups.readyToSubmit);
-    parsed.doctorGroups.buildingHabits = filterNames(parsed.doctorGroups.buildingHabits);
-    parsed.doctorGroups.structuralBarriers = filterNames(parsed.doctorGroups.structuralBarriers);
+    parsed = enforceEnrolledOnly(parsed, enrolledNames);
 
     // VALIDATION PASS: second Claude call checks the output against the rules
     const validationResult = await validateNarratives(parsed, data, enrolledNames, activityNotes, doctorList);
-    if (!validationResult.pass) {
+    if (!validationResult.pass && validationResult.violations.length > 0) {
         console.warn(
-            `[report-narratives] Validation found ${validationResult.violations.length} violation(s):`,
+            `[report-narratives] Validation found ${validationResult.violations.length} violation(s), attempting one corrective rewrite:`,
             JSON.stringify(validationResult.violations, null, 2)
         );
-        // Auto-fix: strip enrolled-name violations that slipped through prose (can't auto-fix prose, but log clearly)
-        // Non-enrolled name violations in structured fields are already stripped above.
-        // Remaining violations are logged for human review — report still generates but audit trail is in server logs.
+
+        // SELF-HEAL: one corrective regeneration. Feed the violations back to
+        // Claude with the original context and ask it to fix exactly those
+        // problems. A single retry (not a loop) so a report can never hang.
+        const healed = await reviseNarratives(
+            parsed,
+            validationResult.violations,
+            generationPrompt,
+        );
+        if (healed) {
+            // Re-apply enrolled-only enforcement to the rewritten output, then
+            // re-validate purely for the audit log (we ship the rewrite either way).
+            const healedEnforced = enforceEnrolledOnly(healed, enrolledNames);
+            const recheck = await validateNarratives(
+                healedEnforced, data, enrolledNames, activityNotes, doctorList,
+            );
+            if (recheck.pass) {
+                console.info('[report-narratives] Corrective rewrite resolved all violations.');
+            } else {
+                console.warn(
+                    `[report-narratives] ${recheck.violations.length} violation(s) remain after rewrite (shipping rewrite; logged for human review):`,
+                    JSON.stringify(recheck.violations, null, 2)
+                );
+            }
+            return healedEnforced;
+        }
+        // Rewrite failed to run/parse — fall through and ship the enforced original.
+        console.warn('[report-narratives] Corrective rewrite did not produce usable output; shipping the enforced original draft.');
     }
 
     return parsed;
+}
+
+/**
+ * Corrective regeneration. Given the drafted narratives and the specific
+ * violations the validator flagged, ask Claude to rewrite ONLY what's broken
+ * and return the full corrected JSON. Returns null if the call fails or the
+ * response can't be parsed — the caller then ships the enforced original.
+ */
+async function reviseNarratives(
+    narratives: ReportNarratives,
+    violations: ValidationViolation[],
+    generationPrompt: string,
+): Promise<ReportNarratives | null> {
+    const violationList = violations
+        .map(v => `- [${v.rule}] field "${v.field}": ${v.detail}`)
+        .join('\n');
+
+    const revisionPrompt = `${generationPrompt}
+
+---
+
+You already produced the following draft, but a quality auditor flagged problems with it.
+
+YOUR PREVIOUS DRAFT:
+${JSON.stringify(narratives, null, 2)}
+
+AUDITOR VIOLATIONS TO FIX:
+${violationList}
+
+Rewrite the report to fix every violation above while keeping everything else intact.
+Apply the same rules as before — especially: only enrolled doctors may be named, no
+client-inappropriate content (location, illness, personal/family/travel), every specific
+claim must trace to the activity notes, numbers must match the roster, and no em dashes.
+
+Return ONLY the corrected JSON object with the exact same keys as before. No preamble,
+no explanation, no markdown code fences, no reasoning — just the final JSON.`;
+
+    try {
+        const message = await client.messages.create({
+            model: REPORT_MODEL,
+            max_tokens: 6000,
+            messages: [{ role: 'user', content: revisionPrompt }],
+        });
+
+        const content = message.content[0];
+        if (content.type !== 'text') return null;
+
+        return parseNarrativesJson(content.text);
+    } catch (e) {
+        console.error('[report-narratives] Corrective rewrite failed to run:', e);
+        return null;
+    }
 }
 
 async function validateNarratives(
@@ -219,11 +318,11 @@ or if violations found:
   ]
 }
 
-No preamble. No explanation. Valid JSON only.`;
+No preamble. No explanation. No reasoning. Valid JSON only.`;
 
     try {
         const message = await client.messages.create({
-            model: 'claude-sonnet-4-6',
+            model: REPORT_MODEL,
             max_tokens: 1000,
             messages: [{ role: 'user', content: validationPrompt }],
         });
