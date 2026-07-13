@@ -66,11 +66,15 @@ export async function generateReportData(
         }
     }
 
-    // 4. Pull period_data for these tables, then keep any period that OVERLAPS the
-    //    requested window. This matches how the rest of the app buckets period_data
-    //    (overview-dashboard / attendee-tracker / progress all parse period_start at
-    //    local noon), instead of the old strict-containment SQL filter which silently
-    //    dropped a whole month's metrics whenever a stored boundary drifted by a day.
+    // 4. Pull period_data for these tables, then bucket each monthly period by the
+    //    calendar month its period_start falls in — the exact rule the dashboards and
+    //    progress view use (overview-dashboard / attendee-tracker parse period_start at
+    //    local noon and test it against the month). The old strict-containment SQL
+    //    filter (period_start >= start AND period_end <= end) instead required each
+    //    period row to nest entirely inside the window, so it silently dropped a whole
+    //    month's metrics whenever a stored boundary didn't line up — making the report
+    //    disagree with every other screen. Parsing at noon keeps a UTC/local offset
+    //    from shifting the day.
     const { data: allPeriodDataRows } = await supabaseAdmin
         .from('period_data')
         .select('*')
@@ -79,11 +83,9 @@ export async function generateReportData(
     const rangeStart = new Date(periodStart + 'T00:00:00');
     const rangeEnd = new Date(periodEnd + 'T23:59:59');
     const periodDataRows = (allPeriodDataRows || []).filter(pd => {
-        if (!pd.period_start || !pd.period_end) return false;
-        // Parse at noon so a UTC/local offset can never shift the calendar day.
+        if (!pd.period_start) return false;
         const pStart = new Date(pd.period_start + 'T12:00:00');
-        const pEnd = new Date(pd.period_end + 'T12:00:00');
-        return pStart <= rangeEnd && pEnd >= rangeStart;
+        return pStart >= rangeStart && pStart <= rangeEnd;
     });
 
     // Build metric ID → name map from table time_tracking configs
