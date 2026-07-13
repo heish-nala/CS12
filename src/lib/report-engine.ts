@@ -66,13 +66,25 @@ export async function generateReportData(
         }
     }
 
-    // 4. Pull period_data for the date range
-    const { data: periodDataRows } = await supabaseAdmin
+    // 4. Pull period_data for these tables, then keep any period that OVERLAPS the
+    //    requested window. This matches how the rest of the app buckets period_data
+    //    (overview-dashboard / attendee-tracker / progress all parse period_start at
+    //    local noon), instead of the old strict-containment SQL filter which silently
+    //    dropped a whole month's metrics whenever a stored boundary drifted by a day.
+    const { data: allPeriodDataRows } = await supabaseAdmin
         .from('period_data')
         .select('*')
-        .in('table_id', attendeeTableIds)
-        .gte('period_start', periodStart)
-        .lte('period_end', periodEnd);
+        .in('table_id', attendeeTableIds);
+
+    const rangeStart = new Date(periodStart + 'T00:00:00');
+    const rangeEnd = new Date(periodEnd + 'T23:59:59');
+    const periodDataRows = (allPeriodDataRows || []).filter(pd => {
+        if (!pd.period_start || !pd.period_end) return false;
+        // Parse at noon so a UTC/local offset can never shift the calendar day.
+        const pStart = new Date(pd.period_start + 'T12:00:00');
+        const pEnd = new Date(pd.period_end + 'T12:00:00');
+        return pStart <= rangeEnd && pEnd >= rangeStart;
+    });
 
     // Build metric ID → name map from table time_tracking configs
     const metricIdToName: Record<string, string> = {};
