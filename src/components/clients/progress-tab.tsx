@@ -111,6 +111,7 @@ export function ProgressTab({ clientId, clientName, cohortId }: ProgressTabProps
     const [loadingPeriods, setLoadingPeriods] = useState(false);
     const [saving, setSaving] = useState(false);
     const [pendingChanges, setPendingChanges] = useState<Record<string, Record<string, number>>>({});
+    const [mentorshipChanges, setMentorshipChanges] = useState<Record<string, string | null>>({});
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
     // Report dialog state
@@ -256,6 +257,7 @@ export function ProgressTab({ clientId, clientName, cohortId }: ProgressTabProps
         setSelectedContact(contact);
         setPanelOpen(true);
         setPendingChanges({});
+        setMentorshipChanges({});
         fetchPeriodData(contact.tableId, contact.rowId);
     };
 
@@ -276,23 +278,42 @@ export function ProgressTab({ clientId, clientName, cohortId }: ProgressTabProps
         );
     };
 
+    // Handle mentorship call change (date string = done, null = not done)
+    const handleMentorshipChange = (periodId: string, date: string | null) => {
+        setMentorshipChanges(prev => ({ ...prev, [periodId]: date }));
+        setPeriodData(prev =>
+            prev.map(p => p.id === periodId ? { ...p, mentorship_call_date: date } : p)
+        );
+    };
+
     // Save changes
     const handleSave = async () => {
-        if (!selectedContact || Object.keys(pendingChanges).length === 0) {
+        const changedPeriodIds = Array.from(new Set([
+            ...Object.keys(pendingChanges),
+            ...Object.keys(mentorshipChanges),
+        ]));
+        if (!selectedContact || changedPeriodIds.length === 0) {
             toast.info('No changes to save');
             return;
         }
 
         setSaving(true);
         try {
-            const savePromises = Object.entries(pendingChanges).map(
-                async ([periodId, metrics]) => {
+            const savePromises = changedPeriodIds.map(
+                async (periodId) => {
+                    const payload: Record<string, unknown> = { user_id: user?.id };
+                    if (pendingChanges[periodId]) {
+                        payload.metrics = pendingChanges[periodId];
+                    }
+                    if (periodId in mentorshipChanges) {
+                        payload.mentorship_call_date = mentorshipChanges[periodId];
+                    }
                     const response = await fetch(
                         `/api/data-tables/${selectedContact.tableId}/rows/${selectedContact.rowId}/periods/${periodId}`,
                         {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ metrics, user_id: user?.id }),
+                            body: JSON.stringify(payload),
                         }
                     );
                     if (!response.ok) throw new Error(`Failed to save period ${periodId}`);
@@ -302,6 +323,7 @@ export function ProgressTab({ clientId, clientName, cohortId }: ProgressTabProps
 
             await Promise.all(savePromises);
             setPendingChanges({});
+            setMentorshipChanges({});
             const updatedAt = new Date().toISOString();
             setContacts(prev => prev.map(c =>
                 c.id === selectedContact.id
@@ -348,7 +370,7 @@ export function ProgressTab({ clientId, clientName, cohortId }: ProgressTabProps
         return date.toLocaleDateString();
     };
 
-    const hasPendingChanges = Object.keys(pendingChanges).length > 0;
+    const hasPendingChanges = Object.keys(pendingChanges).length > 0 || Object.keys(mentorshipChanges).length > 0;
 
     // Handle panel close with unsaved changes check
     const handlePanelClose = (open: boolean) => {
@@ -362,6 +384,7 @@ export function ProgressTab({ clientId, clientName, cohortId }: ProgressTabProps
     const confirmClose = () => {
         setShowCloseConfirm(false);
         setPendingChanges({});
+        setMentorshipChanges({});
         setPanelOpen(false);
     };
 
@@ -688,6 +711,9 @@ export function ProgressTab({ clientId, clientName, cohortId }: ProgressTabProps
                                                 isCurrent={isCurrent}
                                                 onChange={(metricId, value) => {
                                                     handleMetricChange(period.id, metricId, value);
+                                                }}
+                                                onMentorshipChange={(date) => {
+                                                    handleMentorshipChange(period.id, date);
                                                 }}
                                             />
                                         );
