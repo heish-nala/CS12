@@ -64,9 +64,14 @@ export async function PUT(
         return accessResult.response;
     }
 
-    const { metrics } = body;
-    if (!metrics || typeof metrics !== 'object') {
-        return NextResponse.json({ error: 'Metrics object required' }, { status: 400 });
+    const { metrics, mentorship_call_date } = body;
+    const hasMetrics = metrics && typeof metrics === 'object';
+    const hasMentorship = 'mentorship_call_date' in body;
+    if (!hasMetrics && !hasMentorship) {
+        return NextResponse.json({ error: 'Metrics object or mentorship_call_date required' }, { status: 400 });
+    }
+    if (hasMentorship && mentorship_call_date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(mentorship_call_date)) {
+        return NextResponse.json({ error: 'mentorship_call_date must be YYYY-MM-DD or null' }, { status: 400 });
     }
 
     // Get existing metrics to merge
@@ -81,14 +86,19 @@ export async function PUT(
     }
 
     // Merge existing metrics with new values
-    const mergedMetrics = { ...existing.metrics, ...metrics };
+    const updatePayload: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+    };
+    if (hasMetrics) {
+        updatePayload.metrics = { ...existing.metrics, ...metrics };
+    }
+    if (hasMentorship) {
+        updatePayload.mentorship_call_date = mentorship_call_date;
+    }
 
     const { data: updated, error: updateError } = await supabaseAdmin
         .from('period_data')
-        .update({
-            metrics: mergedMetrics,
-            updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq('id', periodId)
         .select()
         .single();

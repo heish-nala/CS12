@@ -437,6 +437,7 @@ export interface PeriodData {
     period_end: string;
     period_label: string; // e.g., "November 2024", "Week 48", "Q4 2024"
     metrics: Record<string, number>; // metric_id -> value
+    mentorship_call_date: string | null; // date of the monthly mentorship call, NULL = not logged
     created_at: string;
     updated_at: string;
 }
