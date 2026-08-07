@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest",
+    "health": "bash scripts/health-check.sh",
     "test:api": "npx tsx scripts/api-health-check.ts",
     "test:e2e": "playwright test tests/example.spec.ts",
     "test:ux": "playwright test tests/ux.spec.ts",

@@ -1,5 +1,24 @@
 # Claude Development Instructions
 
+## Current State (updated 2026-08-07 — update this section whenever a feature ships)
+
+**Latest shipped: Monthly Mentorship Tracker + reports integration (both live in production).**
+- Progress tab → click a doctor → each month card has a "Mentorship call" checkbox + editable date (Ileana ticks one call per doctor per month). Data lives in `period_data.mentorship_call_date` (nullable DATE; NULL = not held).
+- Generated reports show a "Mentorship Call" column per doctor (✓ date / "Not held"), a Doctors Mentored X-of-Y stat, and AI rules that forbid inferring call status from notes (report-rules.ts rules 7/6).
+- Also live: every new data table gets progress tracking enabled by default (`POST /api/data-tables`).
+- Full history: vault page `Alan's Brain/Projects/CS12.md`.
+
+**Start-of-session routine:** run `git fetch origin` and check you're not behind `origin/main` — this local checkout has been stale before.
+
+**Known open items:**
+- Older activities have inconsistent/NULL `contact_name` — per-doctor call counts in reports undercount until backfilled.
+- Supabase CLI here is linked to the RETIRED old DB (`vekxzuupejmitvwwokrf`) and cannot reach production (`gvtphsbqipapirpwrlhp`, Craig's org). NEVER `supabase db push` from this machine. Schema changes: prepare the SQL + a `supabase_migrations.schema_migrations` insert, and have Alan paste it into the dashboard SQL editor (or complete the Supabase MCP OAuth).
+- Merging to main from a background session is blocked — give Alan a `! gh pr merge <n> --repo heish-nala/CS12 --merge` line to run in-chat.
+
+## Health Check
+
+`npm run health` — one command, ~15 seconds, safe to run anytime. Verifies: live site up, production DB has the mentorship column, a date actually saves (write + self-revert on one row), report wiring present in this code copy, and whether this checkout is behind the live code. When Alan asks "is everything working?" — run this and report the output.
+
 ## Context
 - **User**: CEO/CPO, non-technical
 - **Claude's Role**: Acting as the developer for this project
