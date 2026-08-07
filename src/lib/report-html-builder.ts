@@ -77,12 +77,15 @@ export function buildReportHtml(data: ReportData, narratives: ReportNarratives):
             d.blueprintPct >= 80 ? 'bp-green' :
             d.blueprintPct >= 50 ? 'bp-orange' : 'bp-red';
         const bp = d.blueprintPct !== null ? `${d.blueprintPct}%` : '—';
-        return `<tr>\n  <td><strong>${escHtml(d.name)}</strong></td>\n  <td class="${bpClass}">${bp}</td>\n  <td>${d.callCount}</td>\n  <td>${escHtml(d.priorActivity)}</td>\n  <td>${escHtml(d.currentActivity)}</td>\n</tr>`;
+        const mentorship = d.mentorshipCallDate
+            ? `<span class="bp-green">✓ ${formatShortDate(d.mentorshipCallDate)}</span>`
+            : '<span class="bp-red">Not held</span>';
+        return `<tr>\n  <td><strong>${escHtml(d.name)}</strong></td>\n  <td class="${bpClass}">${bp}</td>\n  <td>${d.callCount}</td>\n  <td>${mentorship}</td>\n  <td>${escHtml(d.priorActivity)}</td>\n  <td>${escHtml(d.currentActivity)}</td>\n</tr>`;
     }).join('\n');
 
     // Replace the placeholder table body
     html = html.replace(
-        /<tbody>\s*<!-- Row example:[\s\S]*?-->\s*<tr>\s*<td colspan="5"[^>]*>[^<]*<\/td>\s*<\/tr>\s*<\/tbody>/,
+        /<tbody>\s*<!-- Row example:[\s\S]*?-->\s*<tr>\s*<td colspan="6"[^>]*>[^<]*<\/td>\s*<\/tr>\s*<\/tbody>/,
         `<tbody>\n${doctorRows}\n</tbody>`,
     );
 
@@ -227,6 +230,10 @@ function buildSentimentTableRows(data: ReportData): string {
         rows.push(`<tr>\n  <td>${escHtml(s.element)}</td>\n  <td><span style="color:${color};font-weight:600;">${s.sentiment}</span></td>\n  <td>${escHtml(s.whoSaidIt)}</td>\n</tr>`);
     }
     return rows.join('\n');
+}
+
+function formatShortDate(iso: string): string {
+    return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function replaceAll(str: string, search: string, replacement: string): string {
