@@ -24,7 +24,7 @@ export async function draftNarratives(data: ReportData): Promise<ReportNarrative
     const enrolledNames = new Set(data.doctors.map(d => d.name));
 
     const doctorList = data.doctors.map(d =>
-        `- ${d.name}: Blueprint ${d.blueprintPct ?? 'N/A'}%, Status: ${d.status}, Calls: ${d.callCount}, Accepted: ${d.accepted}, Scans: ${d.scans}, Diagnosed: ${d.diagnosed}`
+        `- ${d.name}: Blueprint ${d.blueprintPct ?? 'N/A'}%, Status: ${d.status}, Calls: ${d.callCount}, Mentorship call: ${d.mentorshipCallDate ?? 'not held'}, Accepted: ${d.accepted}, Scans: ${d.scans}, Diagnosed: ${d.diagnosed}`
     ).join('\n');
 
     // Filter quotes to enrolled doctors only before they reach the prompt
@@ -63,6 +63,7 @@ Reporting Period: ${data.period.start} to ${data.period.end}
 Doctor Count: ${data.dso.doctorCount}
 Total Calls: ${data.stats.callCount}
 Doctors Contacted: ${data.stats.doctorsContacted}
+Doctors Mentored (monthly 1:1 held): ${data.stats.doctorsMentored} of ${data.dso.doctorCount}
 Cases Accepted: ${data.stats.casesAccepted}
 Scans: ${data.stats.scans}
 Diagnosed: ${data.stats.diagnosed}

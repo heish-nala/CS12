@@ -102,6 +102,7 @@ export interface ReportDoctorRow {
     name: string;
     blueprintPct: number | null;
     callCount: number;
+    mentorshipCallDate: string | null; // from period_data.mentorship_call_date — NULL = no monthly 1:1 logged
     priorActivity: string;
     currentActivity: string;
     activityNotesFull: string;  // full notes block for AI prompt — NOT rendered in table
@@ -139,6 +140,7 @@ export interface ReportData {
     stats: {
         callCount: number;
         doctorsContacted: number;
+        doctorsMentored: number; // doctors with a mentorship call logged this period
         casesAccepted: number;
         scans: number;
         diagnosed: number;

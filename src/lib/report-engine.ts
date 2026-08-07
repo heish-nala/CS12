@@ -86,8 +86,15 @@ export async function generateReportData(
 
     // Aggregate period_data per doctor row
     const rowMetrics: Record<string, Record<string, number>> = {};
+    const rowMentorshipDate: Record<string, string> = {};
     for (const pd of (periodDataRows || [])) {
-        if (!pd.row_id || !pd.metrics) continue;
+        if (!pd.row_id) continue;
+        // Mentorship call: keep the latest logged date in the range
+        if (pd.mentorship_call_date &&
+            (!rowMentorshipDate[pd.row_id] || pd.mentorship_call_date > rowMentorshipDate[pd.row_id])) {
+            rowMentorshipDate[pd.row_id] = pd.mentorship_call_date;
+        }
+        if (!pd.metrics) continue;
         if (!rowMetrics[pd.row_id]) rowMetrics[pd.row_id] = {};
         for (const [metricId, value] of Object.entries(pd.metrics as Record<string, any>)) {
             const name = metricIdToName[metricId] || metricId;
@@ -187,6 +194,7 @@ export async function generateReportData(
             name: dr.name,
             blueprintPct: dr.blueprintPct,
             callCount,
+            mentorshipCallDate: rowMentorshipDate[dr.rowId] || null,
             priorActivity,
             currentActivity,
             activityNotesFull,
@@ -246,6 +254,7 @@ export async function generateReportData(
         stats: {
             callCount: (activities || []).filter(a => a.activity_type === 'phone').length,
             doctorsContacted: doctorsContactedSet.size,
+            doctorsMentored: reportDoctors.filter(d => d.mentorshipCallDate).length,
             casesAccepted: totalStats.accepted,
             scans: totalStats.scans,
             diagnosed: totalStats.diagnosed,

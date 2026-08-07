@@ -45,6 +45,13 @@ REPORT GENERATION RULES — follow all of these without exception:
    Direct, analytical, no filler sentences. Lead with what changed.
    Name the doctor, name the issue. No warm-up sentences.
    Do not use em dashes in prose. Use short sentences and plain punctuation.
+
+7. MENTORSHIP CALL STATUS FROM DATA ONLY
+   Whether a doctor's monthly mentorship call was held comes ONLY from the
+   "Mentorship call" field in the DOCTOR ROSTER (a date = held, "not held" = not held).
+   Do not infer mentorship-call completion from activity notes or call counts.
+   If coverage is incomplete, state it plainly (e.g. "4 of 6 doctors received
+   their monthly mentorship call") using the Doctors Mentored stat.
 `.trim();
 
 /**
@@ -76,4 +83,10 @@ AUDIT RULES — check every rule below against the report narratives:
 5. WRITING STYLE
    Does any field use em dashes (—) in prose?
    Flag as: { rule: "style", field: "fieldName", detail: "contains em dash" }
+
+6. MENTORSHIP CALL ACCURACY
+   Does any narrative claim a mentorship call happened (or did not happen) for a
+   doctor in a way that contradicts the "Mentorship call" field in the roster,
+   or state a mentored-doctor count that contradicts the Doctors Mentored stat?
+   Flag every violation as: { rule: "mentorship", field: "fieldName", detail: "states X but data says Y" }
 `.trim();
