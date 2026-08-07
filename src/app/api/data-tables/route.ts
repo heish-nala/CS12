@@ -153,8 +153,10 @@ export async function POST(request: NextRequest) {
             .select('*', { count: 'exact', head: true })
             .eq('client_id', client_id);
 
-        // Build time_tracking config from template or attendee list defaults
-        let timeTracking = null;
+        // Build time_tracking config — every new table gets tracking enabled so the
+        // Progress tab always works, regardless of creation path (button, template,
+        // or CSV import). Users can still disable it per-table in settings.
+        let timeTracking;
         if (template?.time_tracking?.enabled) {
             timeTracking = {
                 enabled: true,
@@ -165,8 +167,7 @@ export async function POST(request: NextRequest) {
                     type: m.type,
                 })),
             };
-        } else if (isAttendeeList) {
-            // Attendee lists always have time tracking enabled by default
+        } else {
             timeTracking = {
                 enabled: true,
                 frequency: 'monthly',
